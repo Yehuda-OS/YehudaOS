@@ -1,0 +1,4 @@
+# compile results
+*.log
+*.iso
+target/
