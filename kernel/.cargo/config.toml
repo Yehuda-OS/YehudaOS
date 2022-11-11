@@ -5,3 +5,6 @@ build-std-features = ["compiler-builtins-mem"]
 [build]
 rustflags = ["-Cforce-frame-pointers=yes"]
 target = "x86_64-unknown-none"
+
+[target.x86_64-unknown-none]
+runner = ".cargo/runner.sh"

@@ -1,13 +1,11 @@
 #![no_std]
 #![no_main]
 
-mod writer;
+mod io;
 
 use limine::LimineBootInfoRequest;
-use limine::LimineTerminalRequest;
 
 static BOOTLOADER_INFO: LimineBootInfoRequest = LimineBootInfoRequest::new(0);
-static TERMINAL_REQUEST: LimineTerminalRequest = LimineTerminalRequest::new(0);
 
 /// Kernel Entry Point
 ///

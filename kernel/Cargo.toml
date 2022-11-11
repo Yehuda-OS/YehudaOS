@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 limine = "0.1.9"
+spin = "0.9"
