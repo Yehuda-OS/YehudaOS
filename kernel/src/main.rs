@@ -2,6 +2,7 @@
 #![no_main]
 
 mod io;
+mod paging;
 
 use limine::LimineBootInfoRequest;
 
