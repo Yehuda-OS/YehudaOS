@@ -6,16 +6,7 @@ struct FreePageNode {
     pub next: *mut FreePageNode,
 }
 
-pub unsafe fn free(address: PhysAddr) {
-    let free_page =
-        (super::HHDM_OFFSET + (address.as_u64() & 0xffff_ffff_ffff_f000)) as *mut FreePageNode;
-
-    *free_page = FreePageNode {
-        next: FREE_LIST_START,
-    };
-    FREE_LIST_START = free_page;
-}
-
+/// Returns the address of a newly allocated physical page.
 pub unsafe fn allocate() -> PhysAddr {
     let free_page;
 
@@ -27,4 +18,18 @@ pub unsafe fn allocate() -> PhysAddr {
     }
 
     return free_page;
+}
+
+/// Free a physical page that was previously allocated with `allocate`.
+/// 
+/// # Arguments
+/// * address - Physical address of the page.
+pub unsafe fn free(address: PhysAddr) {
+    let free_page =
+        (super::HHDM_OFFSET + (address.as_u64() & 0xffff_ffff_ffff_f000)) as *mut FreePageNode;
+
+    *free_page = FreePageNode {
+        next: FREE_LIST_START,
+    };
+    FREE_LIST_START = free_page;
 }
