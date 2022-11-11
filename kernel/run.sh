@@ -7,7 +7,7 @@ LIMINE_GIT_URL="https://github.com/limine-bootloader/limine.git"
 KERNEL="target/kernel/debug/kernel"
 
 # 1. build the kernel
-cargo +nightly build
+cargo build
 
 # 2. fetch and build limine
 if [ ! -d target/limine ]; then
