@@ -1,7 +1,5 @@
 use x86_64::{registers, structures::paging::PageTableFlags, PhysAddr, VirtAddr};
 
-const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
-
 /// Get the physical addresses a virtual address is mapped to.
 ///
 /// # Arguments
@@ -18,7 +16,8 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
         // by 55 to place the offset at the lower 9 bits.
         let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
         let entry_bits = unsafe {
-            let entry_virtual = ((page_table as *const u64).offset(offset) as u64) + HHDM_OFFSET;
+            let entry_virtual =
+                ((page_table as *const u64).offset(offset) as u64) + super::HHDM_OFFSET;
 
             *(entry_virtual as *const u64)
         };
