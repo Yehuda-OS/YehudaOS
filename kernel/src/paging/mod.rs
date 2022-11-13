@@ -1,9 +1,12 @@
 pub mod virtual_memory_manager;
 pub mod page_allocator;
 
+use limine::LimineMemmapRequest;
 use x86_64::PhysAddr;
 
 const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
+const PAGE_SIZE: u64 = 0x1000;
+static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
 pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
     use x86_64::{registers::control::{Cr3, Cr3Flags}, structures::paging::{Size4KiB, PhysFrame}};
