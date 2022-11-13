@@ -6,7 +6,6 @@ mod paging;
 
 use limine::{LimineBootInfoRequest, LimineMemmapRequest};
 
-static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 static BOOTLOADER_INFO: LimineBootInfoRequest = LimineBootInfoRequest::new(0);
 
 /// Kernel Entry Point
@@ -25,8 +24,6 @@ pub extern "C" fn _start() -> ! {
             bootinfo.version.to_str().unwrap().to_str().unwrap(),
         );
     }
-
-    println!("{:?}", paging::find_usable_memory());
 
     hcf();
 }
