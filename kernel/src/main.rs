@@ -4,7 +4,7 @@
 mod io;
 mod paging;
 
-use limine::LimineBootInfoRequest;
+use limine::{LimineBootInfoRequest, LimineMemmapRequest};
 
 static BOOTLOADER_INFO: LimineBootInfoRequest = LimineBootInfoRequest::new(0);
 
