@@ -20,6 +20,7 @@ pub unsafe fn allocate() -> Option<PhysFrame> {
         free_page = PhysFrame::from_start_address(PhysAddr::new(
             FREE_LIST_START as u64 - super::HHDM_OFFSET,
         ))
+        // UNWRAP: Freed pages are always 4KiB aligned
         .unwrap();
         FREE_LIST_START = (*FREE_LIST_START).next;
     }
