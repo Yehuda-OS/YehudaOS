@@ -5,7 +5,6 @@ use limine::LimineMemmapRequest;
 use x86_64::PhysAddr;
 
 const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
-const PAGE_SIZE: u64 = 0x1000;
 static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
 pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
