@@ -55,6 +55,8 @@ pub fn map_address(
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
 
+    assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
+
     // Iterate up to 4 times because there are 4 page tables
     // and we want the entry in the last table
     // If the size of the physical frame divided by is 2MiB or 1GiB, after dividing it by 512 it
@@ -66,9 +68,15 @@ pub fn map_address(
         let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
 
         if page_table == 0 {
+            // SAFETY: Entry is not null because pml4 has been asserted to be not null
             unsafe {
+                page_table = super::page_allocator::allocate()
+                    .expect("No free memory for a page table")
+                    .start_address()
+                    .as_u64();
+                // Update the previous entry
                 (*entry).set_addr(
-                    super::page_allocator::allocate().unwrap().start_address(),
+                    PhysAddr::new(page_table),
                     PageTableFlags::PRESENT
                         | PageTableFlags::PRESENT
                         | PageTableFlags::USER_ACCESSIBLE,
@@ -76,7 +84,7 @@ pub fn map_address(
             }
         }
 
-        // Safety: The resulting pointer is always in the table because offset is 9 bits
+        // SAFETY: The resulting pointer is always in the table because offset is 9 bits
         entry = unsafe {
             let entry_virtual =
                 ((page_table as *const u64).offset(offset) as u64) + super::HHDM_OFFSET;
@@ -84,7 +92,7 @@ pub fn map_address(
             entry_virtual as *mut PageTableEntry
         };
         // Get the physical address from the page table entry
-        // Safety: TODO
+        // SAFETY: Entry is not null because it points to a valid location in the page table
         page_table = unsafe { (*entry).addr().as_u64() };
         // Mark the bits of the offset as used
         used_bits += 9;
