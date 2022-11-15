@@ -1,10 +1,11 @@
 pub mod page_allocator;
 pub mod virtual_memory_manager;
 
-use limine::LimineMemmapRequest;
+use limine::{LimineMemmapRequest, LimineHhdmRequest};
 use x86_64::PhysAddr;
 
-const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
+static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
+static mut HHDM_OFFSET: u64 = 0;
 static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
 pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
