@@ -1,6 +1,9 @@
 use x86_64::{
     registers,
-    structures::paging::{page_table::PageTableEntry, PageTableFlags, PhysFrame},
+    structures::paging::{
+        page_table::PageTableEntry, PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB,
+        Size4KiB,
+    },
     PhysAddr, VirtAddr,
 };
 
@@ -54,14 +57,30 @@ pub fn map_address(
     let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
+    let tables = match physical_address.size() {
+        Size4KiB::SIZE => 4,
+        Size2MiB::SIZE => {
+            assert!(
+                flags.contains(PageTableFlags::HUGE_PAGE),
+                "Missing huge page flag"
+            );
+
+            3 // When the page size is 2MiB we stop iterating at p2 table
+        }
+        Size1GiB::SIZE => {
+            assert!(
+                flags.contains(PageTableFlags::HUGE_PAGE),
+                "Missing huge page flag"
+            );
+
+            2 // When the apge size is 1GiB we stop iterating at p3 table
+        }
+        _ => 0, // size always returns one of the above
+    };
 
     assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
 
-    // Iterate up to 4 times because there are 4 page tables
-    // and we want the entry in the last table
-    // If the size of the physical frame divided by is 2MiB or 1GiB, after dividing it by 512 it
-    // will produce the required amount of iterations because 4KiB * 512 * 512 = 2MiB * 512 = 1GiB
-    for _ in (physical_address.size() / super::PAGE_SIZE / 512)..4 {
+    for _ in 0..tables {
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
@@ -84,7 +103,7 @@ pub fn map_address(
             }
         }
 
-        // SAFETY: The resulting pointer is always in the table because offset is 9 bits
+        // SAFETY: The resulting pointer is always in the table because the offset is 9 bits
         entry = unsafe {
             let entry_virtual =
                 ((page_table as *const u64).offset(offset) as u64) + super::HHDM_OFFSET;
@@ -92,11 +111,12 @@ pub fn map_address(
             entry_virtual as *mut PageTableEntry
         };
         // Get the physical address from the page table entry
-        // SAFETY: Entry is not null because it points to a valid location in the page table
+        // SAFETY: entry is not null because it points to a valid location in the page table
         page_table = unsafe { (*entry).addr().as_u64() };
         // Mark the bits of the offset as used
         used_bits += 9;
     }
+    // SAFETY: entry is not null because the loop is guarenteed to be ran at least once
     unsafe {
         assert!((*entry).is_unused());
         (*entry).set_addr(physical_address.start_address(), flags);
