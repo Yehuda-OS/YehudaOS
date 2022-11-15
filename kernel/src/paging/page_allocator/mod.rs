@@ -11,6 +11,7 @@ struct FreePageNode {
 }
 
 /// Returns the address of a newly allocated physical page, or None if there are no free pages.
+/// 
 /// # Safety
 /// This function may produce a page fault if an invalid page was freed with the `free` function.
 /// If this happens, a page fault was already triggered before in the call to `free`.
@@ -35,6 +36,7 @@ pub unsafe fn allocate() -> Option<PhysFrame> {
 ///
 /// # Arguments
 /// * address - Physical address of the page.
+/// 
 /// # Safety
 /// The function may produce a page fault if the address is not valid.
 pub unsafe fn free(address: PhysFrame) {
