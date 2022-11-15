@@ -7,6 +7,22 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
+/// Get an entry in a page table.
+///
+/// # Arguments
+/// * `page_table` - The physical address of the page table.
+/// * `offset` - The offset in the page table.
+///
+/// # Safety
+/// The function will result in undefined behavior if `page_table` does not point to a valid page
+/// table or `offset` equals or greater than 512.
+unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut PageTableEntry {
+    let entry_physical = (page_table.as_u64() as *const u64).offset(offset) as u64;
+    let entry_virtual = entry_physical + super::HHDM_OFFSET;
+
+    entry_virtual as *mut PageTableEntry
+}
+
 /// Get the physical addresses a virtual address is mapped to.
 ///
 /// # Arguments
@@ -22,17 +38,12 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
         let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
-        // Safety: The resulting pointer is always in the table because offset is 9 bits
-        let entry_bits = unsafe {
-            let entry_virtual =
-                ((page_table as *const u64).offset(offset) as u64) + super::HHDM_OFFSET;
-
-            *(entry_virtual as *const u64)
-        };
-        let entry_flags = PageTableFlags::from_bits_truncate(entry_bits);
+        // SAFETY: the offset is valid because it is 9 bits.
+        let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
+        let entry_flags = entry.flags();
 
         // Get the physical address from the page table entry
-        page_table = entry_bits & 0x000f_ffff_ffff_f000;
+        page_table = entry.addr().as_u64();
         // Mark the bits of the offset as used
         used_bits += 9;
         // If the huge page flag is on, that means that this was the last page table
@@ -103,20 +114,15 @@ pub fn map_address(
             }
         }
 
-        // SAFETY: The resulting pointer is always in the table because the offset is 9 bits
-        entry = unsafe {
-            let entry_virtual =
-                ((page_table as *const u64).offset(offset) as u64) + super::HHDM_OFFSET;
-
-            entry_virtual as *mut PageTableEntry
-        };
-        // Get the physical address from the page table entry
-        // SAFETY: entry is not null because it points to a valid location in the page table
+        // SAFETY: The offset is valid because it is 9 bits
+        entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), offset) };
+        // Get the physical address from the page table entry.
+        // SAFETY: `entry` is not null because it points to a valid location in the page table.
         page_table = unsafe { (*entry).addr().as_u64() };
         // Mark the bits of the offset as used
         used_bits += 9;
     }
-    // SAFETY: entry is not null because the loop is guarenteed to be ran at least once
+    // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
         assert!((*entry).is_unused());
         (*entry).set_addr(physical_address.start_address(), flags);
