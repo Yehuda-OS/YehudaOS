@@ -51,6 +51,10 @@ pub unsafe fn free(address: PhysFrame) {
 pub fn mark_free_memory() {
     let memmap = super::MEMMAP.get_response().get().unwrap();
 
+    unsafe {
+        super::HHDM_OFFSET = super::HHDM.get_response().get().unwrap().offset;
+    };
+
     for i in 0..memmap.entry_count {
         let entry = unsafe { &*(*memmap.entries.as_ptr().offset(i as isize)).as_ptr() };
         let mut current;
