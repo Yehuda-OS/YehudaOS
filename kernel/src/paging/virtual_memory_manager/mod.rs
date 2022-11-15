@@ -72,10 +72,10 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
 /// - `pml4` is 0.
 /// - The virtual address is already in use.
 /// - The physical frame is 2MiB or 1GiB and flags does not have the `HUGE_PAGE` flag set.
-pub fn map_address(
+pub fn map_address<T: PageSize>(
     pml4: PhysAddr,
     virtual_address: VirtAddr,
-    physical_address: PhysFrame,
+    physical_address: PhysFrame<T>,
     flags: PageTableFlags,
 ) {
     let mut page_table = pml4.as_u64();
@@ -84,7 +84,7 @@ pub fn map_address(
     let tables = match physical_address.size() {
         Size4KiB::SIZE => {
             assert!(
-                flags.contains(PageTableFlags::HUGE_PAGE),
+                !flags.contains(PageTableFlags::HUGE_PAGE),
                 "Huge page flag on 4KiB page"
             );
             4
@@ -143,7 +143,7 @@ pub fn map_address(
     }
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
-        assert!((*entry).is_unused(), "Virtual address is already in use");
+        // assert!((*entry).is_unused(), "Virtual address is already in use");
         (*entry).set_addr(physical_address.start_address(), flags);
     }
 }
