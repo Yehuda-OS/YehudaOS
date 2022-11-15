@@ -1,4 +1,6 @@
 use x86_64::PhysAddr;
+use limine::{LimineMemoryMapEntryType};
+use super::PAGE_SIZE;
 
 static mut FREE_LIST_START: *mut FreePageNode = core::ptr::null_mut();
 
@@ -32,4 +34,26 @@ pub unsafe fn free(address: PhysAddr) {
         next: FREE_LIST_START,
     };
     FREE_LIST_START = free_page;
+}
+
+fn mark_free_memory() {
+    let memmap = super::MEMMAP.get_response().get().unwrap(); 
+
+    for i in 0..memmap.entry_count {
+        let entry = unsafe {
+            &*(*memmap.entries.as_ptr().offset(i as isize))
+                .as_ptr()
+        };
+        let mut current;
+
+        if entry.typ == LimineMemoryMapEntryType::Usable {
+            current = entry.base;
+            while current + PAGE_SIZE <= entry.base + entry.len {
+                unsafe {
+                    free(PhysAddr::new(current))
+                }
+                current += 0x1000;
+            }
+        }
+    }
 }
