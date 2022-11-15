@@ -60,14 +60,14 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
 }
 
 /// Map a virtual address to a physical address.
-/// 
+///
 /// # Arguments
 /// * `pml4` - The address of the Page Map Level 4.
 /// * `virtual_address` - The virtual address to map.
 /// * `physical_address` - The physical frame to map the virtual address to.
 /// The function supports 2MiB and 1GiB pages.
 /// * `flags` - The flags of the last entry.
-/// 
+///
 /// ### The function panics if:
 /// - `pml4` is 0.
 /// - The virtual address is already in use.
@@ -82,7 +82,13 @@ pub fn map_address(
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
     let tables = match physical_address.size() {
-        Size4KiB::SIZE => 4,
+        Size4KiB::SIZE => {
+            assert!(
+                flags.contains(PageTableFlags::HUGE_PAGE),
+                "Huge page flag on 4KiB page"
+            );
+            4
+        }
         Size2MiB::SIZE => {
             assert!(
                 flags.contains(PageTableFlags::HUGE_PAGE),
@@ -121,7 +127,7 @@ pub fn map_address(
                 (*entry).set_addr(
                     PhysAddr::new(page_table),
                     PageTableFlags::PRESENT
-                        | PageTableFlags::PRESENT
+                        | PageTableFlags::WRITABLE
                         | PageTableFlags::USER_ACCESSIBLE,
                 );
             }
