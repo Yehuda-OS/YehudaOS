@@ -48,7 +48,7 @@ pub unsafe fn free(address: PhysFrame) {
     FREE_LIST_START = free_page;
 }
 
-fn mark_free_memory() {
+pub fn mark_free_memory() {
     let memmap = super::MEMMAP.get_response().get().unwrap();
 
     for i in 0..memmap.entry_count {
