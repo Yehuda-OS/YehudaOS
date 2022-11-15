@@ -59,6 +59,19 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
     );
 }
 
+/// Map a virtual address to a physical address.
+/// 
+/// # Arguments
+/// * `pml4` - The address of the Page Map Level 4.
+/// * `virtual_address` - The virtual address to map.
+/// * `physical_address` - The physical frame to map the virtual address to.
+/// The function supports 2MiB and 1GiB pages.
+/// * `flags` - The flags of the last entry.
+/// 
+/// ### The function panics if:
+/// - `pml4` is 0.
+/// - The virtual address is already in use.
+/// - The physical frame is 2MiB or 1GiB and flags does not have the `HUGE_PAGE` flag set.
 pub fn map_address(
     pml4: PhysAddr,
     virtual_address: VirtAddr,
@@ -124,7 +137,7 @@ pub fn map_address(
     }
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
-        assert!((*entry).is_unused());
+        assert!((*entry).is_unused(), "Virtual address is already in use");
         (*entry).set_addr(physical_address.start_address(), flags);
     }
 }
