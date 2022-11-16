@@ -144,7 +144,7 @@ pub fn map_address<T: PageSize>(
     }
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
-        // assert!((*entry).is_unused(), "Virtual address is already in use");
+        assert!((*entry).is_unused(), "Virtual address is already in use");
         (*entry).set_addr(physical_address.start_address(), flags);
     }
 }
