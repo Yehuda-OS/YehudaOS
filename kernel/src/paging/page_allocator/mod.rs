@@ -63,7 +63,7 @@ pub fn initialize() {
             current = entry.base;
             while current + Size4KiB::SIZE <= entry.base + entry.len {
                 unsafe {
-                    // UNWRAP: usable entries are 4KiB aligned
+                    // UNWRAP: usable entries are 4KiB aligned.
                     free(PhysFrame::from_start_address(PhysAddr::new(current)).unwrap())
                 }
                 current += 0x1000;

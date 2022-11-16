@@ -68,10 +68,11 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
 /// The function supports 2MiB and 1GiB pages.
 /// * `flags` - The flags of the last entry.
 ///
-/// ### The function panics if:
+/// ### Panics if:
 /// - `pml4` is 0.
 /// - The virtual address is already in use.
-/// - The physical frame is 2MiB or 1GiB and flags does not have the `HUGE_PAGE` flag set.
+/// - The physical frame is 4KiB but the `HUGE_PAGE` flag is set.
+/// - The physical frame is 2MiB or 1GiB but `flags` does not contain the `HUGE_PAGE` flag.
 pub fn map_address<T: PageSize>(
     pml4: PhysAddr,
     virtual_address: VirtAddr,
@@ -111,7 +112,7 @@ pub fn map_address<T: PageSize>(
     assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
 
     for _ in 0..tables {
-        // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
+        // The offset is 9 bits. To get the offset we shift to the left all the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
         let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
