@@ -1,7 +1,7 @@
 pub mod page_allocator;
 pub mod virtual_memory_manager;
 
-use limine::{LimineMemmapRequest, LimineHhdmRequest};
+use limine::{LimineHhdmRequest, LimineMemmapRequest};
 use x86_64::PhysAddr;
 
 static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
@@ -14,8 +14,7 @@ pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
         structures::paging::{PhysFrame, Size4KiB},
     };
     Cr3::write(
-        // UNWRAP: The page frame allocator will make sure that
-        // the page size will be 4KiB aligned
+        // UNWRAP: the page frame allocator will make sure that the address will be 4KiB aligned.
         PhysFrame::<Size4KiB>::from_start_address(p4_addr).unwrap(),
         Cr3Flags::empty(),
     );
