@@ -8,6 +8,13 @@ static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
 static mut HHDM_OFFSET: u64 = 0;
 static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
+/// Load a PML4 page table to the CR3 register.
+/// 
+/// # Arguments
+/// `p4_addr` - The address of the page table.
+/// 
+/// # Safety
+/// The function is unsafe because changing the page table can lead to a memory violation.
 pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
     use x86_64::{
         registers::control::{Cr3, Cr3Flags},

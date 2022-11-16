@@ -48,6 +48,8 @@ pub unsafe fn free(address: PhysFrame) {
     FREE_LIST_START = free_page;
 }
 
+/// Initialize the free pages list with the usable pages in limine's memmap and initialize the value
+/// of the hhdm offset.
 pub fn initialize() {
     let memmap = super::MEMMAP.get_response().get().unwrap();
 
