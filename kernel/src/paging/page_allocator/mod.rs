@@ -53,6 +53,7 @@ pub unsafe fn free(address: PhysFrame) {
 pub fn initialize() {
     let memmap = super::get_memmap();
 
+    // UNSAFE: the kernel does not use multithreading
     unsafe {
         super::HHDM_OFFSET = super::HHDM.get_response().get().unwrap().offset;
     };
@@ -75,4 +76,24 @@ pub fn initialize() {
     }
 }
 
-pub fn reclaim_bootloader_memory() {}
+/// Free all the memory marked as bootloader reclaimable.
+pub fn reclaim_bootloader_memory() {
+    let memmap = super::get_memmap();
+
+    for i in 0..memmap.entry_count {
+        // UNSAFE: `i` is between 0 and the entry count.
+        let entry = unsafe { super::get_memmap_entry(memmap, i) };
+        let mut current;
+
+        if entry.typ == LimineMemoryMapEntryType::BootloaderReclaimable {
+            current = entry.base;
+            while current + Size4KiB::SIZE <= entry.base + entry.len {
+                unsafe {
+                    // UNWRAP: bootloader reclaimable entries are 4KiB aligned.
+                    free(PhysFrame::from_start_address(PhysAddr::new(current)).unwrap())
+                }
+                current += Size4KiB::SIZE;
+            }
+        }
+    }
+}
