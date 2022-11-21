@@ -51,14 +51,15 @@ pub unsafe fn free(address: PhysFrame) {
 /// Initialize the free pages list with the usable pages in limine's memmap and initialize the value
 /// of the hhdm offset.
 pub fn initialize() {
-    let memmap = super::MEMMAP.get_response().get().unwrap();
+    let memmap = super::get_memmap();
 
     unsafe {
         super::HHDM_OFFSET = super::HHDM.get_response().get().unwrap().offset;
     };
 
     for i in 0..memmap.entry_count {
-        let entry = unsafe { &*(*memmap.entries.as_ptr().offset(i as isize)).as_ptr() };
+        // UNSAFE: `i` is between 0 and the entry count.
+        let entry = unsafe { super::get_memmap_entry(memmap, i) };
         let mut current;
 
         if entry.typ == LimineMemoryMapEntryType::Usable {
@@ -68,8 +69,10 @@ pub fn initialize() {
                     // UNWRAP: usable entries are 4KiB aligned.
                     free(PhysFrame::from_start_address(PhysAddr::new(current)).unwrap())
                 }
-                current += 0x1000;
+                current += Size4KiB::SIZE;
             }
         }
     }
 }
+
+pub fn reclaim_bootloader_memory() {}
