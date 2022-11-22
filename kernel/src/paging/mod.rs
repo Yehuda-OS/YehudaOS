@@ -1,18 +1,35 @@
 pub mod page_allocator;
 pub mod virtual_memory_manager;
 
-use limine::{LimineHhdmRequest, LimineMemmapRequest};
+use limine::{LimineHhdmRequest, LimineMemmapEntry, LimineMemmapRequest, LimineMemmapResponse};
 use x86_64::PhysAddr;
 
 static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
 static mut HHDM_OFFSET: u64 = 0;
 static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
+/// Unwrap the memory map response from the request.
+fn get_memmap() -> &'static LimineMemmapResponse {
+    MEMMAP.get_response().get().unwrap()
+}
+
+/// Get an entry from the memmory map.
+///
+/// # Arguments
+/// `memmap` - The memory map.
+/// `i` - The offset of the entry in the memory map.
+///
+/// # Safety
+/// This function is unsafe because the offset must be valid.
+unsafe fn get_memmap_entry(memmap: &LimineMemmapResponse, i: u64) -> &LimineMemmapEntry {
+    &*(*memmap.entries.as_ptr().offset(i as isize)).as_ptr()
+}
+
 /// Load a PML4 page table to the CR3 register.
-/// 
+///
 /// # Arguments
 /// `p4_addr` - The address of the page table.
-/// 
+///
 /// # Safety
 /// The function is unsafe because changing the page table can lead to a memory violation.
 pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
