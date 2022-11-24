@@ -1,8 +1,10 @@
+use core::borrow::Borrow;
+
 use x86_64::{
     registers,
     structures::paging::{
         page_table::PageTableEntry, PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB,
-        Size4KiB,
+        Size4KiB, Page, mapper::MapperFlush,
     },
     PhysAddr, VirtAddr,
 };
@@ -147,4 +149,44 @@ pub fn map_address<T: PageSize>(
         assert!((*entry).is_unused(), "Virtual address is already in use");
         (*entry).set_addr(physical_address.start_address(), flags);
     }
+}
+
+/// unmap virtual address
+///
+/// # Arguments
+/// * `pml4` - The address of the Page Map Level 4.
+/// * `virtual_address` - The virtual address to unmap.
+/// ### panics if:
+/// - `pml4` is 0.
+/// - the virtual address is already unused
+pub fn unmap_address (
+    pml4: PhysAddr,
+    virtual_address: VirtAddr,
+) {
+    let mut page_table = pml4.as_u64();
+    let mut used_bits = 16; // The highest 16 bits are unused
+    let mut entry: *mut PageTableEntry = core::ptr::null_mut();
+
+    assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
+    
+    for _ in 0..4 {
+        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        // SAFETY: the offset is valid because it is 9 bits.
+        entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), offset) };
+
+        // Get the physical address from the page table entry
+        page_table = unsafe { (*entry).addr().as_u64() };
+        // Mark the bits of the offset as used
+        used_bits += 9;
+        // If the huge page flag is on, that means that this was the last page table
+        if unsafe {(*entry).flags()}.contains(PageTableFlags::HUGE_PAGE) {
+            break;
+        }
+    }
+    
+    
+    unsafe { 
+        assert!(!(*entry).is_unused(), "entry already unused");
+        (*entry).set_unused();
+     };
 }
