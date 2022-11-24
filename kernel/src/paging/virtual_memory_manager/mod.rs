@@ -4,7 +4,7 @@ use x86_64::{
     registers,
     structures::paging::{
         page_table::PageTableEntry, PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB,
-        Size4KiB, Page, mapper::MapperFlush,
+        Size4KiB, 
     },
     PhysAddr, VirtAddr,
 };
@@ -183,7 +183,6 @@ pub fn unmap_address (
             break;
         }
     }
-    
     
     unsafe { 
         assert!(!(*entry).is_unused(), "entry already unused");
