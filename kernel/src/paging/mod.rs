@@ -4,6 +4,8 @@ pub mod virtual_memory_manager;
 use limine::{LimineHhdmRequest, LimineMemmapEntry, LimineMemmapRequest, LimineMemmapResponse};
 use x86_64::PhysAddr;
 
+const PAGE_TABLE_ENTRIES: isize = 512;
+
 static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
 static mut HHDM_OFFSET: u64 = 0;
 static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
