@@ -28,7 +28,7 @@ unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut Page
 ///
 /// # Returns
 /// The physical address of the page table.
-fn create_page_table() -> PhysAddr {
+pub fn create_page_table() -> PhysAddr {
     let page_table = super::page_allocator::allocate()
         .expect("No free memory for a page table")
         .start_address();
@@ -46,10 +46,10 @@ fn create_page_table() -> PhysAddr {
 /// Returns the physical addresses a virtual address is mapped to.
 ///
 /// # Arguments
+/// * `pml4` - The page map level 4, the highest page table.
 /// * `virtual_address` - The virtual address to translate.
-/// * `hhdm_offset` - The offset of the higher half direct map.
-pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
-    let mut page_table = registers::control::Cr3::read().0.start_address().as_u64();
+pub fn virtual_to_physical(pml4: PhysAddr, virtual_address: VirtAddr) -> PhysAddr {
+    let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
 
     // Iterate 4 times because there are 4 page tables
