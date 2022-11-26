@@ -23,7 +23,26 @@ unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut Page
     entry_virtual as *mut PageTableEntry
 }
 
-/// Get the physical addresses a virtual address is mapped to.
+/// Allocate a page for a page table and set all of its entries to 0.
+///
+/// # Returns
+/// The physical address of the page table.
+fn create_page_table() -> PhysAddr {
+    let page_table = super::page_allocator::allocate()
+        .expect("No free memory for a page table")
+        .start_address();
+
+    for i in 0..super::PAGE_TABLE_ENTRIES {
+        // SAFETY: the page table was allocated and the offset is in the page table range.
+        unsafe {
+            (*get_page_table_entry(page_table, i)).set_unused();
+        }
+    }
+
+    return page_table;
+}
+
+/// Returns the physical addresses a virtual address is mapped to.
 ///
 /// # Arguments
 /// * `virtual_address` - The virtual address to translate.
