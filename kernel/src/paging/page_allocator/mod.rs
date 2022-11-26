@@ -11,22 +11,25 @@ struct FreePageNode {
 }
 
 /// Returns the address of a newly allocated physical page, or None if there are no free pages.
-///
-/// # Safety
-/// This function may produce a page fault if an invalid page was freed with the `free` function.
-/// If this happens, a page fault was already triggered before in the call to `free`.
-pub unsafe fn allocate() -> Option<PhysFrame> {
+pub fn allocate() -> Option<PhysFrame> {
     let free_page;
 
-    if FREE_LIST_START.is_null() {
+    // SAFETY: the kernel is not multithreaded.
+    if unsafe { FREE_LIST_START.is_null() } {
         return None;
     } else {
-        free_page = PhysFrame::from_start_address(PhysAddr::new(
-            FREE_LIST_START as u64 - super::HHDM_OFFSET,
-        ))
-        // UNWRAP: Freed pages are always 4KiB aligned
-        .unwrap();
-        FREE_LIST_START = (*FREE_LIST_START).next;
+        // SAFETY: the kernel is not multithreaded.
+        free_page = unsafe {
+            PhysFrame::from_start_address(PhysAddr::new(
+                FREE_LIST_START as u64 - super::HHDM_OFFSET,
+            ))
+            // UNWRAP: Freed pages are always 4KiB aligned
+            .unwrap()
+        };
+        // SAFETY: if the first free page is invalid a page fault was already triggered.
+        unsafe {
+            FREE_LIST_START = (*FREE_LIST_START).next;
+        };
     }
 
     return Some(free_page);
