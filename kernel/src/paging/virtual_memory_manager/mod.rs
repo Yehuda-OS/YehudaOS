@@ -24,6 +24,7 @@ unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut Page
 }
 
 /// Allocate a page for a page table and set all of its entries to 0.
+/// Panics if there is no free memory for the page table.
 ///
 /// # Returns
 /// The physical address of the page table.
@@ -139,10 +140,7 @@ pub fn map_address<T: PageSize>(
         if page_table == 0 {
             // SAFETY: Entry is not null because pml4 has been asserted to be not null
             unsafe {
-                page_table = super::page_allocator::allocate()
-                    .expect("No free memory for a page table")
-                    .start_address()
-                    .as_u64();
+                page_table = create_page_table().as_u64();
                 // Update the previous entry
                 (*entry).set_addr(
                     PhysAddr::new(page_table),
