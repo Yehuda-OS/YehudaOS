@@ -14,8 +14,8 @@ use x86_64::{
 /// * `offset` - The offset in the page table.
 ///
 /// # Safety
-/// The function will result in undefined behavior if `page_table` does not point to a valid page
-/// table or `offset` equals or greater than 512.
+/// This function is unsafe because `page_table` must be a valid page table and `offset` must be
+/// equals or greater than 0 and must be less than 512.
 unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut PageTableEntry {
     let entry_physical = (page_table.as_u64() as *const u64).offset(offset) as u64;
     let entry_virtual = entry_physical + super::HHDM_OFFSET;
@@ -59,7 +59,7 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
     );
 }
 
-/// Map a virtual address to a physical address.
+/// Maps a virtual address to a physical address.
 ///
 /// # Arguments
 /// * `pml4` - The address of the Page Map Level 4.
