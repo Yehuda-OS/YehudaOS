@@ -1,5 +1,3 @@
-use core::borrow::Borrow;
-
 use x86_64::{
     registers,
     structures::paging::{
@@ -151,6 +149,49 @@ pub fn map_address<T: PageSize>(
     }
 }
 
+/// to be implemented in the future
+fn virt_addr_to_page_table(
+    level: u8,
+    addr: VirtAddr
+) -> PhysAddr {    
+    unimplemented!()
+}
+
+
+/// check if the page table is free
+/// 
+/// # Arguments
+/// * `addr` - the address of the page table.
+/// * `level` - The level of the page table.
+fn is_page_table_free(
+    addr: PhysAddr,
+    level: u8,
+) -> bool {
+    let mut page_table = addr.as_u64();
+    let mut used_bits = 16; // The highest 16 bits are unused
+    let mut entry: *mut PageTableEntry = core::ptr::null_mut();
+
+    // assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
+    
+    for _ in 0..level {
+        let offset = ((addr.as_u64() << used_bits) >> 55) as isize;
+        // SAFETY: the offset is valid because it is 9 bits.
+        entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), offset) };
+
+        // Get the physical address from the page table entry
+        page_table = unsafe { (*entry).addr().as_u64() };
+        // Mark the bits of the offset as used
+        used_bits += 9;
+       
+        // if entry is used, return false
+        if !unsafe {(*entry).is_unused()} {
+            return false;
+        }
+    }
+    
+    true
+}
+
 /// unmap virtual address
 ///
 /// # Arguments
@@ -166,6 +207,7 @@ pub fn unmap_address (
     let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
+    let mut level_counter: u8 = 0;
 
     assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
     
@@ -178,6 +220,9 @@ pub fn unmap_address (
         page_table = unsafe { (*entry).addr().as_u64() };
         // Mark the bits of the offset as used
         used_bits += 9;
+
+        level_counter += 1;
+
         // If the huge page flag is on, that means that this was the last page table
         if unsafe {(*entry).flags()}.contains(PageTableFlags::HUGE_PAGE) {
             break;
@@ -188,4 +233,14 @@ pub fn unmap_address (
         assert!(!(*entry).is_unused(), "entry already unused");
         (*entry).set_unused();
      };
+
+     for i in (0..level_counter).rev() {
+        let table = virt_addr_to_page_table(i, VirtAddr::new(page_table));
+        
+        if is_page_table_free(table, level_counter) {
+            unsafe { super::page_allocator::free(
+                PhysFrame::from_start_address(table).unwrap()
+            ) };
+        }
+     }
 }
