@@ -165,7 +165,7 @@ fn virt_addr_to_page_table(
 fn is_page_table_free(
     table_addr: PhysAddr,
 ) -> bool {
-    let mut page_table = addr.as_u64();
+    let mut page_table = table_addr.as_u64();
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
 
     // assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
