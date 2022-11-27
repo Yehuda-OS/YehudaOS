@@ -163,14 +163,14 @@ fn virt_addr_to_page_table(
 /// # Arguments
 /// * `table_addr` - the address of the page table.
 fn is_page_table_free(
-    table_addr: PhysAddr,
+    table_addr: &PhysAddr,
 ) -> bool {
-    let mut page_table = table_addr.as_u64();
+    let mut page_table: u64 = 0;
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
     
     for i in 0..super::PAGE_TABLE_ENTRIES {
         // SAFETY: the offset is valid because it is 9 bits.
-        entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), i) };
+        entry = unsafe { get_page_table_entry(PhysAddr::new(table_addr.as_u64()), i) };
 
         // Get the physical address from the page table entry
         page_table = unsafe { (*entry).addr().as_u64() };       
