@@ -167,8 +167,6 @@ fn is_page_table_free(
 ) -> bool {
     let mut page_table = table_addr.as_u64();
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
-
-    // assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
     
     for i in 0..super::PAGE_TABLE_ENTRIES {
         // SAFETY: the offset is valid because it is 9 bits.
