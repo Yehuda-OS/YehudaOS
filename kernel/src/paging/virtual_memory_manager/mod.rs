@@ -231,6 +231,8 @@ pub fn unmap_address (
             unsafe { super::page_allocator::free(
                 PhysFrame::from_start_address(table).unwrap()
             ) };
+        } else {
+            break;
         }
      }
 }
