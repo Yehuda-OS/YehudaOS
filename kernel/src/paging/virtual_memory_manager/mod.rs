@@ -149,7 +149,11 @@ pub fn map_address<T: PageSize>(
     }
 }
 
-/// to be implemented in the future
+/// Get the page table a virtual address is mapped to.
+///
+/// # Arguments
+/// * `virtual_address` - The virtual address to translate.
+/// * `level` - the level of the page table.
 fn virt_addr_to_page_table(
     level: u8,
     virtual_address: VirtAddr
