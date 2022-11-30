@@ -149,7 +149,7 @@ pub fn map_address<T: PageSize>(
     }
 }
 
-/// Get the page table a virtual address is mapped to.
+/// Get a page table a virtual address is using.
 ///
 /// # Arguments
 /// * `virtual_address` - The virtual address to translate.
@@ -162,7 +162,7 @@ fn virt_addr_to_page_table(
     let mut used_bits = 16; // The highest 16 bits are unused
 
     // Iterate 4 times because there are 4 page tables
-    for _ in 0..level {
+    for _ in 0..(4 - level) {
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
@@ -175,16 +175,10 @@ fn virt_addr_to_page_table(
         page_table = entry.addr().as_u64();
         // Mark the bits of the offset as used
         used_bits += 9;
-        // // If the huge page flag is on, that means that this was the last page table
-        // // and the next address is the physical page
-        // if entry_flags.contains(PageTableFlags::HUGE_PAGE) {
-        //     break;
-        // }
     }
 
-    // Use all the unused bits as the offset in the physical page
     return PhysAddr::new(
-        page_table + (virtual_address.as_u64() & (0xffff_ffff_ffff_ffff >> used_bits)),
+        page_table,
     );
 }
 
