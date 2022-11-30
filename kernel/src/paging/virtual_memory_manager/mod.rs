@@ -7,6 +7,8 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
+use super::{PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS};
+
 /// Get an entry in a page table.
 ///
 /// # Arguments
@@ -156,13 +158,13 @@ pub fn map_address<T: PageSize>(
 /// * `level` - the level of the page table.
 fn virt_addr_to_page_table(
     level: u8,
-    virtual_address: VirtAddr
+    virtual_address: VirtAddr,
 ) -> PhysAddr {    
     let mut page_table = registers::control::Cr3::read().0.start_address().as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
 
     // Iterate 4 times because there are 4 page tables
-    for _ in 0..(4 - level) {
+    for _ in 0..(PAGE_TABLE_LEVELS - level) {
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
