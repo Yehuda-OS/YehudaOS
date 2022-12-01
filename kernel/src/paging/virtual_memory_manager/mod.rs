@@ -160,6 +160,7 @@ pub fn map_address<T: PageSize>(
         // Mark the bits of the offset as used
         used_bits += 9;
     }
+
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
         assert!((*entry).is_unused(), "Virtual address is already in use");
@@ -248,6 +249,7 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) {
         }
     }
 
+    // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
         assert!(!(*entry).is_unused(), "entry already unused");
         (*entry).set_unused();
