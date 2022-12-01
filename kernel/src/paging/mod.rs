@@ -12,14 +12,11 @@ use x86_64::{
 };
 
 const PAGE_TABLE_ENTRIES: isize = 512;
-
-static KERNEL_ADDRESS: LimineKernelAddressRequest = LimineKernelAddressRequest::new(0);
-static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
-static mut HHDM_OFFSET: u64 = 0;
-static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
-
-const PAGE_TABLE_ENTRIES: isize = 512;
 const PAGE_TABLE_LEVELS: u8 = 4;
+pub const KERNEL_ADDRESS: u64 = 0xffff_ffff_8000_0000;
+pub const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
+
+pub static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
 /// Unwrap the memory map response from the request.
 fn get_memmap() -> &'static LimineMemmapResponse {
@@ -59,7 +56,6 @@ pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
 /// * `pml4` - The page map level 4, the highest page table.
 pub fn map_kernel_address(pml4: PhysAddr) {
     let memmap = get_memmap();
-    let virtual_address = KERNEL_ADDRESS.get_response().get().unwrap().virtual_base;
     let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
     let mut entry;
     let mut offset = 0;
@@ -76,7 +72,7 @@ pub fn map_kernel_address(pml4: PhysAddr) {
 
                 virtual_memory_manager::map_address(
                     pml4,
-                    VirtAddr::new(virtual_address + offset),
+                    VirtAddr::new(KERNEL_ADDRESS + offset),
                     physical,
                     flags,
                 );

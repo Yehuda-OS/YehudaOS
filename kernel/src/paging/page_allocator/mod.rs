@@ -56,11 +56,6 @@ pub unsafe fn free(address: PhysFrame) {
 pub fn initialize() {
     let memmap = super::get_memmap();
 
-    // UNSAFE: the kernel does not use multithreading
-    unsafe {
-        super::HHDM_OFFSET = super::HHDM.get_response().get().unwrap().offset;
-    };
-
     for i in 0..memmap.entry_count {
         // UNSAFE: `i` is between 0 and the entry count.
         let entry = unsafe { super::get_memmap_entry(memmap, i) };
