@@ -2,8 +2,7 @@ pub mod page_allocator;
 pub mod virtual_memory_manager;
 
 use limine::{
-    LimineHhdmRequest, LimineKernelAddressRequest, LimineMemmapEntry, LimineMemmapRequest,
-    LimineMemmapResponse, LimineMemoryMapEntryType,
+    LimineMemmapEntry, LimineMemmapRequest, LimineMemmapResponse, LimineMemoryMapEntryType,
 };
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
