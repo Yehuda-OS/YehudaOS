@@ -18,6 +18,9 @@ static HHDM: LimineHhdmRequest = LimineHhdmRequest::new(0);
 static mut HHDM_OFFSET: u64 = 0;
 static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 
+const PAGE_TABLE_ENTRIES: isize = 512;
+const PAGE_TABLE_LEVELS: u8 = 4;
+
 /// Unwrap the memory map response from the request.
 fn get_memmap() -> &'static LimineMemmapResponse {
     MEMMAP.get_response().get().unwrap()

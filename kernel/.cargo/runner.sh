@@ -35,7 +35,7 @@ xorriso -as mkisofs                                             \
 target/limine/limine-deploy $KERNEL.iso
 
 # Run the created image with QEMU.
-qemu-system-x86_64 \
+qemu-system-x86_64 -s -S \
     -machine q35 -cpu qemu64 -M smm=off \
     -D target/log.txt -d int,guest_errors -no-reboot -no-shutdown \
     -serial stdio \
