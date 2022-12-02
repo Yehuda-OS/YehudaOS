@@ -107,8 +107,6 @@ pub fn map_physical_addresses(pml4: PhysAddr) {
             let physical =
                 PhysFrame::<Size2MiB>::containing_address(PhysAddr::new(entry.base + offset));
 
-        crate::println!("{:?}", physical);
-
             virtual_memory_manager::map_address(
                 pml4,
                 VirtAddr::new(HHDM_OFFSET + offset),
