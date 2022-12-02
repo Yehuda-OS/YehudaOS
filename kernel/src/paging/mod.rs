@@ -6,7 +6,7 @@ use limine::{
 };
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
-    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB, Size2MiB},
     PhysAddr, VirtAddr,
 };
 
@@ -49,6 +49,13 @@ pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
     );
 }
 
+fn get_last_phys_addr() -> u64 {
+    let last_entry = 
+        unsafe { get_memmap_entry(get_memmap(), get_memmap().entry_count - 1) };
+    
+    last_entry.base + last_entry.len
+}
+
 /// Map the kernel's virtual address.
 ///
 /// # Arguments
@@ -81,3 +88,36 @@ pub fn map_kernel_address(pml4: PhysAddr) {
         }
     }
 }
+
+
+/// Map every physical address to virtual address by using hhdm.
+///
+/// # Arguments
+/// * `pml4` - The page map level 4, the highest page table.
+pub fn map_physical_addresses(pml4: PhysAddr) {
+    let memmap = get_memmap();
+    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::HUGE_PAGE;
+    let mut entry;
+    let mut offset = 0;
+
+    for i in 0..memmap.entry_count {
+        entry = unsafe { get_memmap_entry(memmap, i) };
+
+        while offset < entry.len {
+            let physical =
+                PhysFrame::<Size2MiB>::containing_address(PhysAddr::new(entry.base + offset));
+
+        crate::println!("{:?}", physical);
+
+            virtual_memory_manager::map_address(
+                pml4,
+                VirtAddr::new(HHDM_OFFSET + offset),
+                physical,
+                flags,
+            );
+            offset += Size2MiB::SIZE;
+        }
+    }
+}
+    
+
