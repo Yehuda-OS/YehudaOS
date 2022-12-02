@@ -90,7 +90,7 @@ pub fn map_kernel_address(pml4: PhysAddr) {
 }
 
 
-/// Map every physical address to virtual address by using hhdm.
+/// Map every physical address to virtual address using hhdm.
 ///
 /// # Arguments
 /// * `pml4` - The page map level 4, the highest page table.
