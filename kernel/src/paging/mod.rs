@@ -6,9 +6,11 @@ use limine::{
 };
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
-    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size2MiB, Size4KiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB, Size2MiB, Size1GiB},
     PhysAddr, VirtAddr,
 };
+
+use crate::println;
 
 const PAGE_TABLE_ENTRIES: isize = 512;
 const PAGE_TABLE_LEVELS: u8 = 4;
@@ -47,6 +49,13 @@ pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
         PhysFrame::<Size4KiB>::from_start_address(p4_addr).unwrap(),
         Cr3Flags::empty(),
     );
+}
+
+fn get_last_phys_addr() -> u64 {
+    let last_entry = 
+        unsafe { get_memmap_entry(get_memmap(), get_memmap().entry_count - 1) };
+    
+    last_entry.base + last_entry.len
 }
 
 /// Map the kernel's virtual address.
@@ -88,4 +97,48 @@ pub fn map_kernel_address(pml4: PhysAddr) {
             break;
         }
     }
+}
+
+
+/// Map every physical address to virtual address using hhdm.
+///
+/// # Arguments
+/// * `pml4` - The page map level 4, the highest page table.
+pub fn map_physical_addresses(pml4: PhysAddr) {
+    let last_addr = get_last_phys_addr();
+    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
+    let mut offset: u64 = 0;
+
+    while offset < last_addr {
+        let physical = PhysAddr::new(offset);
+
+        if last_addr - physical.as_u64() >= Size1GiB::SIZE {
+            virtual_memory_manager::map_address(
+                pml4,
+                VirtAddr::new(HHDM_OFFSET + offset),
+                PhysFrame::<Size1GiB>::from_start_address(physical).unwrap(),
+                flags | PageTableFlags::HUGE_PAGE,
+            );
+
+            offset += Size1GiB::SIZE;
+        } else if last_addr - physical.as_u64() >= Size2MiB::SIZE {
+            virtual_memory_manager::map_address(
+                pml4,
+                VirtAddr::new(HHDM_OFFSET + offset),
+                PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
+                flags | PageTableFlags::HUGE_PAGE,
+            );
+
+            offset += Size2MiB::SIZE;
+        } else {
+            virtual_memory_manager::map_address(
+                pml4,
+                VirtAddr::new(HHDM_OFFSET + offset),
+                PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
+                flags,
+            );
+
+            offset += Size4KiB::SIZE;
+        }    
+    }  
 }
