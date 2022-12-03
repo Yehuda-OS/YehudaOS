@@ -109,7 +109,7 @@ pub fn map_physical_addresses(pml4: PhysAddr) {
                 let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::HUGE_PAGE;
                 virtual_memory_manager::map_address(
                     pml4,
-                    VirtAddr::new(KERNEL_ADDRESS + offset),
+                    VirtAddr::new(HHDM_OFFSET + offset),
                     PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
                     flags,
                 );
