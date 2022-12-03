@@ -74,17 +74,25 @@ pub fn map_kernel_address(pml4: PhysAddr) {
 
         if entry.typ == LimineMemoryMapEntryType::KernelAndModules {
             while offset < entry.len {
-                let physical =
-                    PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(entry.base + offset))
-                        .unwrap();
+                let physical = PhysAddr::new(entry.base + offset);
 
-                virtual_memory_manager::map_address(
-                    pml4,
-                    VirtAddr::new(KERNEL_ADDRESS + offset),
-                    physical,
-                    flags,
-                );
-                offset += Size4KiB::SIZE;
+                if entry.len - offset >= Size2MiB::SIZE {
+                    virtual_memory_manager::map_address(
+                        pml4,
+                        VirtAddr::new(KERNEL_ADDRESS + offset),
+                        PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
+                        flags | PageTableFlags::HUGE_PAGE,
+                    );
+                    offset += Size2MiB::SIZE;
+                } else {
+                    virtual_memory_manager::map_address(
+                        pml4,
+                        VirtAddr::new(KERNEL_ADDRESS + offset),
+                        PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
+                        flags,
+                    );
+                    offset += Size4KiB::SIZE;
+                }
             }
             break;
         }
