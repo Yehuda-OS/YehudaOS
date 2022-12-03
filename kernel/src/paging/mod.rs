@@ -96,7 +96,6 @@ pub fn map_kernel_address(pml4: PhysAddr) {
 /// * `pml4` - The page map level 4, the highest page table.
 pub fn map_physical_addresses(pml4: PhysAddr) {
     let memmap = get_memmap();
-    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::HUGE_PAGE;
     let mut entry;
     let mut offset = 0;
 
@@ -104,17 +103,29 @@ pub fn map_physical_addresses(pml4: PhysAddr) {
         entry = unsafe { get_memmap_entry(memmap, i) };
 
         while offset < entry.len {
-            let physical =
-                PhysFrame::<Size2MiB>::containing_address(PhysAddr::new(entry.base + offset));
+            let physical = PhysAddr::new(entry.base + offset);
 
-            virtual_memory_manager::map_address(
-                pml4,
-                VirtAddr::new(HHDM_OFFSET + offset),
-                physical,
-                flags,
-            );
-            offset += Size2MiB::SIZE;
+            if entry.len - offset >= Size2MiB::SIZE {
+                let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::HUGE_PAGE;
+                virtual_memory_manager::map_address(
+                    pml4,
+                    VirtAddr::new(KERNEL_ADDRESS + offset),
+                    PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
+                    flags,
+                );
+                offset += Size2MiB::SIZE;
+            } else {
+                let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
+                virtual_memory_manager::map_address(
+                    pml4,
+                    VirtAddr::new(HHDM_OFFSET + offset),
+                    PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
+                    flags,
+                );
+                offset += Size4KiB::SIZE;
+            }
         }
+        break;
     }
 }
     
