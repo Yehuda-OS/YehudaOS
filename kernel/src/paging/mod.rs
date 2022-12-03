@@ -72,7 +72,7 @@ pub fn map_kernel_address(pml4: PhysAddr) {
                         pml4,
                         VirtAddr::new(KERNEL_ADDRESS + offset),
                         PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
-                        flags,
+                        flags | PageTableFlags::HUGE_PAGE,
                     );
                     offset += Size2MiB::SIZE;
                 } else {
