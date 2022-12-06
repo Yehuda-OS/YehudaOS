@@ -1,15 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Arguments;
-
-use limine::{LimineFramebufferRequest, LimineTerminalRequest};
-use x86_64::{
-    registers::{self, control::Cr3},
-    VirtAddr,
-};
-
-use crate::paging::virtual_memory_manager::virtual_to_physical;
+use x86_64::registers::control::Cr3;
 
 mod io;
 mod paging;
@@ -28,7 +20,7 @@ pub extern "C" fn _start() -> ! {
     table = paging::virtual_memory_manager::create_page_table();
     paging::map_kernel_address(table);
     paging::create_hhdm(table);
-    
+
     unsafe { paging::load_tables_to_cr3(table) };
 
     hcf();
