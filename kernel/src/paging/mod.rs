@@ -61,7 +61,7 @@ fn get_last_phys_addr() -> u64 {
 /// * `pml4` - The page map level 4, the highest page table.
 pub fn map_kernel_address(pml4: PhysAddr) {
     let memmap = get_memmap();
-    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
     let mut entry;
     let mut offset = 0;
 
@@ -102,7 +102,7 @@ pub fn map_kernel_address(pml4: PhysAddr) {
 /// * `pml4` - The page map level 4, the highest page table.
 pub fn create_hhdm(pml4: PhysAddr) {
     let last_addr = get_last_phys_addr();
-    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
+    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let mut offset: u64 = 0;
 
     while offset < last_addr {
