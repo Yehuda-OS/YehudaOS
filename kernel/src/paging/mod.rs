@@ -6,7 +6,7 @@ use limine::{
 };
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
-    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB, Size2MiB, Size1GiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB, Size4KiB},
     PhysAddr, VirtAddr,
 };
 
@@ -52,9 +52,8 @@ pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
 }
 
 fn get_last_phys_addr() -> u64 {
-    let last_entry = 
-        unsafe { get_memmap_entry(get_memmap(), get_memmap().entry_count - 1) };
-    
+    let last_entry = unsafe { get_memmap_entry(get_memmap(), get_memmap().entry_count - 1) };
+
     last_entry.base + last_entry.len
 }
 
@@ -99,7 +98,6 @@ pub fn map_kernel_address(pml4: PhysAddr) {
     }
 }
 
-
 /// Map every physical address to virtual address using hhdm.
 ///
 /// # Arguments
@@ -139,6 +137,6 @@ pub fn map_physical_addresses(pml4: PhysAddr) {
             );
 
             offset += Size4KiB::SIZE;
-        }    
-    }  
+        }
+    }
 }
