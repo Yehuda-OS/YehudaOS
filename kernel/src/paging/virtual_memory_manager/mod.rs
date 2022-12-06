@@ -7,6 +7,8 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
+use super::{PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS};
+
 /// Get an entry in a page table.
 ///
 /// # Arguments
@@ -14,8 +16,8 @@ use x86_64::{
 /// * `offset` - The offset in the page table.
 ///
 /// # Safety
-/// The function will result in undefined behavior if `page_table` does not point to a valid page
-/// table or `offset` equals or greater than 512.
+/// This function is unsafe because `page_table` must be a valid page table and `offset` must be
+/// equals or greater than 0 and must be less than 512.
 unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut PageTableEntry {
     let entry_physical = (page_table.as_u64() as *const u64).offset(offset) as u64;
     let entry_virtual = entry_physical + super::HHDM_OFFSET;
@@ -23,17 +25,36 @@ unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut Page
     entry_virtual as *mut PageTableEntry
 }
 
-/// Get the physical addresses a virtual address is mapped to.
+/// Allocate a page for a page table and set all of its entries to 0.
+/// Panics if there is no free memory for the page table.
+///
+/// # Returns
+/// The physical address of the page table.
+pub fn create_page_table() -> PhysAddr {
+    let page_table = super::page_allocator::allocate()
+        .expect("No free memory for a page table")
+        .start_address();
+
+    for i in 0..super::PAGE_TABLE_ENTRIES {
+        // SAFETY: the page table was allocated and the offset is in the page table range.
+        unsafe {
+            (*get_page_table_entry(page_table, i)).set_unused();
+        }
+    }
+
+    return page_table;
+}
+
+/// Returns the physical addresses a virtual address is mapped to.
 ///
 /// # Arguments
+/// * `pml4` - The page map level 4, the highest page table.
 /// * `virtual_address` - The virtual address to translate.
-/// * `hhdm_offset` - The offset of the higher half direct map.
-pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
-    let mut page_table = registers::control::Cr3::read().0.start_address().as_u64();
+pub fn virtual_to_physical(pml4: PhysAddr, virtual_address: VirtAddr) -> PhysAddr {
+    let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
 
-    // Iterate 4 times because there are 4 page tables
-    for _ in 0..4 {
+    for _ in 0..PAGE_TABLE_LEVELS {
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
@@ -59,7 +80,7 @@ pub fn virtual_to_physical(virtual_address: VirtAddr) -> PhysAddr {
     );
 }
 
-/// Map a virtual address to a physical address.
+/// Maps a virtual address to a physical address.
 ///
 /// # Arguments
 /// * `pml4` - The address of the Page Map Level 4.
@@ -120,10 +141,7 @@ pub fn map_address<T: PageSize>(
         if page_table == 0 {
             // SAFETY: Entry is not null because pml4 has been asserted to be not null
             unsafe {
-                page_table = super::page_allocator::allocate()
-                    .expect("No free memory for a page table")
-                    .start_address()
-                    .as_u64();
+                page_table = create_page_table().as_u64();
                 // Update the previous entry
                 (*entry).set_addr(
                     PhysAddr::new(page_table),
@@ -142,9 +160,108 @@ pub fn map_address<T: PageSize>(
         // Mark the bits of the offset as used
         used_bits += 9;
     }
+
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
         assert!((*entry).is_unused(), "Virtual address is already in use");
         (*entry).set_addr(physical_address.start_address(), flags);
+    }
+}
+
+/// Get a page table a virtual address is using.
+///
+/// # Arguments
+/// * `virtual_address` - The virtual address to translate.
+/// * `level` - the level of the page table.
+fn virt_addr_to_page_table(level: u8, virtual_address: VirtAddr) -> PhysAddr {
+    let mut page_table = registers::control::Cr3::read().0.start_address().as_u64();
+    let mut used_bits = 16; // The highest 16 bits are unused
+
+    for _ in 0..(PAGE_TABLE_LEVELS - level) {
+        // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
+        // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
+        // by 55 to place the offset at the lower 9 bits.
+        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        // SAFETY: the offset is valid because it is 9 bits.
+        let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
+
+        // Get the physical address from the page table entry
+        page_table = entry.addr().as_u64();
+        // Mark the bits of the offset as used
+        used_bits += 9;
+    }
+
+    return PhysAddr::new(page_table);
+}
+
+/// check if the page table is free
+///
+/// # Arguments
+/// * `table_addr` - the address of the page table.
+fn is_page_table_free(table_addr: &PhysAddr) -> bool {
+    let page_table: u64 = table_addr.as_u64();
+    let mut entry;
+
+    for i in 0..PAGE_TABLE_ENTRIES {
+        // SAFETY: the offset is valid because it is 9 bits.
+        entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), i) };
+
+        // if entry is used, return false
+        if !unsafe { (*entry).is_unused() } {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Unmap a virtual address.
+///
+/// # Arguments
+/// * `pml4` - The address of the Page Map Level 4.
+/// * `virtual_address` - The virtual address to unmap.
+/// ### panics if:
+/// - `pml4` is 0.
+/// - The virtual address is already unused.
+pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) {
+    let mut page_table = pml4.as_u64();
+    let mut used_bits = 16; // The highest 16 bits are unused
+    let mut entry: *mut PageTableEntry = core::ptr::null_mut();
+    let mut level_counter: u8 = 0;
+
+    assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
+
+    for _ in 0..PAGE_TABLE_LEVELS {
+        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        // SAFETY: the offset is valid because it is 9 bits.
+        entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), offset) };
+
+        // Get the physical address from the page table entry
+        page_table = unsafe { (*entry).addr().as_u64() };
+        // Mark the bits of the offset as used
+        used_bits += 9;
+
+        level_counter += 1;
+
+        // If the huge page flag is on, that means that this was the last page table
+        if unsafe { (*entry).flags() }.contains(PageTableFlags::HUGE_PAGE) {
+            break;
+        }
+    }
+
+    // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
+    unsafe {
+        assert!(!(*entry).is_unused(), "entry already unused");
+        (*entry).set_unused();
+    };
+
+    for i in 1..level_counter {
+        let table = virt_addr_to_page_table(i, VirtAddr::new(page_table));
+
+        if is_page_table_free(&table) {
+            unsafe { super::page_allocator::free(PhysFrame::from_start_address(table).unwrap()) };
+        } else {
+            break;
+        }
     }
 }

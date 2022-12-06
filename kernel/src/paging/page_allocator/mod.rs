@@ -11,22 +11,25 @@ struct FreePageNode {
 }
 
 /// Returns the address of a newly allocated physical page, or None if there are no free pages.
-///
-/// # Safety
-/// This function may produce a page fault if an invalid page was freed with the `free` function.
-/// If this happens, a page fault was already triggered before in the call to `free`.
-pub unsafe fn allocate() -> Option<PhysFrame> {
+pub fn allocate() -> Option<PhysFrame> {
     let free_page;
 
-    if FREE_LIST_START.is_null() {
+    // SAFETY: the kernel is not multithreaded.
+    if unsafe { FREE_LIST_START.is_null() } {
         return None;
     } else {
-        free_page = PhysFrame::from_start_address(PhysAddr::new(
-            FREE_LIST_START as u64 - super::HHDM_OFFSET,
-        ))
-        // UNWRAP: Freed pages are always 4KiB aligned
-        .unwrap();
-        FREE_LIST_START = (*FREE_LIST_START).next;
+        // SAFETY: the kernel is not multithreaded.
+        free_page = unsafe {
+            PhysFrame::from_start_address(PhysAddr::new(
+                FREE_LIST_START as u64 - super::HHDM_OFFSET,
+            ))
+            // UNWRAP: Freed pages are always 4KiB aligned
+            .unwrap()
+        };
+        // SAFETY: if the first free page is invalid a page fault was already triggered.
+        unsafe {
+            FREE_LIST_START = (*FREE_LIST_START).next;
+        };
     }
 
     return Some(free_page);
@@ -51,14 +54,11 @@ pub unsafe fn free(address: PhysFrame) {
 /// Initialize the free pages list with the usable pages in limine's memmap and initialize the value
 /// of the hhdm offset.
 pub fn initialize() {
-    let memmap = super::MEMMAP.get_response().get().unwrap();
-
-    unsafe {
-        super::HHDM_OFFSET = super::HHDM.get_response().get().unwrap().offset;
-    };
+    let memmap = super::get_memmap();
 
     for i in 0..memmap.entry_count {
-        let entry = unsafe { &*(*memmap.entries.as_ptr().offset(i as isize)).as_ptr() };
+        // UNSAFE: `i` is between 0 and the entry count.
+        let entry = unsafe { super::get_memmap_entry(memmap, i) };
         let mut current;
 
         if entry.typ == LimineMemoryMapEntryType::Usable {
@@ -68,7 +68,29 @@ pub fn initialize() {
                     // UNWRAP: usable entries are 4KiB aligned.
                     free(PhysFrame::from_start_address(PhysAddr::new(current)).unwrap())
                 }
-                current += 0x1000;
+                current += Size4KiB::SIZE;
+            }
+        }
+    }
+}
+
+/// Free all the memory marked as bootloader reclaimable.
+pub fn reclaim_bootloader_memory() {
+    let memmap = super::get_memmap();
+
+    for i in 0..memmap.entry_count {
+        // UNSAFE: `i` is between 0 and the entry count.
+        let entry = unsafe { super::get_memmap_entry(memmap, i) };
+        let mut current;
+
+        if entry.typ == LimineMemoryMapEntryType::BootloaderReclaimable {
+            current = entry.base;
+            while current + Size4KiB::SIZE <= entry.base + entry.len {
+                unsafe {
+                    // UNWRAP: bootloader reclaimable entries are 4KiB aligned.
+                    free(PhysFrame::from_start_address(PhysAddr::new(current)).unwrap())
+                }
+                current += Size4KiB::SIZE;
             }
         }
     }
