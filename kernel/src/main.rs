@@ -1,12 +1,18 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Arguments;
+
+use limine::{LimineFramebufferRequest, LimineTerminalRequest};
+use x86_64::{
+    registers::{self, control::Cr3},
+    VirtAddr,
+};
+
+use crate::paging::virtual_memory_manager::virtual_to_physical;
+
 mod io;
 mod paging;
-
-use limine::LimineBootInfoRequest;
-
-static BOOTLOADER_INFO: LimineBootInfoRequest = LimineBootInfoRequest::new(0);
 
 /// Kernel Entry Point
 ///
@@ -15,15 +21,15 @@ static BOOTLOADER_INFO: LimineBootInfoRequest = LimineBootInfoRequest::new(0);
 /// the bootloader will transfer control to this function.
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    println!("hello, world!");
+    let theirs = Cr3::read().0.start_address();
+    let table;
 
-    if let Some(bootinfo) = BOOTLOADER_INFO.get_response().get() {
-        println!(
-            "booted by {} v{}",
-            bootinfo.name.to_str().unwrap().to_str().unwrap(),
-            bootinfo.version.to_str().unwrap().to_str().unwrap(),
-        );
-    }
+    paging::page_allocator::initialize();
+    table = paging::virtual_memory_manager::create_page_table();
+    paging::map_kernel_address(table);
+    paging::create_hhdm(table);
+    
+    unsafe { paging::load_tables_to_cr3(table) };
 
     hcf();
 }
