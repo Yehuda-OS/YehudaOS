@@ -10,8 +10,6 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-const PAGE_TABLE_ENTRIES: isize = 512;
-const PAGE_TABLE_LEVELS: u8 = 4;
 pub const KERNEL_ADDRESS: u64 = 0xffff_ffff_8000_0000;
 pub const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
 
