@@ -3,15 +3,20 @@ use core::{
     ptr::null_mut,
 };
 
+use x86_64::{
+    structures::paging::{PageSize, Size4KiB},
+    VirtAddr,
+};
+
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
-pub const MAX_PAGES: u32 = 25; // 100 KiB
+pub const MAX_PAGES: u64 = 25; // 100 KiB
 
 #[global_allocator]
 static ALLOCATOR: Locked<Allocator> = Locked::<Allocator>::new(Allocator::new(HEAP_START));
 
 pub struct Allocator {
     heap_start: u64,
-    pages: u32,
+    pages: u64,
 }
 
 pub struct HeapBlock {
@@ -98,15 +103,28 @@ impl HeapBlock {
     }
 }
 
-fn alloc_node(allocator: &Allocator, size: usize) -> *mut HeapBlock {
+/// Request pages from the page allocator until there is enough space for the required data size
+/// and create a [`HeapBlock`](HeapBlock) instance at the start of the allocated space.
+///
+/// # Arguments
+/// - `allocator` - The allocator instance that is being used.
+/// - `size` - The required allocation size.
+/// - `align` - The required alignment for the allocation start address.
+///
+/// # Returns
+/// A pointer to the created [`HeapBlock`](HeapBlock) instance.
+fn alloc_node(allocator: &Allocator, size: usize, align: usize) -> *mut HeapBlock {
+    let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
+    let mut current_size = 0;
+
     null_mut()
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         let allocator = self.lock();
-        let align = _layout.align();
         let size = _layout.size();
+        let align = _layout.align();
         let start = if allocator.pages == 0 {
             null_mut()
         } else {
@@ -123,7 +141,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
             curr = (*curr).next();
         }
         if curr == null_mut() {
-            curr = alloc_node(&allocator, size);
+            curr = alloc_node(&allocator, size, align);
             if curr == null_mut() {
                 return null_mut();
             }
