@@ -4,7 +4,7 @@ use core::{
 };
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
-pub const HEAP_SIZE: u32 = 100 * 1024; // 100 KiB
+pub const MAX_PAGES: u32 = 25; // 100 KiB
 
 #[global_allocator]
 static ALLOCATOR: Locked<Allocator> = Locked::<Allocator>::new(Allocator::new(HEAP_START));
@@ -98,15 +98,36 @@ impl HeapBlock {
     }
 }
 
+fn alloc_node(allocator: &Allocator, size: usize) -> *mut HeapBlock {
+    null_mut()
+}
+
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         let allocator = self.lock();
+        let align = _layout.align();
+        let size = _layout.size();
         let start = if allocator.pages == 0 {
             null_mut()
         } else {
             allocator.heap_start as *mut HeapBlock
         };
-        let curr = start;
+        let mut curr = start;
+
+        while curr != null_mut() {
+            let adjustment = align - (*curr).size() as usize % align;
+
+            if (*curr).free() && (*curr).size() as usize >= size + adjustment {
+                break;
+            }
+            curr = (*curr).next();
+        }
+        if curr == null_mut() {
+            curr = alloc_node(&allocator, size);
+            if curr == null_mut() {
+                return null_mut();
+            }
+        }
 
         null_mut()
     }
