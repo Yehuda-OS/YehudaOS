@@ -81,7 +81,7 @@ impl HeapBlock {
     }
 
     // Get the next heap block in the list.
-    pub fn get_next(&self) -> *mut HeapBlock {
+    pub fn next(&self) -> *mut HeapBlock {
         if self.has_next() {
             unsafe {
                 let start_of_block = (self as *const HeapBlock).offset(1) as u64;
@@ -100,6 +100,14 @@ impl HeapBlock {
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
+        let allocator = self.lock();
+        let start = if allocator.pages == 0 {
+            null_mut()
+        } else {
+            allocator.heap_start as *mut HeapBlock
+        };
+        let curr = start;
+
         null_mut()
     }
 
