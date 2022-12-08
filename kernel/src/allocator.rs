@@ -14,7 +14,7 @@ pub struct Allocator {
     pages: u32,
 }
 
-struct HeapBlock {
+pub struct HeapBlock {
     size: u64,
     prev: *mut HeapBlock,
 }
@@ -29,6 +29,9 @@ impl Allocator {
 }
 
 impl HeapBlock {
+    const FREE_BIT: u8 = 63;
+    const HAS_NEXT_BIT: u8 = 62;
+
     pub const fn empty() -> Self {
         HeapBlock {
             size: 0,
@@ -38,10 +41,10 @@ impl HeapBlock {
 
     pub const fn new(free: bool, has_next: bool, mut size: u64, prev: *mut HeapBlock) -> Self {
         if free {
-            size |= 1 << 63;
+            size |= 1 << HeapBlock::FREE_BIT;
         }
         if has_next {
-            size |= 1 << 62;
+            size |= 1 << HeapBlock::HAS_NEXT_BIT;
         }
 
         HeapBlock { size, prev }
@@ -68,7 +71,7 @@ impl HeapBlock {
 
     pub fn set_has_next(&mut self, has_next: bool) {
         if has_next {
-            self.size |= 1 << 62;
+            self.size |= 1 << HeapBlock::HAS_NEXT_BIT;
         }
     }
 
