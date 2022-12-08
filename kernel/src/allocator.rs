@@ -66,6 +66,12 @@ impl HeapBlock {
         self.size << 1 >> 63 == 1
     }
 
+    pub fn set_has_next(&mut self, has_next: bool) {
+        if has_next {
+            self.size |= 1 << 62;
+        }
+    }
+
     /// Returns `true` if the block is the first in the list.
     pub fn has_prev(&self) -> bool {
         self.prev == null_mut()
