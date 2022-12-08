@@ -5,6 +5,7 @@ use x86_64::registers::control::Cr3;
 
 mod io;
 mod paging;
+mod allocator;
 
 /// Kernel Entry Point
 ///

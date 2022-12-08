@@ -55,13 +55,17 @@ impl HeapBlock {
 
     // Get the next heap block in the list.
     pub fn get_next(&self) -> *mut HeapBlock {
-        unsafe {
-            let start_of_block = (self as *const HeapBlock).offset(1) as u64;
+        if self.has_next() {
+            unsafe {
+                let start_of_block = (self as *const HeapBlock).offset(1) as u64;
 
-            (start_of_block + self.size) as *mut HeapBlock
+                (start_of_block + self.size) as *mut HeapBlock
+            }
+        } else {
+            null_mut()
         }
     }
-    
+
     pub fn get_prev(&self) -> *mut HeapBlock {
         self.prev
     }
