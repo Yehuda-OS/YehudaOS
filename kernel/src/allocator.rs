@@ -3,30 +3,48 @@ use core::{
     ptr::null_mut,
 };
 
-pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+pub const HEAP_START: u64 = 0x_4444_4444_0000;
+pub const HEAP_SIZE: u32 = 100 * 1024; // 100 KiB
 
 #[global_allocator]
-static ALLOCATOR: Locked<Allocator> = Locked::<Allocator>::new(Allocator::new());
+static ALLOCATOR: Locked<Allocator> = Locked::<Allocator>::new(Allocator::new(HEAP_START));
 
-pub struct Allocator;
+pub struct Allocator {
+    heap_start: u64,
+    pages: u32,
+}
+
 struct HeapBlock {
     size: u64,
     prev: *mut HeapBlock,
 }
 
 impl Allocator {
-    pub const fn new() -> Self {
-        Allocator
+    pub const fn new(heap_start: u64) -> Self {
+        Allocator {
+            heap_start,
+            pages: 0,
+        }
     }
 }
 
 impl HeapBlock {
-    pub const fn new() -> Self {
+    pub const fn empty() -> Self {
         HeapBlock {
             size: 0,
             prev: null_mut(),
         }
+    }
+
+    pub const fn new(free: bool, has_next: bool, mut size: u64, prev: *mut HeapBlock) -> Self {
+        if free {
+            size |= 1 << 63;
+        }
+        if has_next {
+            size |= 1 << 62;
+        }
+
+        HeapBlock { size, prev }
     }
 
     /// Get the size of the block.
