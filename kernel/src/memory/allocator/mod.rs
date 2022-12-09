@@ -131,10 +131,10 @@ unsafe fn find_usable_block(
 }
 
 /// Merge a block with the next block after it.
-/// 
+///
 /// # Arguments
 /// - `block` - The block to merge.
-/// 
+///
 /// # Safety
 /// This function is unsafe because it requires the block to have a free block after it.
 unsafe fn merge_blocks(block: *mut HeapBlock) {
@@ -144,7 +144,22 @@ unsafe fn merge_blocks(block: *mut HeapBlock) {
     (*block).set_has_next(next.has_next());
 }
 
-fn shrink_block(block: *mut HeapBlock, size: usize) {}
+/// Split a block into two blocks, one with the required size and one with the remaining size.
+///
+/// # Arguments
+/// - `block` - The block to shrink.
+/// - `size` - The required size of the block, including any alignment adjustments.
+///
+/// # Safety
+/// This function is unsafe because the block must have enough space to contain a `HeapBlock` header
+/// for the next block.
+unsafe fn shrink_block(block: *mut HeapBlock, size: usize) {
+    let has_next = (*block).has_next();
+    let extra = (*block).size() as usize - size;
+
+    (*block).set_size(size as u64);
+    *(*block).next() = HeapBlock::new(true, has_next, (extra - HEADER_SIZE) as u64, block);
+}
 
 /// Check if the block is bigger than the required size and if it is resize it accordingly and
 /// merge it with the other blocks around it if it is possible.
