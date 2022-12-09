@@ -4,19 +4,25 @@ use core::{
 };
 
 use x86_64::{
-    structures::paging::{PageSize, Size4KiB},
-    VirtAddr,
+    structures::paging::{PageSize, PageTableFlags, Size4KiB},
+    PhysAddr, VirtAddr,
 };
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
 pub const MAX_PAGES: u64 = 25; // 100 KiB
 
+const HEADER_SIZE: usize = core::mem::size_of::<HeapBlock>();
+
 #[global_allocator]
-static ALLOCATOR: Locked<Allocator> = Locked::<Allocator>::new(Allocator::new(HEAP_START));
+static ALLOCATOR: Locked<Allocator> =
+    Locked::<Allocator>::new(Allocator::new(HEAP_START, unsafe {
+        super::paging::PAGE_TABLE
+    }));
 
 pub struct Allocator {
     heap_start: u64,
     pages: u64,
+    page_table: PhysAddr,
 }
 
 pub struct HeapBlock {
@@ -25,10 +31,11 @@ pub struct HeapBlock {
 }
 
 impl Allocator {
-    pub const fn new(heap_start: u64) -> Self {
+    pub const fn new(heap_start: u64, page_table: PhysAddr) -> Self {
         Allocator {
             heap_start,
             pages: 0,
+            page_table,
         }
     }
 }
@@ -104,12 +111,12 @@ impl HeapBlock {
 }
 
 /// Returns the required adjustment of a data block to match the required allocation alignment.
-/// 
+///
 /// # Arguments
 /// - `addr` - Pointer to the heap block.
 /// - `align` - The required alignment.
-unsafe fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
-    let data_start_address = addr.offset(1) as usize;
+fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
+    let data_start_address = unsafe { addr.offset(1) } as usize;
 
     align - data_start_address % align
 }
@@ -123,17 +130,46 @@ unsafe fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
 /// - `align` - The required alignment for the allocation's start address.
 ///
 /// # Returns
-/// A pointer to the created [`HeapBlock`](HeapBlock) instance.
-fn alloc_node(allocator: &Allocator, size: usize, align: usize) -> *mut HeapBlock {
+/// A pointer to the created [`HeapBlock`](HeapBlock) instance,
+/// or [`None`](None) if the allocation failed.
+fn alloc_node(
+    allocator: &mut Allocator,
+    last: *mut HeapBlock,
+    size: usize,
+    align: usize,
+) -> Option<*mut HeapBlock> {
     let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
     let mut current_size = 0;
+    let adjustment = get_adjustment(start.as_mut_ptr(), align);
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let allocated;
 
-    null_mut()
+    while current_size < size + adjustment {
+        if let Some(page) = super::paging::page_allocator::allocate() {
+            allocator.pages += 1;
+            current_size += Size4KiB::SIZE as usize;
+            super::paging::virtual_memory_manager::map_address(
+                allocator.page_table,
+                start + current_size,
+                page,
+                flags,
+            );
+        } else {
+            return None;
+        }
+    }
+    allocated = start.as_mut_ptr::<HeapBlock>();
+    unsafe {
+        (*last).set_has_next(true);
+        (*allocated) = HeapBlock::new(true, false, (current_size - HEADER_SIZE) as u64, last);
+    };
+
+    Some(allocated)
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        let allocator = self.lock();
+        let mut allocator = self.lock();
         let size = _layout.size();
         let align = _layout.align();
         let start = if allocator.pages == 0 {
@@ -152,8 +188,9 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
             curr = (*curr).next();
         }
         if curr == null_mut() {
-            curr = alloc_node(&allocator, size, align);
-            if curr == null_mut() {
+            if let Some(allocated) = alloc_node(&mut allocator, curr, size, align) {
+                curr = allocated;
+            } else {
                 return null_mut();
             }
         }
