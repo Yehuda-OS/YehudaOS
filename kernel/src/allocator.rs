@@ -103,6 +103,17 @@ impl HeapBlock {
     }
 }
 
+/// Returns the required adjustment of a data block to match the required allocation alignment.
+/// 
+/// # Arguments
+/// - `addr` - Pointer to the heap block.
+/// - `align` - The required alignment.
+unsafe fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
+    let data_start_address = addr.offset(1) as usize;
+
+    align - data_start_address % align
+}
+
 /// Request pages from the page allocator until there is enough space for the required data size
 /// and create a [`HeapBlock`](HeapBlock) instance at the start of the allocated space.
 ///
@@ -133,7 +144,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         let mut curr = start;
 
         while curr != null_mut() {
-            let adjustment = align - curr as usize % align;
+            let adjustment = get_adjustment(curr, align);
 
             if (*curr).free() && (*curr).size() as usize >= size + adjustment {
                 break;
