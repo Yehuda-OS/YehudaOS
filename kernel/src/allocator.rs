@@ -109,7 +109,7 @@ impl HeapBlock {
 /// # Arguments
 /// - `allocator` - The allocator instance that is being used.
 /// - `size` - The required allocation size.
-/// - `align` - The required alignment for the allocation start address.
+/// - `align` - The required alignment for the allocation's start address.
 ///
 /// # Returns
 /// A pointer to the created [`HeapBlock`](HeapBlock) instance.
@@ -133,7 +133,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         let mut curr = start;
 
         while curr != null_mut() {
-            let adjustment = align - (*curr).size() as usize % align;
+            let adjustment = align - curr as usize % align;
 
             if (*curr).free() && (*curr).size() as usize >= size + adjustment {
                 break;
