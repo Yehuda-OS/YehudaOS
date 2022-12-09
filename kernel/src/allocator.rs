@@ -122,21 +122,21 @@ fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
 }
 
 /// Request pages from the page allocator until there is enough space for the required data size
-/// and create a [`HeapBlock`](HeapBlock) instance at the start of the allocated space.
+/// and create a `HeapBlock` instance at the start of the allocated space.
 ///
 /// # Arguments
-/// - `allocator` - The allocator instance that is being used.
+/// - `allocator` - The `Allocator` instance that is being used.
 /// - `size` - The required allocation size.
 /// - `align` - The required alignment for the allocation's start address.
 ///
 /// # Returns
-/// The required adjustment for the data, or [`None`](None) if the allocation failed.
+/// A pointer to the created `HeapBlock`, or [`None`] if the allocation failed.
 fn alloc_node(
     allocator: &mut Allocator,
     last: *mut HeapBlock,
     size: usize,
     align: usize,
-) -> Option<usize> {
+) -> Option<*mut HeapBlock> {
     let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
     let mut current_size = 0;
     let adjustment = get_adjustment(start.as_mut_ptr(), align);
@@ -163,7 +163,42 @@ fn alloc_node(
         (*allocated) = HeapBlock::new(true, false, (current_size - HEADER_SIZE) as u64, last);
     };
 
-    Some(adjustment)
+    Some(allocated)
+}
+
+/// Returns a usable heap block for a specific allocation request
+/// or [`None`] if the allocation fails.
+///
+/// # Arguments
+/// - `allocator` - The `Allocator` instance that is being used.
+/// - `size` - The required allocation size.
+/// - `align` - The required alignment for the allocation's start address.
+unsafe fn find_usable_block(
+    allocator: &mut Allocator,
+    size: usize,
+    align: usize,
+) -> Option<*mut HeapBlock> {
+    let start = if allocator.pages == 0 {
+        null_mut()
+    } else {
+        allocator.heap_start as *mut HeapBlock
+    };
+    let mut curr = start;
+
+    loop {
+        let curr_adjustment = get_adjustment(curr, align);
+
+        if curr == null_mut() || !(*curr).has_next() {
+            return if let Some(allocated) = alloc_node(allocator, curr, size, align) {
+                Some(allocated)
+            } else {
+                None
+            };
+        } else if (*curr).free() && (*curr).size() as usize >= size + curr_adjustment {
+            return Some(curr);
+        }
+        curr = (*curr).next();
+    }
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
@@ -171,33 +206,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         let mut allocator = self.lock();
         let size = _layout.size();
         let align = _layout.align();
-        let start = if allocator.pages == 0 {
-            null_mut()
-        } else {
-            allocator.heap_start as *mut HeapBlock
-        };
-        let adjustment;
-        let mut curr = start;
-
-        loop {
-            let curr_adjustment = get_adjustment(curr, align);
-
-            if curr == null_mut() || !(*curr).has_next() {
-                if let Some(allocated) = alloc_node(&mut allocator, curr, size, align) {
-                    adjustment = allocated;
-                } else {
-                    return null_mut();
-                }
-                curr = (*curr).next();
-
-                break; // Found a usable block
-            } else if (*curr).free() && (*curr).size() as usize >= size + curr_adjustment {
-                adjustment = curr_adjustment;
-
-                break; // Found a usable block
-            }
-            curr = (*curr).next();
-        }
+        let block = find_usable_block(&mut allocator, size, align);
 
         null_mut()
     }
