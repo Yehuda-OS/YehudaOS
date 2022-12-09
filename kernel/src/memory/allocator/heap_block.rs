@@ -36,11 +36,12 @@ impl HeapBlock {
 
     pub fn set_size(&mut self, size: u64) {
         assert!(
-            self.size & (1 << HeapBlock::FREE_BIT) == 0
-                && self.size & (1 << HeapBlock::HAS_NEXT_BIT) == 0,
+            size & (1 << HeapBlock::FREE_BIT) == 0 && size & (1 << HeapBlock::HAS_NEXT_BIT) == 0,
             "Size is greater than the maximum"
         );
-        self.size |= size;
+        self.size = size
+            | self.size & (1 << HeapBlock::FREE_BIT)
+            | self.size & (1 << HeapBlock::HAS_NEXT_BIT);
     }
 
     /// Returns `true` if the block is free.
@@ -61,7 +62,7 @@ impl HeapBlock {
     pub fn has_next(&self) -> bool {
         // The second top most bit of the size represents
         // whether the block has another block after it.
-        self.size & (1 << HeapBlock::HAS_NEXT_BIT) >> HeapBlock::HAS_NEXT_BIT == 1
+        (self.size & (1 << HeapBlock::HAS_NEXT_BIT)) >> HeapBlock::HAS_NEXT_BIT == 1
     }
 
     pub fn set_has_next(&mut self, has_next: bool) {
@@ -74,7 +75,7 @@ impl HeapBlock {
 
     /// Returns `true` if the block is the first in the list.
     pub fn has_prev(&self) -> bool {
-        self.prev == null_mut()
+        !self.prev.is_null()
     }
 
     // Get the next heap block in the list.
@@ -83,7 +84,7 @@ impl HeapBlock {
             unsafe {
                 let start_of_block = (self as *const HeapBlock).offset(1) as u64;
 
-                (start_of_block + self.size) as *mut HeapBlock
+                (start_of_block + self.size()) as *mut HeapBlock
             }
         } else {
             null_mut()
