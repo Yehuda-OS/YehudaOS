@@ -17,7 +17,7 @@ pub const MAX_PAGES: u64 = 25; // 100 KiB
 const HEADER_SIZE: usize = core::mem::size_of::<HeapBlock>();
 
 #[global_allocator]
-static ALLOCATOR: Locked<Allocator> =
+pub static mut ALLOCATOR: Locked<Allocator> =
     Locked::<Allocator>::new(Allocator::new(HEAP_START, unsafe { super::PAGE_TABLE }));
 
 pub struct Allocator {

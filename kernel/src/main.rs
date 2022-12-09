@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
 
+extern crate alloc;
+use alloc::boxed::Box;
 use x86_64::registers::control::Cr3;
 
 mod io;
@@ -14,7 +17,13 @@ mod memory;
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     let theirs = Cr3::read().0.start_address();
-
+    unsafe {
+        memory::allocator::ALLOCATOR =
+            memory::allocator::Locked::<memory::allocator::Allocator>::new(
+                memory::allocator::Allocator::new(memory::allocator::HEAP_START, theirs),
+            )
+    };
+    
     memory::page_allocator::initialize();
     unsafe {
         memory::PAGE_TABLE = memory::virtual_memory_manager::create_page_table();
