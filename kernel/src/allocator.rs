@@ -173,6 +173,9 @@ fn alloc_node(
 /// - `allocator` - The `Allocator` instance that is being used.
 /// - `size` - The required allocation size.
 /// - `align` - The required alignment for the allocation's start address.
+/// 
+/// # Safety
+/// This function is unsafe because the heap must not be corrupted.
 unsafe fn find_usable_block(
     allocator: &mut Allocator,
     size: usize,
