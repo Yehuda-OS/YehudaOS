@@ -188,10 +188,13 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
                 } else {
                     return null_mut();
                 }
-                break;
+                curr = (*curr).next();
+
+                break; // Found a usable block
             } else if (*curr).free() && (*curr).size() as usize >= size + curr_adjustment {
                 adjustment = curr_adjustment;
-                break;
+
+                break; // Found a usable block
             }
             curr = (*curr).next();
         }
