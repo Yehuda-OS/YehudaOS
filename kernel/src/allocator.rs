@@ -229,9 +229,17 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         let mut allocator = self.lock();
         let size = _layout.size();
         let align = _layout.align();
-        let block = find_usable_block(&mut allocator, size, align);
+        let adjustment;
 
-        null_mut()
+        if let Some(mut block) = find_usable_block(&mut allocator, size, align) {
+            block = resize_block(block, size, align);
+            (*block).set_free(true);
+            adjustment = get_adjustment(block, align);
+
+            (block as usize + HEADER_SIZE + adjustment) as *mut u8
+        } else {
+            null_mut()
+        }
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
