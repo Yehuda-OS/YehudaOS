@@ -1,6 +1,6 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    ptr::null_mut,
+    ptr::{null, null_mut},
 };
 
 use x86_64::{
@@ -178,21 +178,23 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
             allocator.heap_start as *mut HeapBlock
         };
         let mut curr = start;
+        let mut found = false;
 
-        while curr != null_mut() {
+        while !found {
             let adjustment = get_adjustment(curr, align);
 
             if (*curr).free() && (*curr).size() as usize >= size + adjustment {
-                break;
+                found = true;
+            }
+            if !(*curr).has_next() {
+                if let Some(allocated) = alloc_node(&mut allocator, curr, size, align) {
+                    curr = allocated;
+                } else {
+                    return null_mut();
+                }
+                found = true;
             }
             curr = (*curr).next();
-        }
-        if curr == null_mut() {
-            if let Some(allocated) = alloc_node(&mut allocator, curr, size, align) {
-                curr = allocated;
-            } else {
-                return null_mut();
-            }
         }
 
         null_mut()
