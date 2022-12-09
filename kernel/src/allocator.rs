@@ -173,7 +173,7 @@ fn alloc_node(
 /// - `allocator` - The `Allocator` instance that is being used.
 /// - `size` - The required allocation size.
 /// - `align` - The required alignment for the allocation's start address.
-/// 
+///
 /// # Safety
 /// This function is unsafe because the heap must not be corrupted.
 unsafe fn find_usable_block(
@@ -202,6 +202,14 @@ unsafe fn find_usable_block(
         }
         curr = (*curr).next();
     }
+}
+
+fn merge_blocks(block: *mut HeapBlock) {}
+
+fn shrink_block(block: *mut HeapBlock, size: usize) {}
+
+fn resize_block(block: *mut HeapBlock, size: usize, align: usize) -> *mut HeapBlock {
+    null_mut()
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
