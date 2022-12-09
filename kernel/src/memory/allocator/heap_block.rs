@@ -1,5 +1,6 @@
 use core::ptr::null_mut;
 
+#[derive(Copy, Clone)]
 pub struct HeapBlock {
     size: u64,
     prev: *mut HeapBlock,
@@ -31,6 +32,15 @@ impl HeapBlock {
     pub fn size(&self) -> u64 {
         // The two top most bits are used as flags.
         self.size << 2 >> 2
+    }
+
+    pub fn set_size(&mut self, size: u64) {
+        assert!(
+            self.size & (1 << HeapBlock::FREE_BIT) == 0
+                && self.size & (1 << HeapBlock::HAS_NEXT_BIT) == 0,
+            "Size is greater than the maximum"
+        );
+        self.size |= size;
     }
 
     /// Returns `true` if the block is free.
