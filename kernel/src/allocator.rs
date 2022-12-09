@@ -16,7 +16,7 @@ const HEADER_SIZE: usize = core::mem::size_of::<HeapBlock>();
 #[global_allocator]
 static ALLOCATOR: Locked<Allocator> =
     Locked::<Allocator>::new(Allocator::new(HEAP_START, unsafe {
-        super::paging::PAGE_TABLE
+        super::memory::PAGE_TABLE
     }));
 
 pub struct Allocator {
@@ -154,10 +154,10 @@ fn alloc_node(
     let allocated;
 
     while current_size < size + adjustment {
-        if let Some(page) = super::paging::page_allocator::allocate() {
+        if let Some(page) = super::memory::page_allocator::allocate() {
             allocator.pages += 1;
             current_size += Size4KiB::SIZE as usize;
-            super::paging::virtual_memory_manager::map_address(
+            super::memory::virtual_memory_manager::map_address(
                 allocator.page_table,
                 start + current_size,
                 page,
