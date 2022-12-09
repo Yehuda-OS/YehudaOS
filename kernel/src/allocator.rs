@@ -71,19 +71,31 @@ impl HeapBlock {
     /// Returns `true` if the block is free.
     pub fn free(&self) -> bool {
         // The top most bit of the size represents if the block is free.
-        self.size >> 63 == 1
+        self.size >> HeapBlock::FREE_BIT == 1
+    }
+
+    pub fn set_free(&mut self, free: bool) {
+        if free {
+            self.size |= 1 << HeapBlock::FREE_BIT;
+        }
+        else {
+            self.size &= !(1 << HeapBlock::FREE_BIT);
+        }
     }
 
     // Returns `true` if the block is not the last in the linked list.
     pub fn has_next(&self) -> bool {
         // The second top most bit of the size represents
         // whether the block has another block after it.
-        self.size << 1 >> 63 == 1
+        self.size & (1 << HeapBlock::HAS_NEXT_BIT) >> HeapBlock::HAS_NEXT_BIT == 1
     }
 
     pub fn set_has_next(&mut self, has_next: bool) {
         if has_next {
             self.size |= 1 << HeapBlock::HAS_NEXT_BIT;
+        }
+        else {
+            self.size &= !(1 << HeapBlock::HAS_NEXT_BIT);
         }
     }
 
