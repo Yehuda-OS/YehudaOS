@@ -130,14 +130,13 @@ fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
 /// - `align` - The required alignment for the allocation's start address.
 ///
 /// # Returns
-/// A pointer to the created [`HeapBlock`](HeapBlock) instance,
-/// or [`None`](None) if the allocation failed.
+/// The required adjustment for the data, or [`None`](None) if the allocation failed.
 fn alloc_node(
     allocator: &mut Allocator,
     last: *mut HeapBlock,
     size: usize,
     align: usize,
-) -> Option<*mut HeapBlock> {
+) -> Option<usize> {
     let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
     let mut current_size = 0;
     let adjustment = get_adjustment(start.as_mut_ptr(), align);
@@ -164,7 +163,7 @@ fn alloc_node(
         (*allocated) = HeapBlock::new(true, false, (current_size - HEADER_SIZE) as u64, last);
     };
 
-    Some(allocated)
+    Some(adjustment)
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
@@ -177,21 +176,22 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         } else {
             allocator.heap_start as *mut HeapBlock
         };
+        let adjustment;
         let mut curr = start;
-        let mut found = false;
 
-        while !found {
-            let adjustment = get_adjustment(curr, align);
+        loop {
+            let curr_adjustment = get_adjustment(curr, align);
 
             if curr == null_mut() || !(*curr).has_next() {
                 if let Some(allocated) = alloc_node(&mut allocator, curr, size, align) {
-                    curr = allocated;
+                    adjustment = allocated;
                 } else {
                     return null_mut();
                 }
-                found = true;
-            } else if (*curr).free() && (*curr).size() as usize >= size + adjustment {
-                found = true;
+                break;
+            } else if (*curr).free() && (*curr).size() as usize >= size + curr_adjustment {
+                adjustment = curr_adjustment;
+                break;
             }
             curr = (*curr).next();
         }
