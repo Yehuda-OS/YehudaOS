@@ -220,8 +220,23 @@ fn merge_blocks(block: *mut HeapBlock) {}
 
 fn shrink_block(block: *mut HeapBlock, size: usize) {}
 
-fn resize_block(block: *mut HeapBlock, size: usize, align: usize) -> *mut HeapBlock {
-    null_mut()
+unsafe fn resize_block(mut block: *mut HeapBlock, size: usize, align: usize) -> *mut HeapBlock {
+    let mut adjustment = get_adjustment(block, align);
+
+    if (*block).size() as usize > size + adjustment {
+        if (*block).has_next() && (*(*block).next()).free() {
+            merge_blocks(block);
+            shrink_block(block, size + adjustment);
+        }
+        else if (*block).has_prev() && (*(*block).prev).free() {
+            block = (*block).prev;
+            adjustment = get_adjustment(block, align);
+            merge_blocks(block);
+            shrink_block(block, size + adjustment);
+        }
+    }
+
+    block
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
