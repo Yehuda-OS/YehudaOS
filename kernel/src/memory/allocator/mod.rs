@@ -130,7 +130,19 @@ unsafe fn find_usable_block(
     }
 }
 
-fn merge_blocks(block: *mut HeapBlock) {}
+/// Merge a block with the next block after it.
+/// 
+/// # Arguments
+/// - `block` - The block to merge.
+/// 
+/// # Safety
+/// This function is unsafe because it requires the block to have a free block after it.
+unsafe fn merge_blocks(block: *mut HeapBlock) {
+    let next = *(*block).next();
+
+    (*block).set_size((*block).size() + next.size());
+    (*block).set_has_next(next.has_next());
+}
 
 fn shrink_block(block: *mut HeapBlock, size: usize) {}
 
