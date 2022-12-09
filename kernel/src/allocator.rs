@@ -1,6 +1,6 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    ptr::{null, null_mut},
+    ptr::null_mut,
 };
 
 use x86_64::{
@@ -183,15 +183,14 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         while !found {
             let adjustment = get_adjustment(curr, align);
 
-            if (*curr).free() && (*curr).size() as usize >= size + adjustment {
-                found = true;
-            }
-            if !(*curr).has_next() {
+            if curr == null_mut() || !(*curr).has_next() {
                 if let Some(allocated) = alloc_node(&mut allocator, curr, size, align) {
                     curr = allocated;
                 } else {
                     return null_mut();
                 }
+                found = true;
+            } else if (*curr).free() && (*curr).size() as usize >= size + adjustment {
                 found = true;
             }
             curr = (*curr).next();
