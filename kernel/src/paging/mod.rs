@@ -14,6 +14,7 @@ pub const KERNEL_ADDRESS: u64 = 0xffff_ffff_8000_0000;
 pub const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
 
 pub static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
+pub static mut PAGE_TABLE: PhysAddr = PhysAddr::zero();
 
 /// Unwrap the memory map response from the request.
 fn get_memmap() -> &'static LimineMemmapResponse {

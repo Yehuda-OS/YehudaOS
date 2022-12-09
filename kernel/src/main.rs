@@ -3,9 +3,9 @@
 
 use x86_64::registers::control::Cr3;
 
+mod allocator;
 mod io;
 mod paging;
-mod allocator;
 
 /// Kernel Entry Point
 ///
@@ -15,14 +15,15 @@ mod allocator;
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     let theirs = Cr3::read().0.start_address();
-    let table;
 
     paging::page_allocator::initialize();
-    table = paging::virtual_memory_manager::create_page_table();
-    paging::map_kernel_address(table);
-    paging::create_hhdm(table);
+    unsafe {
+        paging::PAGE_TABLE = paging::virtual_memory_manager::create_page_table();
+        paging::map_kernel_address(paging::PAGE_TABLE);
+        paging::create_hhdm(paging::PAGE_TABLE);
+    }
 
-    unsafe { paging::load_tables_to_cr3(table) };
+    unsafe { paging::load_tables_to_cr3(paging::PAGE_TABLE) };
 
     hcf();
 }
