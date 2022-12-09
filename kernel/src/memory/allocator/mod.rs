@@ -72,20 +72,22 @@ fn alloc_node(
     while current_size < size + adjustment {
         if let Some(page) = super::page_allocator::allocate() {
             allocator.pages += 1;
-            current_size += Size4KiB::SIZE as usize;
             super::virtual_memory_manager::map_address(
                 allocator.page_table,
                 start + current_size,
                 page,
                 flags,
             );
+            current_size += Size4KiB::SIZE as usize;
         } else {
             return None;
         }
     }
     allocated = start.as_mut_ptr::<HeapBlock>();
     unsafe {
-        (*last).set_has_next(true);
+        if !last.is_null() {
+            (*last).set_has_next(true);
+        }
         (*allocated) = HeapBlock::new(true, false, (current_size - HEADER_SIZE) as u64, last);
     };
 
@@ -117,7 +119,7 @@ unsafe fn find_usable_block(
     loop {
         let curr_adjustment = get_adjustment(curr, align);
 
-        if curr == null_mut() || !(*curr).has_next() {
+        if curr.is_null() || !(*curr).has_next() {
             return if let Some(allocated) = alloc_node(allocator, curr, size, align) {
                 Some(allocated)
             } else {
@@ -158,6 +160,7 @@ unsafe fn shrink_block(block: *mut HeapBlock, size: usize) {
     let extra = (*block).size() as usize - size;
 
     (*block).set_size(size as u64);
+    (*block).set_has_next(true);
     *(*block).next() = HeapBlock::new(true, has_next, (extra - HEADER_SIZE) as u64, block);
 }
 
@@ -233,4 +236,9 @@ impl<A> Locked<A> {
     pub fn lock(&self) -> spin::MutexGuard<A> {
         self.inner.lock()
     }
+}
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
 }
