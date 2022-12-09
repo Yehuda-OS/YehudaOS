@@ -77,8 +77,7 @@ impl HeapBlock {
     pub fn set_free(&mut self, free: bool) {
         if free {
             self.size |= 1 << HeapBlock::FREE_BIT;
-        }
-        else {
+        } else {
             self.size &= !(1 << HeapBlock::FREE_BIT);
         }
     }
@@ -93,8 +92,7 @@ impl HeapBlock {
     pub fn set_has_next(&mut self, has_next: bool) {
         if has_next {
             self.size |= 1 << HeapBlock::HAS_NEXT_BIT;
-        }
-        else {
+        } else {
             self.size &= !(1 << HeapBlock::HAS_NEXT_BIT);
         }
     }
@@ -117,7 +115,7 @@ impl HeapBlock {
         }
     }
 
-    pub fn get_prev(&self) -> *mut HeapBlock {
+    pub fn prev(&self) -> *mut HeapBlock {
         self.prev
     }
 }
@@ -220,18 +218,34 @@ fn merge_blocks(block: *mut HeapBlock) {}
 
 fn shrink_block(block: *mut HeapBlock, size: usize) {}
 
+/// Check if the block is bigger than the required size and if it is resize it accordingly and
+/// merge it with the other blocks around it if it is possible.
+///
+/// # Arguments
+/// - `block` - A free block with at least `size` space.
+/// - `size` - The required allocation size.
+/// - `align` - The required alignment for the allocation's start address.
+///
+/// # Safety
+/// This function is unsafe because the heap must not be corrupted and the block must be valid.
 unsafe fn resize_block(mut block: *mut HeapBlock, size: usize, align: usize) -> *mut HeapBlock {
     let mut adjustment = get_adjustment(block, align);
 
     if (*block).size() as usize > size + adjustment {
+        // Check if the current block can be merged with the next one.
         if (*block).has_next() && (*(*block).next()).free() {
             merge_blocks(block);
             shrink_block(block, size + adjustment);
         }
-        else if (*block).has_prev() && (*(*block).prev).free() {
-            block = (*block).prev;
+        // Check if the current block can be merged with the previous one.
+        else if (*block).has_prev() && (*(*block).prev()).free() {
+            block = (*block).prev();
             adjustment = get_adjustment(block, align);
             merge_blocks(block);
+            shrink_block(block, size + adjustment);
+        }
+        // Check if there's enough free space to split the current block.
+        else if (*block).size() as usize > size + adjustment + HEADER_SIZE {
             shrink_block(block, size + adjustment);
         }
     }
@@ -248,7 +262,6 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
 
         if let Some(mut block) = find_usable_block(&mut allocator, size, align) {
             block = resize_block(block, size, align);
-            (*block).set_free(true);
             adjustment = get_adjustment(block, align);
 
             (block as usize + HEADER_SIZE + adjustment) as *mut u8
