@@ -1,5 +1,6 @@
 pub mod page_allocator;
 pub mod virtual_memory_manager;
+pub mod allocator;
 
 use limine::{
     LimineMemmapEntry, LimineMemmapRequest, LimineMemmapResponse, LimineMemoryMapEntryType,
