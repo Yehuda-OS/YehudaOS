@@ -1,5 +1,6 @@
 pub mod page_allocator;
 pub mod virtual_memory_manager;
+pub mod allocator;
 
 use limine::{
     LimineMemmapEntry, LimineMemmapRequest, LimineMemmapResponse, LimineMemoryMapEntryType,
@@ -10,12 +11,11 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-const PAGE_TABLE_ENTRIES: isize = 512;
-const PAGE_TABLE_LEVELS: u8 = 4;
 pub const KERNEL_ADDRESS: u64 = 0xffff_ffff_8000_0000;
 pub const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
 
 pub static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
+pub static mut PAGE_TABLE: PhysAddr = PhysAddr::zero();
 
 /// Unwrap the memory map response from the request.
 fn get_memmap() -> &'static LimineMemmapResponse {
@@ -61,7 +61,7 @@ fn get_last_phys_addr() -> u64 {
 /// * `pml4` - The page map level 4, the highest page table.
 pub fn map_kernel_address(pml4: PhysAddr) {
     let memmap = get_memmap();
-    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
+    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let mut entry;
     let mut offset = 0;
 
