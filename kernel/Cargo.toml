@@ -12,3 +12,7 @@ bench = false
 limine = "0.1.9"
 spin = "0.9"
 x86_64 = "0.14.10"
+
+[dependencies.fs-rs]
+path = "../fs-rs"
+

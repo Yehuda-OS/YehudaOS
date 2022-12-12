@@ -3,8 +3,10 @@ name = "fs-rs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "fs_rs"
+path = "src/lib.rs"
+
 
 [dependencies]
 micromath = "2.0.0"
-const_format = "0.2.30"
