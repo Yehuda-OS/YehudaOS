@@ -104,34 +104,13 @@ pub fn map_kernel_address(pml4: PhysAddr) {
     let memmap = get_memmap();
     let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let mut entry;
-    let mut offset = 0;
 
     for i in 0..memmap.entry_count {
         // UNSAFE: `i` is between 0 and the entry count.
         entry = unsafe { get_memmap_entry(memmap, i) };
 
         if entry.typ == LimineMemoryMapEntryType::KernelAndModules {
-            while offset < entry.len {
-                let physical = PhysAddr::new(entry.base + offset);
-
-                if entry.len - offset >= Size2MiB::SIZE {
-                    virtual_memory_manager::map_address(
-                        pml4,
-                        VirtAddr::new(KERNEL_ADDRESS + offset),
-                        PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
-                        flags | PageTableFlags::HUGE_PAGE,
-                    );
-                    offset += Size2MiB::SIZE;
-                } else {
-                    virtual_memory_manager::map_address(
-                        pml4,
-                        VirtAddr::new(KERNEL_ADDRESS + offset),
-                        PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
-                        flags,
-                    );
-                    offset += Size4KiB::SIZE;
-                }
-            }
+            map_memmap_entry(VirtAddr::new(KERNEL_ADDRESS), entry, flags);
             break;
         }
     }
