@@ -1,6 +1,6 @@
+pub mod allocator;
 pub mod page_allocator;
 pub mod virtual_memory_manager;
-pub mod allocator;
 
 use limine::{
     LimineMemmapEntry, LimineMemmapRequest, LimineMemmapResponse, LimineMemoryMapEntryType,
@@ -56,7 +56,7 @@ fn get_last_phys_addr() -> u64 {
 }
 
 /// Map a memmap entry to a virtual address.
-/// 
+///
 /// # Arguments
 /// - `virtual_addr` - The required virtual start address.
 /// - `entry` - The entry to map.
@@ -162,7 +162,7 @@ pub fn create_hhdm(pml4: PhysAddr) {
 /// Identity map the framebuffer and any bootloader reclaimable memory that does not contain the
 /// page tables and the stack.
 /// Free the bootloader reclaimable memory that contains the page tables.
-pub fn map_framebuffer() {
+pub fn reclaim_bootloader_memory() {
     let memmap = get_memmap();
     let limine_table = Cr3::read().0.start_address().as_u64();
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;

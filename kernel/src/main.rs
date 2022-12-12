@@ -20,7 +20,7 @@ pub extern "C" fn _start() -> ! {
         memory::map_kernel_address(memory::PAGE_TABLE);
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
-        memory::map_framebuffer();
+        memory::reclaim_bootloader_memory();
     }
     println!("Hello world");
 
