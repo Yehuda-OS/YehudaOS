@@ -61,7 +61,7 @@ fn get_last_phys_addr() -> u64 {
 /// * `pml4` - The page map level 4, the highest page table.
 pub fn map_kernel_address(pml4: PhysAddr) {
     let memmap = get_memmap();
-    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT;
+    let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let mut entry;
     let mut offset = 0;
 
