@@ -158,3 +158,38 @@ pub fn create_hhdm(pml4: PhysAddr) {
         }
     }
 }
+
+
+pub fn map_framebuffer() {
+    let memmap = get_memmap();
+    let limine_table = Cr3::read().0.start_address().as_u64();
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let mut entry;
+    let mut rsp;
+    let mut addr;
+
+    unsafe { core::arch::asm!("mov {rsp}, rsp", rsp=out(reg)rsp) };
+
+    for i in 0..memmap.entry_count {
+        entry = unsafe { get_memmap_entry(memmap, i) };
+
+        if entry.typ == LimineMemoryMapEntryType::Framebuffer {
+            map_memmap_entry(VirtAddr::new(entry.base), entry, flags);
+        } else if entry.typ == LimineMemoryMapEntryType::BootloaderReclaimable {
+            if entry.base > limine_table || entry.base + entry.len < limine_table {
+                map_memmap_entry(VirtAddr::new(entry.base), entry, flags);
+            } else if entry.base > rsp || entry.base + entry.len < rsp {
+                addr = entry.base;
+
+                while addr < entry.base + entry.len {
+                    unsafe {
+                        page_allocator::free(
+                            PhysFrame::from_start_address(PhysAddr::new(addr)).unwrap(),
+                        );
+                    }
+                    addr += Size4KiB::SIZE;
+                }
+            }
+        }
+    }
+}
