@@ -55,6 +55,47 @@ fn get_last_phys_addr() -> u64 {
     last_entry.base + last_entry.len
 }
 
+/// Map a memmap entry to a virtual address.
+/// 
+/// # Arguments
+/// - `virtual_addr` - The required virtual start address.
+/// - `entry` - The entry to map.
+/// - `flags` - The page table flags to use.
+fn map_memmap_entry(virtual_addr: VirtAddr, entry: &LimineMemmapEntry, flags: PageTableFlags) {
+    let mut offset = 0;
+
+    while offset < entry.len {
+        let physical = PhysAddr::new(entry.base + offset);
+        let remaining = entry.len - offset;
+
+        if virtual_addr.is_aligned(Size1GiB::SIZE) && remaining >= Size1GiB::SIZE {
+            virtual_memory_manager::map_address(
+                unsafe { PAGE_TABLE },
+                VirtAddr::new(virtual_addr.as_u64() + offset),
+                PhysFrame::<Size1GiB>::from_start_address(physical).unwrap(),
+                flags | PageTableFlags::HUGE_PAGE,
+            );
+            offset += Size1GiB::SIZE;
+        } else if virtual_addr.is_aligned(Size2MiB::SIZE) && remaining >= Size2MiB::SIZE {
+            virtual_memory_manager::map_address(
+                unsafe { PAGE_TABLE },
+                VirtAddr::new(virtual_addr.as_u64() + offset),
+                PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
+                flags | PageTableFlags::HUGE_PAGE,
+            );
+            offset += Size2MiB::SIZE;
+        } else {
+            virtual_memory_manager::map_address(
+                unsafe { PAGE_TABLE },
+                VirtAddr::new(virtual_addr.as_u64() + offset),
+                PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
+                flags,
+            );
+            offset += Size4KiB::SIZE;
+        }
+    }
+}
+
 /// Map the kernel's virtual address.
 ///
 /// # Arguments
