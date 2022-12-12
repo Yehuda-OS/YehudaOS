@@ -159,7 +159,9 @@ pub fn create_hhdm(pml4: PhysAddr) {
     }
 }
 
-
+/// Identity map the framebuffer and any bootloader reclaimable memory that does not contain the
+/// page tables and the stack.
+/// Free the bootloader reclaimable memory that contains the page tables.
 pub fn map_framebuffer() {
     let memmap = get_memmap();
     let limine_table = Cr3::read().0.start_address().as_u64();
@@ -176,9 +178,7 @@ pub fn map_framebuffer() {
         if entry.typ == LimineMemoryMapEntryType::Framebuffer {
             map_memmap_entry(VirtAddr::new(entry.base), entry, flags);
         } else if entry.typ == LimineMemoryMapEntryType::BootloaderReclaimable {
-            if entry.base > limine_table || entry.base + entry.len < limine_table {
-                map_memmap_entry(VirtAddr::new(entry.base), entry, flags);
-            } else if entry.base > rsp || entry.base + entry.len < rsp {
+            if entry.base < limine_table && entry.base + entry.len > limine_table {
                 addr = entry.base;
 
                 while addr < entry.base + entry.len {
@@ -189,6 +189,8 @@ pub fn map_framebuffer() {
                     }
                     addr += Size4KiB::SIZE;
                 }
+            } else if entry.base > rsp || entry.base + entry.len < rsp {
+                map_memmap_entry(VirtAddr::new(entry.base), entry, flags);
             }
         }
     }
