@@ -1,4 +1,4 @@
-mod blkdev;
+pub mod blkdev;
 
 extern crate alloc;
 
@@ -10,7 +10,7 @@ use blkdev::BlkDev;
 use core::result::{Result, Result::Err, Result::Ok};
 
 use core::option::Option::None;
-struct Fs {
+pub struct Fs {
     blkdev: BlkDev,
     disk_parts: DiskParts,
 }
@@ -248,5 +248,65 @@ impl Fs {
         let block_number: usize = (address - self.disk_parts.data) / BLOCK_SIZE;
 
         self.deallocate(self.disk_parts.block_bit_map, block_number);
+    }
+
+    /*
+
+    _addFileToFolder(const MyFs::DirEntry& file, MyFs::Inode& folder)
+    {
+
+
+
+        this->_writeInode(folder);
+    }
+
+    */
+
+    fn add_file_to_folder(&self, file: &DirEntry, folder: &mut Inode) {
+        let mut pointer: usize = folder.size / BLOCK_SIZE;
+        let mut bytes_left: usize = core::mem::size_of_val(file);
+        let mut address: isize = 0;
+        let mut space_taken_in_last_block: isize = (folder.size % BLOCK_SIZE) as isize;
+        let mut empty_space: isize = 0;
+        let mut to_write: usize = 0;
+        let mut written: usize = 0;
+
+        *folder = self
+            .reallocate_blocks(folder, folder.size + core::mem::size_of_val(file))
+            .unwrap();
+
+        address = folder.addresses[pointer] as isize + space_taken_in_last_block;
+        empty_space = BLOCK_SIZE as isize - space_taken_in_last_block;
+        to_write = if bytes_left > empty_space as usize {
+            empty_space as usize
+        } else {
+            bytes_left
+        };
+
+        loop {
+            unsafe {
+                self.blkdev.write(
+                    address as usize,
+                    to_write as usize,
+                    (file as *const _ as *mut u8).add(written),
+                )
+            };
+
+            folder.size += to_write;
+            written += to_write;
+            bytes_left -= to_write;
+            pointer += 1;
+            address = folder.addresses[pointer] as isize;
+
+            to_write = if bytes_left > BLOCK_SIZE {
+                BLOCK_SIZE
+            } else {
+                bytes_left
+            };
+
+            if bytes_left == 0 {
+                break;
+            }
+        }
     }
 }
