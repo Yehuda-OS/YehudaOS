@@ -8,6 +8,7 @@ use alloc::{
 };
 use blkdev::BlkDev;
 use core::result::{Result, Result::Err, Result::Ok};
+use micromath::F32;
 
 use core::option::Option::None;
 pub struct Fs {
@@ -47,7 +48,7 @@ struct DirEntry {
     id: usize,
 }
 
-/// private functions implementation
+/// private functions
 impl Fs {
     fn get_root_dir(&self) -> Inode {
         let ans: Inode = Inode {
@@ -250,18 +251,6 @@ impl Fs {
         self.deallocate(self.disk_parts.block_bit_map, block_number);
     }
 
-    /*
-
-    _addFileToFolder(const MyFs::DirEntry& file, MyFs::Inode& folder)
-    {
-
-
-
-        this->_writeInode(folder);
-    }
-
-    */
-
     fn add_file_to_folder(&self, file: &DirEntry, folder: &mut Inode) {
         let mut pointer: usize = folder.size / BLOCK_SIZE;
         let mut bytes_left: usize = core::mem::size_of_val(file);
@@ -307,6 +296,59 @@ impl Fs {
             if bytes_left == 0 {
                 break;
             }
+        }
+    }
+
+    fn calc_parts() -> DiskParts {
+        let device_size: usize = BlkDev::DEVICE_SIZE;
+        let mut parts: DiskParts = DiskParts {
+            block_bit_map: 0,
+            inode_bit_map: 0,
+            root: 0,
+            unused: 0,
+            data: 0,
+        };
+        let mut remaining_space: usize = device_size - core::mem::size_of::<Header>();
+        let mut amount_of_blocks: usize = remaining_space / BLOCK_SIZE;
+        let mut amount_of_inodes: usize = 0;
+
+        parts.block_bit_map = core::mem::size_of::<Header>();
+        parts.inode_bit_map = parts.block_bit_map;
+
+        while ((parts.inode_bit_map - parts.block_bit_map) % BLOCK_SIZE) < amount_of_blocks {
+            if (parts.inode_bit_map - parts.block_bit_map) % BLOCK_SIZE == 0 {
+                amount_of_blocks -= 1;
+            }
+            parts.inode_bit_map += 1;
+        }
+
+        /*
+        remainingSpace = deviceSize - parts.inodeBitMap;
+            amountOfInodes = remainingSpace / BYTES_PER_INODE;
+            parts.root = parts.inodeBitMap + (int)std::ceil((float)amountOfInodes / BITS_IN_BYTE);
+            parts.unused = parts.root + amountOfInodes * (int)sizeof(Inode);
+
+            parts.data = parts.unused + (deviceSize - parts.unused) % BLOCK_SIZE;
+        */
+
+        remaining_space = device_size - parts.inode_bit_map;
+        amount_of_inodes = remaining_space / BYTES_PER_INODE;
+        parts.root =
+            parts.inode_bit_map + F32((amount_of_blocks / BITS_IN_BYTE) as f32).ceil().0 as usize;
+        parts.unused = parts.root + amount_of_inodes * core::mem::size_of::<Inode>();
+
+        parts.data = parts.unused + (device_size - parts.unused) % BLOCK_SIZE;
+
+        parts
+    }
+}
+
+/// public functions
+impl Fs {
+    fn new(blkdev: BlkDev) -> Self {
+        Self {
+            blkdev: blkdev,
+            disk_parts: Self::calc_parts(),
         }
     }
 }
