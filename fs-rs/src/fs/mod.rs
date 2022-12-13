@@ -322,15 +322,6 @@ impl Fs {
             parts.inode_bit_map += 1;
         }
 
-        /*
-        remainingSpace = deviceSize - parts.inodeBitMap;
-            amountOfInodes = remainingSpace / BYTES_PER_INODE;
-            parts.root = parts.inodeBitMap + (int)std::ceil((float)amountOfInodes / BITS_IN_BYTE);
-            parts.unused = parts.root + amountOfInodes * (int)sizeof(Inode);
-
-            parts.data = parts.unused + (deviceSize - parts.unused) % BLOCK_SIZE;
-        */
-
         remaining_space = device_size - parts.inode_bit_map;
         amount_of_inodes = remaining_space / BYTES_PER_INODE;
         parts.root =
