@@ -4,6 +4,7 @@ extern crate alloc;
 
 use alloc::{
     string::{String, ToString},
+    vec,
     vec::Vec,
 };
 use blkdev::BlkDev;
@@ -11,6 +12,12 @@ use core::result::{Result, Result::Err, Result::Ok};
 use micromath::F32;
 
 use core::option::Option::None;
+
+type DirList = Vec<DirListEntry>;
+
+const FS_MAGIC: [u8; 4] = *b"FSRS";
+const CURR_VERSION: u8 = 0x1;
+
 pub struct Fs {
     blkdev: BlkDev,
     disk_parts: DiskParts,
@@ -41,6 +48,12 @@ struct Inode {
     directory: bool,
     size: usize,
     addresses: [usize; DIRECT_POINTERS],
+}
+
+struct DirListEntry {
+    name: String,
+    is_dir: bool,
+    file_size: usize,
 }
 
 struct DirEntry {
@@ -336,10 +349,57 @@ impl Fs {
 
 /// public functions
 impl Fs {
-    fn new(blkdev: BlkDev) -> Self {
+    pub fn new(blkdev: BlkDev) -> Self {
         Self {
             blkdev: blkdev,
             disk_parts: Self::calc_parts(),
         }
+    }
+
+    fn format(&mut self) {
+        let mut header: Header = Header {
+            magic: [0; 4],
+            version: 0,
+        };
+
+        let bit_maps_size = self.disk_parts.root - self.disk_parts.block_bit_map;
+        let zeroes_buf = vec![0; bit_maps_size];
+        let mut root: Inode = Inode {
+            id: 0,
+            directory: false,
+            size: 0,
+            addresses: [0; DIRECT_POINTERS],
+        };
+
+        // put the header in place
+        header.magic.copy_from_slice(&FS_MAGIC);
+        header.version = CURR_VERSION;
+        unsafe {
+            self.blkdev.write(
+                0,
+                core::mem::size_of_val(&header),
+                &header as *const _ as *mut u8,
+            )
+        };
+
+        // zero out bit maps
+        unsafe {
+            self.blkdev.write(
+                self.disk_parts.block_bit_map,
+                bit_maps_size,
+                zeroes_buf.as_ptr() as *mut u8,
+            )
+        };
+
+        // create root directory Inode
+        root.directory = true;
+        root.id = self.allocate_inode();
+        unsafe {
+            self.blkdev.write(
+                self.disk_parts.root,
+                core::mem::size_of_val(&root),
+                &root as *const _ as *mut u8,
+            )
+        };
     }
 }
