@@ -25,12 +25,12 @@ impl BlkDev {
         Ok(BlkDev(filemap))
     }
 
-    pub unsafe fn read(self, addr: usize, size: usize, ans: *mut u8) {
+    pub unsafe fn read(&self, addr: usize, size: usize, ans: *mut u8) {
         let src: *const u8 = (self.0.as_ptr().addr() + addr) as *const u8;
         core::ptr::copy_nonoverlapping(src, ans, size);
     }
 
-    pub unsafe fn write(self, addr: usize, size: usize, data: *mut u8) {
+    pub unsafe fn write(&self, addr: usize, size: usize, data: *mut u8) {
         let dst: *mut u8 = (self.0.as_ptr().addr() + addr) as *mut u8;
         core::ptr::copy_nonoverlapping(data, dst, size);
     }

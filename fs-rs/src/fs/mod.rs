@@ -7,7 +7,7 @@ use alloc::{
     vec::Vec,
 };
 use blkdev::BlkDev;
-use core::result::{Result, Result::Ok};
+use core::result::{Result, Result::Err, Result::Ok};
 
 use core::option::Option::None;
 struct Fs {
@@ -34,6 +34,7 @@ const BLOCK_SIZE: usize = 16;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 
+#[derive(Clone, Copy)]
 struct Inode {
     id: usize,
     directory: bool,
@@ -46,6 +47,7 @@ struct DirEntry {
     id: usize,
 }
 
+/// private functions implementation
 impl Fs {
     fn get_root_dir(&self) -> Inode {
         let ans: Inode = Inode {
@@ -66,8 +68,8 @@ impl Fs {
         ans
     }
 
-    fn get_inode(&self, path: String) -> Inode {
-        let next_delimiter = path.find('/');
+    fn get_inode(&self, mut path: String) -> Inode {
+        let mut next_delimiter = path.find('/');
         let mut next_folder = String::new();
         let mut inode = self.get_root_dir();
         let mut dir_content: Vec<DirEntry> = Vec::new();
@@ -106,20 +108,23 @@ impl Fs {
     }
 
     fn read_inode_data(&self, inode: &Inode) -> Result<Vec<DirEntry>, &'static str> {
-        let LAST_POINTER = inode.size / BLOCK_SIZE;
+        let last_pointer: usize = inode.size / BLOCK_SIZE;
         let mut pointer = 0;
         let mut to_read = 0;
         let mut buffer = Vec::<DirEntry>::new();
 
         while buffer.len() != inode.size {
-            to_read = if pointer == LAST_POINTER {
+            to_read = if pointer == last_pointer {
                 inode.size % BLOCK_SIZE
             } else {
                 BLOCK_SIZE
             };
             unsafe {
-                self.blkdev
-                    .read(inode.addresses[pointer], to_read, buffer.as_mut_ptr())
+                self.blkdev.read(
+                    inode.addresses[pointer],
+                    to_read,
+                    buffer.as_ptr() as *mut u8,
+                )
             };
             pointer += 1;
         }
@@ -179,5 +184,69 @@ impl Fs {
             }
         }
         address
+    }
+
+    fn deallocate(&self, bitmap_start: usize, n: usize) {
+        let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;
+        let mut byte: usize = 0;
+        let mut offset: usize = n % BITS_IN_BYTE;
+
+        unsafe {
+            self.blkdev
+                .read(byte_address, 1, byte as *mut usize as *mut u8)
+        };
+        byte ^= 1 << offset; // flip the bit to mark as unoccupied
+        unsafe {
+            self.blkdev
+                .write(byte_address, 1, byte as *mut usize as *mut u8)
+        };
+    }
+
+    fn reallocate_blocks(&self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
+        let mut used_blocks: isize = 0;
+        let required_blocks: usize = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
+        let mut blocks_to_allocate: isize = 0;
+        let mut new_addresses: Inode = *inode;
+
+        if required_blocks > DIRECT_POINTERS {
+            return Err("too many blocks are required");
+        }
+
+        while new_addresses.addresses[used_blocks as usize] != 0 {
+            used_blocks += 1;
+        }
+
+        blocks_to_allocate = (required_blocks as isize - used_blocks) as isize;
+
+        if blocks_to_allocate > 0 {
+            for i in 0..blocks_to_allocate {
+                new_addresses.addresses[used_blocks as usize] = self.allocate_block();
+                used_blocks += 1;
+            }
+        } else if blocks_to_allocate < 0 {
+            for i in 0..(-blocks_to_allocate) {
+                used_blocks -= 1;
+                self.deallocate_block(new_addresses.addresses[used_blocks as usize]);
+                new_addresses.addresses[used_blocks as usize] = 0;
+            }
+        }
+
+        Ok(new_addresses)
+    }
+
+    fn allocate_block(&self) -> usize {
+        let mut address: usize = self.allocate(self.disk_parts.block_bit_map);
+
+        // get physical address of the occupied block
+        address *= BLOCK_SIZE;
+        address += self.disk_parts.data;
+
+        address
+    }
+
+    fn deallocate_block(&self, address: usize) {
+        let block_number: usize = (address - self.disk_parts.data) / BLOCK_SIZE;
+
+        self.deallocate(self.disk_parts.block_bit_map, block_number);
     }
 }
