@@ -1,6 +1,6 @@
 //#![no_std]
 #![feature(strict_provenance)]
-#![feature(inherent_associated_types)]
+#![feature(allocator_api)]
 
 extern crate alloc;
 use alloc::string::String;
