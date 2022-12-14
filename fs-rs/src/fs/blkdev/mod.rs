@@ -31,7 +31,7 @@ impl BlkDev {
         }
 
         for i in 0..size {
-            *(ans.add(i)) = self.0[addr + i];
+            *(ans.add(self.0.as_ptr().addr() + i)) = self.0[addr + i];
         }
     }
 
@@ -41,7 +41,7 @@ impl BlkDev {
         }
 
         for i in 0..size {
-            self.0[addr + i] = *(data.add(i));
+            self.0[addr + i] = *(data.add(self.0.as_ptr().addr() + i));
         }
     }
 }

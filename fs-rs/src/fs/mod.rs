@@ -448,14 +448,14 @@ impl Fs {
         } else {
             0
         };
-        let file_name: String = (*path_str)[last_delimeter + 1..].to_string();
+        let file_name: String = path_str[last_delimeter + 1..].to_string();
         let mut file: Inode = Inode {
             id: 0,
             directory: false,
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let mut dir: Inode = self.get_inode(path_str[0..last_delimeter].to_string());
+        let mut dir: Inode = self.get_inode(path_str[0..(last_delimeter + 1)].to_string());
         let mut file_details: DirEntry = DirEntry {
             name: "".to_string(),
             id: 0,

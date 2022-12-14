@@ -1,13 +1,7 @@
 #![no_std]
 #![no_main]
-#![feature(strict_provenance)]
 
-use x86_64::{registers::control::Cr3, VirtAddr};
-
-use crate::paging::virtual_memory_manager;
-use limine::LimineFramebufferRequest;
-
-static FRAME_BUFFER: LimineFramebufferRequest = LimineFramebufferRequest::new(0);
+use x86_64::registers::control::Cr3;
 
 mod io;
 mod paging;
@@ -26,10 +20,6 @@ pub extern "C" fn _start() -> ! {
     table = paging::virtual_memory_manager::create_page_table();
     paging::map_kernel_address(table);
     paging::create_hhdm(table);
-
-    let a = FRAME_BUFFER.get_response().get().unwrap().framebuffers();
-
-    println!("{:p}", a.as_ptr());
 
     unsafe { paging::load_tables_to_cr3(table) };
 

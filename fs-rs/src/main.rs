@@ -1,3 +1,5 @@
+#![feature(strict_provenance)]
+
 use std::vec::Vec;
 
 use fs::Fs;
