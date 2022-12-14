@@ -173,7 +173,7 @@ impl Fs {
                 self.blkdev.read(
                     inode.addresses[pointer],
                     to_read,
-                    buffer.as_ptr() as *mut u8,
+                    core::mem::transmute(&buffer as *const _ as *mut u8),
                 )
             };
             pointer += 1;
