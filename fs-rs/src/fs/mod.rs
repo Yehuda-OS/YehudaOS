@@ -8,12 +8,15 @@ use alloc::{
     vec::Vec,
 };
 use blkdev::BlkDev;
-use core::result::{Result, Result::Err, Result::Ok};
+use core::{
+    ptr::slice_from_raw_parts,
+    result::{Result, Result::Err, Result::Ok},
+};
 use micromath::F32;
 
 use core::option::Option::None;
 
-type DirList = Vec<DirListEntry>;
+pub type DirList = Vec<DirListEntry>;
 
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
@@ -50,12 +53,14 @@ struct Inode {
     addresses: [usize; DIRECT_POINTERS],
 }
 
-struct DirListEntry {
-    name: String,
-    is_dir: bool,
-    file_size: usize,
+#[derive(Clone)]
+pub struct DirListEntry {
+    pub name: String,
+    pub is_dir: bool,
+    pub file_size: usize,
 }
 
+#[derive(Clone)]
 struct DirEntry {
     name: String,
     id: usize,
@@ -96,6 +101,7 @@ impl Fs {
         while next_delimiter != None {
             dir_content = self
                 .read_inode_data(&inode)
+                .0
                 .expect("Error: failed to read the inode data");
             path = path[(next_delimiter.unwrap() + 1)..].to_string();
             next_delimiter = path.find('/');
@@ -121,7 +127,13 @@ impl Fs {
         self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
 
-    fn read_inode_data(&self, inode: &Inode) -> Result<Vec<DirEntry>, &'static str> {
+    fn read_inode_data(
+        &self,
+        inode: &Inode,
+    ) -> (
+        Result<Vec<DirEntry>, &'static str>,
+        Result<(*mut u8, usize), &'static str>,
+    ) {
         let last_pointer: usize = inode.size / BLOCK_SIZE;
         let mut pointer = 0;
         let mut to_read = 0;
@@ -143,7 +155,10 @@ impl Fs {
             pointer += 1;
         }
 
-        Ok(buffer)
+        (
+            Ok(buffer.to_vec()),
+            Ok((buffer.as_ptr() as *mut u8, buffer.len())),
+        )
     }
 
     fn write_inode(&self, inode: &Inode) {
@@ -356,7 +371,7 @@ impl Fs {
         }
     }
 
-    fn format(&mut self) {
+    pub fn format(&mut self) {
         let mut header: Header = Header {
             magic: [0; 4],
             version: 0,
@@ -401,5 +416,130 @@ impl Fs {
                 &root as *const _ as *mut u8,
             )
         };
+    }
+
+    pub fn create_file(&mut self, path_str: String, directory: bool) {
+        let last_delimeter: usize = if path_str.rfind('/').is_some() {
+            path_str.rfind('/').unwrap()
+        } else {
+            0
+        };
+        let file_name: String = (*path_str)[last_delimeter + 1..].to_string();
+        let mut file: Inode = Inode {
+            id: 0,
+            directory: false,
+            size: 0,
+            addresses: [0; DIRECT_POINTERS],
+        };
+        let mut dir: Inode = self.get_inode(path_str[0..last_delimeter].to_string());
+        let mut file_details: DirEntry = DirEntry {
+            name: "".to_string(),
+            id: 0,
+        };
+
+        file.id = self.allocate_inode();
+        file.directory = directory;
+        self.write_inode(&file);
+
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                file_name.as_ptr(),
+                file_details.name.as_mut_ptr(),
+                core::mem::size_of_val(&file_details.name) - 1,
+            )
+        };
+        file_details.id = file.id;
+        self.add_file_to_folder(&file_details, &mut dir);
+    }
+
+    pub fn get_content(&self, path_str: &String) -> String {
+        let file: Inode = self.get_inode(path_str.clone());
+        let content = self.read_inode_data(&file).1.unwrap();
+        let content_str: String =
+            String::from_utf8_lossy(unsafe { &*slice_from_raw_parts(content.0, content.1) })
+                .to_string();
+
+        content_str
+    }
+
+    pub fn list_dir(&self, path_str: &String) -> DirList {
+        let mut ans: DirList = vec![];
+        let mut entry: &mut DirListEntry = &mut DirListEntry {
+            name: "".to_string(),
+            is_dir: false,
+            file_size: 0,
+        };
+        let dir: Inode = self.get_inode(path_str.clone());
+        let mut root_dir_content: Vec<DirEntry> = self
+            .read_inode_data(&dir)
+            .0
+            .expect("Error: failed to read the inode data");
+
+        let mut file: Inode = Inode {
+            id: 0,
+            directory: false,
+            size: 0,
+            addresses: [0; DIRECT_POINTERS],
+        };
+        let mut dir_entries: usize = 0;
+
+        dir_entries = dir.size / core::mem::size_of::<DirEntry>();
+        for i in 0..dir_entries {
+            entry.name = root_dir_content[i].name.clone();
+
+            unsafe {
+                self.blkdev.read(
+                    self.get_inode_address(root_dir_content[i].id),
+                    core::mem::size_of::<Inode>(),
+                    &file as *const _ as *mut u8,
+                )
+            };
+
+            entry.file_size = file.size;
+            entry.is_dir = file.directory;
+            ans.push(entry.clone());
+        }
+
+        ans
+    }
+
+    /*
+
+
+
+    this->_writeInode(file);
+    */
+
+    pub fn set_content(&self, path_str: &String, content: &String) {
+        let new_size: usize = content.len();
+        let last_pointer: usize = new_size / BLOCK_SIZE;
+        let mut str_as_arr: Vec<char> = content.chars().collect();
+        let mut file: Inode = self.get_inode(path_str.clone());
+        let mut pointer: usize = 0;
+        let mut to_write: usize = 0;
+        let mut bytes_written: usize = 0;
+
+        file = self
+            .reallocate_blocks(&file, new_size)
+            .expect("Error: could not reallocate the block");
+        file.size = new_size;
+        while bytes_written != file.size {
+            to_write = if pointer == last_pointer {
+                (file.size % BLOCK_SIZE)
+            } else {
+                BLOCK_SIZE
+            };
+            unsafe {
+                self.blkdev.write(
+                    file.addresses[pointer],
+                    to_write,
+                    str_as_arr.as_mut_ptr().add(bytes_written) as *mut u8,
+                )
+            };
+            bytes_written += to_write;
+            pointer += 1;
+        }
+
+        self.write_inode(&file);
     }
 }
