@@ -26,12 +26,12 @@ impl BlkDev {
     }
 
     pub unsafe fn read(&mut self, addr: usize, size: usize, ans: *mut u8) {
-        if size > self.0.len() {
-            self.0.resize(self.0.len() + size, 0);
+        if (addr + size) > self.0.len() {
+            self.0.resize(self.0.len() + addr + size, 0);
         }
 
         for i in 0..size {
-            *(ans.add(self.0.as_ptr().addr() + i)) = self.0[addr + i];
+            *(ans.add(i)) = self.0[addr + i];
         }
     }
 
@@ -41,7 +41,7 @@ impl BlkDev {
         }
 
         for i in 0..size {
-            self.0[addr + i] = *(data.add(self.0.as_ptr().addr() + i));
+            self.0[addr + i] = *(data.add(i));
         }
     }
 }

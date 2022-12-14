@@ -103,7 +103,7 @@ impl Fs {
             self.blkdev.read(
                 self.disk_parts.root,
                 core::mem::size_of::<Inode>(),
-                &ans as *const _ as *mut u8,
+                core::mem::transmute(&ans as *const Inode as *mut u8),
             )
         };
 
@@ -209,8 +209,11 @@ impl Fs {
         // read the bitmap until an unoccupied memory is found
         loop {
             unsafe {
-                self.blkdev
-                    .read(address, BYTES_IN_BUFFER, buffer as *mut u8)
+                self.blkdev.read(
+                    address,
+                    BYTES_IN_BUFFER,
+                    core::mem::transmute(&buffer as *const usize as *mut u8),
+                )
             };
             address += BYTES_IN_BUFFER;
             if buffer != ALL_OCCUPIED {
@@ -225,8 +228,11 @@ impl Fs {
                 // if the (i)'s bit is 0
                 buffer ^= 1 << i; // flip the bit to mark as occupied
                 unsafe {
-                    self.blkdev
-                        .write(address, BYTES_IN_BUFFER, buffer as *mut u8);
+                    self.blkdev.write(
+                        address,
+                        BYTES_IN_BUFFER,
+                        core::mem::transmute(&buffer as *const usize as *mut u8),
+                    );
                 }
                 // get the index in the bitmap
                 address -= bitmap_start;
@@ -246,12 +252,12 @@ impl Fs {
 
         unsafe {
             self.blkdev
-                .read(byte_address, 1, byte as *mut usize as *mut u8)
+                .read(byte_address, 1, &byte as *const usize as *mut u8)
         };
         byte ^= 1 << offset; // flip the bit to mark as unoccupied
         unsafe {
             self.blkdev
-                .write(byte_address, 1, byte as *mut usize as *mut u8)
+                .write(byte_address, 1, &byte as *const usize as *mut u8)
         };
     }
 
@@ -465,13 +471,7 @@ impl Fs {
         file.directory = directory;
         self.write_inode(&file);
 
-        unsafe {
-            core::ptr::copy_nonoverlapping(
-                file_name.as_ptr(),
-                file_details.name.as_mut_ptr(),
-                core::mem::size_of_val(&file_details.name) - 1,
-            )
-        };
+        file_details.name = file_name;
         file_details.id = file.id;
         self.add_file_to_folder(&file_details, &mut dir);
     }
