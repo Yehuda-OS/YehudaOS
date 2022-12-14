@@ -17,8 +17,8 @@ static mut HELP_STRING: String = String::new();
 
 mod fs;
 
-fn recursive_print(myfs: &Fs, path: String, prefix: String) {
-    let dlist = myfs.list_dir(&path);
+fn recursive_print(fs: &mut Fs, path: String, prefix: String) {
+    let dlist = fs.list_dir(&path);
     for (i, curr_entry) in dlist.iter().enumerate() {
         let entry_prefix = if i == dlist.len() - 1 {
             format!("{}└── ", prefix)
@@ -33,7 +33,7 @@ fn recursive_print(myfs: &Fs, path: String, prefix: String) {
             } else {
                 format!("{}│   ", prefix)
             };
-            recursive_print(myfs, format!("{}/{}", path, curr_entry.name), dir_prefix);
+            recursive_print(fs, format!("{}/{}", path, curr_entry.name), dir_prefix);
         }
     }
 }
@@ -127,7 +127,7 @@ fn main() {
                 }
             }
 
-            TREE_CMD => recursive_print(&fs, "".to_string(), "".to_string()),
+            TREE_CMD => recursive_print(&mut fs, "".to_string(), "".to_string()),
 
             EDIT_CMD => {
                 if cmd.len() == 2 {

@@ -26,6 +26,15 @@ pub struct Fs {
     disk_parts: DiskParts,
 }
 
+impl core::clone::Clone for Fs {
+    fn clone(&self) -> Self {
+        Self {
+            blkdev: self.blkdev.clone(),
+            disk_parts: self.disk_parts,
+        }
+    }
+}
+
 struct Header {
     magic: [u8; 4],
     version: u8,
@@ -38,6 +47,20 @@ struct DiskParts {
     unused: usize,
     data: usize,
 }
+
+impl core::clone::Clone for DiskParts {
+    fn clone(&self) -> Self {
+        Self {
+            block_bit_map: self.block_bit_map.clone(),
+            inode_bit_map: self.inode_bit_map.clone(),
+            root: self.root.clone(),
+            unused: self.unused.clone(),
+            data: self.data.clone(),
+        }
+    }
+}
+
+impl Copy for DiskParts {}
 
 const DIRECT_POINTERS: usize = 12;
 const FILE_NAME_LEN: usize = 11;
@@ -68,7 +91,7 @@ struct DirEntry {
 
 /// private functions
 impl Fs {
-    fn get_root_dir(&self) -> Inode {
+    fn get_root_dir(&mut self) -> Inode {
         let ans: Inode = Inode {
             id: 0,
             directory: false,
@@ -87,7 +110,7 @@ impl Fs {
         ans
     }
 
-    fn get_inode(&self, mut path: String) -> Inode {
+    fn get_inode(&mut self, mut path: String) -> Inode {
         let mut next_delimiter = path.find('/');
         let mut next_folder = String::new();
         let mut inode = self.get_root_dir();
@@ -112,7 +135,8 @@ impl Fs {
 
             unsafe {
                 self.blkdev.read(
-                    self.get_inode_address(dir_content[index as usize].id),
+                    self.clone()
+                        .get_inode_address(dir_content[index as usize].id),
                     core::mem::size_of::<Inode>(),
                     &mut inode as *mut Inode as *mut u8,
                 )
@@ -123,12 +147,12 @@ impl Fs {
         inode
     }
 
-    fn get_inode_address(&self, id: usize) -> usize {
+    fn get_inode_address(&mut self, id: usize) -> usize {
         self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
 
     fn read_inode_data(
-        &self,
+        &mut self,
         inode: &Inode,
     ) -> (
         Result<Vec<DirEntry>, &'static str>,
@@ -161,21 +185,21 @@ impl Fs {
         )
     }
 
-    fn write_inode(&self, inode: &Inode) {
+    fn write_inode(&mut self, inode: &Inode) {
         unsafe {
             self.blkdev.write(
-                self.get_inode_address(inode.id),
+                self.clone().get_inode_address(inode.id),
                 core::mem::size_of::<Inode>(),
                 inode as *const _ as *mut u8,
             )
         };
     }
 
-    fn allocate_inode(&self) -> usize {
+    fn allocate_inode(&mut self) -> usize {
         self.allocate(self.disk_parts.inode_bit_map)
     }
 
-    fn allocate(&self, bitmap_start: usize) -> usize {
+    fn allocate(&mut self, bitmap_start: usize) -> usize {
         const BITS_IN_BUFFER: usize = 64;
         const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
         const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
@@ -215,7 +239,7 @@ impl Fs {
         address
     }
 
-    fn deallocate(&self, bitmap_start: usize, n: usize) {
+    fn deallocate(&mut self, bitmap_start: usize, n: usize) {
         let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;
         let mut byte: usize = 0;
         let mut offset: usize = n % BITS_IN_BYTE;
@@ -231,7 +255,7 @@ impl Fs {
         };
     }
 
-    fn reallocate_blocks(&self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
+    fn reallocate_blocks(&mut self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
         let mut used_blocks: isize = 0;
         let required_blocks: usize = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
         let mut blocks_to_allocate: isize = 0;
@@ -263,7 +287,7 @@ impl Fs {
         Ok(new_addresses)
     }
 
-    fn allocate_block(&self) -> usize {
+    fn allocate_block(&mut self) -> usize {
         let mut address: usize = self.allocate(self.disk_parts.block_bit_map);
 
         // get physical address of the occupied block
@@ -273,13 +297,13 @@ impl Fs {
         address
     }
 
-    fn deallocate_block(&self, address: usize) {
+    fn deallocate_block(&mut self, address: usize) {
         let block_number: usize = (address - self.disk_parts.data) / BLOCK_SIZE;
 
         self.deallocate(self.disk_parts.block_bit_map, block_number);
     }
 
-    fn add_file_to_folder(&self, file: &DirEntry, folder: &mut Inode) {
+    fn add_file_to_folder(&mut self, file: &DirEntry, folder: &mut Inode) {
         let mut pointer: usize = folder.size / BLOCK_SIZE;
         let mut bytes_left: usize = core::mem::size_of_val(file);
         let mut address: isize = 0;
@@ -452,7 +476,7 @@ impl Fs {
         self.add_file_to_folder(&file_details, &mut dir);
     }
 
-    pub fn get_content(&self, path_str: &String) -> String {
+    pub fn get_content(&mut self, path_str: &String) -> String {
         let file: Inode = self.get_inode(path_str.clone());
         let content = self.read_inode_data(&file).1.unwrap();
         let content_str: String =
@@ -462,7 +486,7 @@ impl Fs {
         content_str
     }
 
-    pub fn list_dir(&self, path_str: &String) -> DirList {
+    pub fn list_dir(&mut self, path_str: &String) -> DirList {
         let mut ans: DirList = vec![];
         let mut entry: &mut DirListEntry = &mut DirListEntry {
             name: "".to_string(),
@@ -489,7 +513,7 @@ impl Fs {
 
             unsafe {
                 self.blkdev.read(
-                    self.get_inode_address(root_dir_content[i].id),
+                    self.clone().get_inode_address(root_dir_content[i].id),
                     core::mem::size_of::<Inode>(),
                     &file as *const _ as *mut u8,
                 )
@@ -510,7 +534,7 @@ impl Fs {
     this->_writeInode(file);
     */
 
-    pub fn set_content(&self, path_str: &String, content: &String) {
+    pub fn set_content(&mut self, path_str: &String, content: &String) {
         let new_size: usize = content.len();
         let last_pointer: usize = new_size / BLOCK_SIZE;
         let mut str_as_arr: Vec<char> = content.chars().collect();
