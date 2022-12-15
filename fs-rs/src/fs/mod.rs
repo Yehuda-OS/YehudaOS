@@ -186,7 +186,7 @@ impl Fs {
     fn write_inode(&mut self, inode: &Inode) {
         unsafe {
             self.blkdev.write(
-                self.clone().get_inode_address(inode.id),
+                self.get_inode_address(inode.id),
                 core::mem::size_of::<Inode>(),
                 inode as *const _ as *mut u8,
             )
