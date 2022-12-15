@@ -91,7 +91,7 @@ struct DirEntry {
 
 /// private functions
 impl Fs {
-    fn get_root_dir(&mut self) -> Inode {
+    fn get_root_dir(&self) -> Inode {
         let mut ans = Inode {
             id: 0,
             directory: false,
@@ -110,7 +110,7 @@ impl Fs {
         ans
     }
 
-    fn get_inode(&mut self, mut path: String) -> Inode {
+    fn get_inode(&self, mut path: String) -> Inode {
         let mut next_delimiter = path.find('/');
         let mut next_folder = String::new();
         let mut inode = self.get_root_dir();
@@ -147,7 +147,7 @@ impl Fs {
         inode
     }
 
-    fn get_inode_address(&mut self, id: usize) -> usize {
+    fn get_inode_address(&self, id: usize) -> usize {
         self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
 
@@ -504,7 +504,7 @@ impl Fs {
         content_str
     }
 
-    pub fn list_dir(&mut self, path_str: &String) -> DirList {
+    pub fn list_dir(&self, path_str: &String) -> DirList {
         let mut ans: DirList = vec![];
         let mut entry: &mut DirListEntry = &mut DirListEntry {
             name: "".to_string(),
@@ -544,13 +544,6 @@ impl Fs {
 
         ans
     }
-
-    /*
-
-
-
-    this->_writeInode(file);
-    */
 
     pub fn set_content(&mut self, path_str: &String, content: &String) {
         let new_size: usize = content.len();
