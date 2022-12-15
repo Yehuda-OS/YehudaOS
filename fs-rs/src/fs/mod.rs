@@ -312,20 +312,20 @@ impl Fs {
     fn add_file_to_folder(&mut self, file: &DirEntry, folder: &mut Inode) {
         let mut pointer: usize = folder.size / BLOCK_SIZE;
         let mut bytes_left: usize = core::mem::size_of_val(file);
-        let mut address: isize = 0;
-        let mut space_taken_in_last_block: isize = (folder.size % BLOCK_SIZE) as isize;
-        let mut empty_space: isize = 0;
-        let mut to_write: usize = 0;
-        let mut written: usize = 0;
+        let mut address;
+        let space_taken_in_last_block = folder.size % BLOCK_SIZE;
+        let empty_space;
+        let mut to_write;
+        let mut written = 0;
 
         *folder = self
             .reallocate_blocks(folder, folder.size + core::mem::size_of_val(file))
             .unwrap();
 
-        address = folder.addresses[pointer] as isize + space_taken_in_last_block;
-        empty_space = BLOCK_SIZE as isize - space_taken_in_last_block;
-        to_write = if bytes_left > empty_space as usize {
-            empty_space as usize
+        address = folder.addresses[pointer] + space_taken_in_last_block;
+        empty_space = BLOCK_SIZE - space_taken_in_last_block;
+        to_write = if bytes_left > empty_space {
+            empty_space
         } else {
             bytes_left
         };
@@ -333,8 +333,8 @@ impl Fs {
         loop {
             unsafe {
                 self.blkdev.write(
-                    address as usize,
-                    to_write as usize,
+                    address,
+                    to_write,
                     (file as *const _ as *mut u8).add(written),
                 )
             };
@@ -343,7 +343,7 @@ impl Fs {
             written += to_write;
             bytes_left -= to_write;
             pointer += 1;
-            address = folder.addresses[pointer] as isize;
+            address = folder.addresses[pointer];
 
             to_write = if bytes_left > BLOCK_SIZE {
                 BLOCK_SIZE
