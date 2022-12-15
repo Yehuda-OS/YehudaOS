@@ -25,11 +25,7 @@ impl BlkDev {
         Ok(BlkDev(filemap))
     }
 
-    pub unsafe fn read(&mut self, addr: usize, size: usize, ans: *mut u8) {
-        if (addr + size) > self.0.len() {
-            self.0.resize(self.0.len() + addr + size, 0);
-        }
-
+    pub unsafe fn read(&self, addr: usize, size: usize, ans: *mut u8) {
         for i in 0..size {
             *(ans.add(i)) = self.0[addr + i];
         }
