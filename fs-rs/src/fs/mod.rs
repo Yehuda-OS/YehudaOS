@@ -357,8 +357,7 @@ impl Fs {
         }
     }
 
-    fn calc_parts() -> DiskParts {
-        let device_size: usize = BlkDev::DEVICE_SIZE;
+    fn calc_parts(device_size: usize) -> DiskParts {
         let mut parts: DiskParts = DiskParts {
             block_bit_map: 0,
             inode_bit_map: 0,
@@ -394,11 +393,29 @@ impl Fs {
 
 /// public functions
 impl Fs {
-    pub fn new(blkdev: BlkDev) -> Self {
-        Self {
-            blkdev: blkdev,
-            disk_parts: Self::calc_parts(),
+    pub fn new(mut blkdev: BlkDev) -> Self {
+        let mut header = Header {
+            magic: [0; 4],
+            version: 0,
+        };
+        let mut instance;
+
+        unsafe {
+            blkdev.read(
+                0,
+                core::mem::size_of::<Header>(),
+                &mut header as *mut Header as *mut u8,
+            )
+        };
+        instance = Self {
+            blkdev,
+            disk_parts: Self::calc_parts(BlkDev::DEVICE_SIZE),
+        };
+        if header.magic != FS_MAGIC || header.version != CURR_VERSION {
+            instance.format();
         }
+
+        instance
     }
 
     pub fn format(&mut self) {
