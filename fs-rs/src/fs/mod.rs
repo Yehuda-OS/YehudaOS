@@ -308,8 +308,8 @@ impl Fs {
     }
 
     fn add_file_to_folder(&mut self, file: &DirEntry, folder: &mut Inode) {
-        let mut pointer: usize = folder.size / BLOCK_SIZE;
-        let mut bytes_left: usize = core::mem::size_of_val(file);
+        let mut pointer = folder.size / BLOCK_SIZE;
+        let mut bytes_left = core::mem::size_of_val(file);
         let mut address;
         let space_taken_in_last_block = folder.size % BLOCK_SIZE;
         let empty_space;
@@ -465,20 +465,20 @@ impl Fs {
     }
 
     pub fn create_file(&mut self, path_str: String, directory: bool) {
-        let last_delimeter: usize = if path_str.rfind('/').is_some() {
+        let last_delimeter = if path_str.rfind('/').is_some() {
             path_str.rfind('/').unwrap()
         } else {
             0
         };
-        let file_name: String = path_str[last_delimeter + 1..].to_string();
+        let file_name = path_str[last_delimeter + 1..].to_string();
         let mut file: Inode = Inode {
             id: 0,
             directory: false,
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let mut dir: Inode = self.get_inode(path_str[0..(last_delimeter + 1)].to_string());
-        let mut file_details: DirEntry = DirEntry {
+        let mut dir = self.get_inode(path_str[0..(last_delimeter + 1)].to_string());
+        let mut file_details = DirEntry {
             name: "".to_string(),
             id: 0,
         };
