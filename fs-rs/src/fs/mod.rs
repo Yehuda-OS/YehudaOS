@@ -507,27 +507,23 @@ impl Fs {
             file_size: 0,
         };
         let dir = self.get_inode(path_str.clone());
-        let root_dir_content = self.read_dir(&dir);
+        let dir_content = self.read_dir(&dir);
         let file = Inode {
             id: 0,
             directory: false,
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let dir_entries;
 
-        dir_entries = dir.size / core::mem::size_of::<DirEntry>();
-        for i in 0..dir_entries {
-            entry.name = root_dir_content[i].name.clone();
-
+        for i in 0..dir_content.len() {
+            entry.name = dir_content[i].name.clone();
             unsafe {
                 self.blkdev.read(
-                    self.clone().get_inode_address(root_dir_content[i].id),
+                    self.get_inode_address(dir_content[i].id),
                     core::mem::size_of::<Inode>(),
                     &file as *const _ as *mut u8,
                 )
             };
-
             entry.file_size = file.size;
             entry.is_dir = file.directory;
             ans.push(entry.clone());
