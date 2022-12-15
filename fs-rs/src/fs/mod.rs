@@ -355,6 +355,7 @@ impl Fs {
                 break;
             }
         }
+        self.write_inode(folder);
     }
 
     fn calc_parts(device_size: usize) -> DiskParts {
