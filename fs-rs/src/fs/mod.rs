@@ -2,19 +2,17 @@ pub mod blkdev;
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::{
     string::{String, ToString},
     vec,
     vec::Vec,
 };
 use blkdev::BlkDev;
-use core::{
-    ptr::slice_from_raw_parts,
-    result::{Result, Result::Err, Result::Ok},
-};
-use micromath::F32;
-
 use core::option::Option::None;
+use core::result::{Result, Result::Err, Result::Ok};
+use core::slice;
+use micromath::F32;
 
 pub type DirList = Vec<DirListEntry>;
 
@@ -114,7 +112,7 @@ impl Fs {
         let mut next_delimiter = path.find('/');
         let mut next_folder = String::new();
         let mut inode = self.get_root_dir();
-        let mut dir_content: Vec<DirEntry> = Vec::new();
+        let mut dir_content;
         let mut index: usize = 0;
 
         if path == "/" {
@@ -122,21 +120,17 @@ impl Fs {
         }
 
         while next_delimiter != None {
-            dir_content = self
-                .read_inode_data(&inode)
-                .0
-                .expect("Error: failed to read the inode data");
+            dir_content = self.read_dir(&inode);
             path = path[(next_delimiter.unwrap() + 1)..].to_string();
             next_delimiter = path.find('/');
             next_folder = path[0..next_delimiter.unwrap()].to_string();
-            while dir_content[index as usize].name != next_folder {
+            while dir_content[index].name != next_folder {
                 index += 1;
             }
 
             unsafe {
                 self.blkdev.read(
-                    self.clone()
-                        .get_inode_address(dir_content[index as usize].id),
+                    self.get_inode_address(dir_content[index].id),
                     core::mem::size_of::<Inode>(),
                     &mut inode as *mut Inode as *mut u8,
                 )
@@ -151,19 +145,14 @@ impl Fs {
         self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
 
-    fn read_inode_data(
-        &mut self,
-        inode: &Inode,
-    ) -> (
-        Result<Vec<DirEntry>, &'static str>,
-        Result<(*mut u8, usize), &'static str>,
-    ) {
+    fn read_file(&self, inode: &Inode) -> Box<&[u8]> {
         let last_pointer: usize = inode.size / BLOCK_SIZE;
         let mut pointer = 0;
-        let mut to_read = 0;
-        let mut buffer = Vec::<DirEntry>::new();
+        let mut to_read;
+        let mut bytes_read = 0;
+        let mut buffer = Box::new(vec![0; inode.size]);
 
-        while buffer.len() != inode.size {
+        while bytes_read != inode.size {
             to_read = if pointer == last_pointer {
                 inode.size % BLOCK_SIZE
             } else {
@@ -173,16 +162,25 @@ impl Fs {
                 self.blkdev.read(
                     inode.addresses[pointer],
                     to_read,
-                    buffer.as_mut_ptr() as *mut u8
-                )
+                    (*buffer).as_mut_ptr().add(bytes_read),
+                );
             };
+            bytes_read += to_read;
             pointer += 1;
         }
 
-        (
-            Ok(buffer.to_vec()),
-            Ok((buffer.as_ptr() as *mut u8, buffer.len())),
-        )
+        unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
+    }
+
+    fn read_dir(&self, inode: &Inode) -> Box<&[DirEntry]> {
+        let data = self.read_file(inode);
+
+        unsafe {
+            Box::from(slice::from_raw_parts(
+                data.as_ptr() as *const DirEntry,
+                data.len() / core::mem::size_of::<DirEntry>(),
+            ))
+        }
     }
 
     fn write_inode(&mut self, inode: &Inode) {
@@ -496,12 +494,9 @@ impl Fs {
 
     pub fn get_content(&mut self, path_str: &String) -> String {
         let file: Inode = self.get_inode(path_str.clone());
-        let content = self.read_inode_data(&file).1.unwrap();
-        let content_str: String =
-            String::from_utf8_lossy(unsafe { &*slice_from_raw_parts(content.0, content.1) })
-                .to_string();
+        let content = self.read_file(&file);
 
-        content_str
+        String::from_utf8_lossy(*content).to_string()
     }
 
     pub fn list_dir(&self, path_str: &String) -> DirList {
@@ -512,10 +507,7 @@ impl Fs {
             file_size: 0,
         };
         let dir: Inode = self.get_inode(path_str.clone());
-        let mut root_dir_content: Vec<DirEntry> = self
-            .read_inode_data(&dir)
-            .0
-            .expect("Error: failed to read the inode data");
+        let mut root_dir_content = self.read_dir(&dir);
 
         let mut file: Inode = Inode {
             id: 0,
@@ -560,7 +552,7 @@ impl Fs {
         file.size = new_size;
         while bytes_written != file.size {
             to_write = if pointer == last_pointer {
-                (file.size % BLOCK_SIZE)
+                file.size % BLOCK_SIZE
             } else {
                 BLOCK_SIZE
             };
