@@ -92,7 +92,7 @@ struct DirEntry {
 /// private functions
 impl Fs {
     fn get_root_dir(&mut self) -> Inode {
-        let ans: Inode = Inode {
+        let mut ans = Inode {
             id: 0,
             directory: false,
             size: 0,
@@ -103,7 +103,7 @@ impl Fs {
             self.blkdev.read(
                 self.disk_parts.root,
                 core::mem::size_of::<Inode>(),
-                core::mem::transmute(&ans as *const Inode as *mut u8),
+                &mut ans as *mut Inode as *mut u8,
             )
         };
 
