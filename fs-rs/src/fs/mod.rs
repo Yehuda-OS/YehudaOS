@@ -506,16 +506,15 @@ impl Fs {
             is_dir: false,
             file_size: 0,
         };
-        let dir: Inode = self.get_inode(path_str.clone());
-        let mut root_dir_content = self.read_dir(&dir);
-
-        let mut file: Inode = Inode {
+        let dir = self.get_inode(path_str.clone());
+        let root_dir_content = self.read_dir(&dir);
+        let file = Inode {
             id: 0,
             directory: false,
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let mut dir_entries: usize = 0;
+        let dir_entries;
 
         dir_entries = dir.size / core::mem::size_of::<DirEntry>();
         for i in 0..dir_entries {
