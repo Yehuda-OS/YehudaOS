@@ -390,11 +390,11 @@ impl Fs {
     }
 
     /// Add the "." and ".." special folders to a folder.
-    /// 
+    ///
     /// # Arguments
-    /// - `folder` - The folder to add to.
     /// - `containing_folder` - The folder that contains `folder`.
-    fn add_special_folders(&mut self, folder: &mut Inode, containing_folder: &Inode) {
+    /// - `folder` - The folder to add to.
+    fn add_special_folders(&mut self, containing_folder: &Inode, folder: &mut Inode) {
         let dot = DirEntry {
             name: String::from("."),
             id: folder.id,
@@ -481,6 +481,7 @@ impl Fs {
                 &root as *const _ as *mut u8,
             )
         };
+        self.add_special_folders(&root.clone(), &mut root);
     }
 
     pub fn create_file(&mut self, path_str: String, directory: bool) {
@@ -506,7 +507,7 @@ impl Fs {
         file.directory = directory;
         self.write_inode(&file);
         if file.directory {
-            self.add_special_folders(&mut file, &dir)
+            self.add_special_folders(&dir, &mut file)
         }
 
         file_details.name = file_name;
