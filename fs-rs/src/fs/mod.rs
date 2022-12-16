@@ -388,6 +388,25 @@ impl Fs {
 
         parts
     }
+
+    /// Add the "." and ".." special folders to a folder.
+    /// 
+    /// # Arguments
+    /// - `folder` - The folder to add to.
+    /// - `containing_folder` - The folder that contains `folder`.
+    fn add_special_folders(&mut self, folder: &mut Inode, containing_folder: &Inode) {
+        let dot = DirEntry {
+            name: String::from("."),
+            id: folder.id,
+        };
+        let dot_dot = DirEntry {
+            name: String::from(".."),
+            id: containing_folder.id,
+        };
+
+        self.add_file_to_folder(&dot, folder);
+        self.add_file_to_folder(&dot_dot, folder);
+    }
 }
 
 /// public functions
@@ -486,6 +505,9 @@ impl Fs {
         file.id = self.allocate_inode();
         file.directory = directory;
         self.write_inode(&file);
+        if file.directory {
+            self.add_special_folders(&mut file, &dir)
+        }
 
         file_details.name = file_name;
         file_details.id = file.id;
