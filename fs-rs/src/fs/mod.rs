@@ -12,7 +12,6 @@ use blkdev::BlkDev;
 use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
-use micromath::F32;
 
 pub type DirList = Vec<DirListEntry>;
 
@@ -364,6 +363,7 @@ impl Fs {
             unused: 0,
             data: 0,
         };
+
         let mut remaining_space: usize = device_size - core::mem::size_of::<Header>();
         let mut amount_of_blocks: usize = remaining_space / BLOCK_SIZE;
         let mut amount_of_inodes: usize = 0;
@@ -371,7 +371,7 @@ impl Fs {
         parts.block_bit_map = core::mem::size_of::<Header>();
         parts.inode_bit_map = parts.block_bit_map;
 
-        while ((parts.inode_bit_map - parts.block_bit_map) % BLOCK_SIZE) < amount_of_blocks {
+        while (parts.inode_bit_map - parts.block_bit_map) * BITS_IN_BYTE < amount_of_blocks {
             if (parts.inode_bit_map - parts.block_bit_map) % BLOCK_SIZE == 0 {
                 amount_of_blocks -= 1;
             }
@@ -381,7 +381,7 @@ impl Fs {
         remaining_space = device_size - parts.inode_bit_map;
         amount_of_inodes = remaining_space / BYTES_PER_INODE;
         parts.root =
-            parts.inode_bit_map + F32((amount_of_blocks / BITS_IN_BYTE) as f32).ceil().0 as usize;
+            parts.inode_bit_map + ((amount_of_inodes as f64 / BITS_IN_BYTE as f64) as usize + 1);
         parts.unused = parts.root + amount_of_inodes * core::mem::size_of::<Inode>();
 
         parts.data = parts.unused + (device_size - parts.unused) % BLOCK_SIZE;
