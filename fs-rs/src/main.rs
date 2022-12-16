@@ -76,7 +76,7 @@ fn main() {
 
     // Start the main loop
     while !exit {
-        print!("{}$ ", FS_NAME);
+        println!("{}$ ", FS_NAME);
         // Read a command line from the standard input
         let mut cmdline = String::new();
         std::io::stdin().read_line(&mut cmdline).unwrap();
