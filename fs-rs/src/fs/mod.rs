@@ -515,6 +515,53 @@ impl Fs {
         self.add_file_to_folder(&file_details, &mut dir);
     }
 
+    pub unsafe fn read(&self, file: &str, buffer: &mut [u8], offset: usize) -> usize {
+        let inode = self.get_inode(file.to_string());
+        let start = offset % BLOCK_SIZE;
+        let mut to_read = BLOCK_SIZE - start;
+        let mut pointer = offset / BLOCK_SIZE;
+        let mut bytes_read = 0;
+        let mut remaining;
+
+        if offset >= inode.size {
+            return 0;
+        }
+
+        remaining = if buffer.len() > inode.size - offset {
+            inode.size - offset
+        } else {
+            buffer.len()
+        };
+        if remaining < to_read {
+            to_read = remaining;
+        }
+        self.blkdev.read(
+            inode.addresses[pointer] + start,
+            to_read,
+            buffer.as_mut_ptr(),
+        );
+        bytes_read += to_read;
+        remaining -= to_read;
+        pointer += 1;
+        while remaining != 0 {
+            self.blkdev.read(
+                inode.addresses[pointer],
+                to_read,
+                buffer.as_mut_ptr().add(bytes_read),
+            );
+            bytes_read += to_read;
+            remaining -= to_read;
+            pointer += 1;
+            to_read = if remaining < BLOCK_SIZE {
+                remaining
+            } else {
+                BLOCK_SIZE
+            };
+        }
+
+        bytes_read
+    }
+
     pub fn get_content(&mut self, path_str: &String) -> String {
         let file: Inode = self.get_inode(path_str.clone());
         let content = self.read_file(&file);
