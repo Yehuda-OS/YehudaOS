@@ -517,7 +517,7 @@ impl Fs {
 
     pub unsafe fn read(&self, file: &str, buffer: &mut [u8], offset: usize) -> usize {
         let inode = self.get_inode(file.to_string());
-        let start = offset % BLOCK_SIZE;
+        let mut start = offset % BLOCK_SIZE;
         let mut to_read = BLOCK_SIZE - start;
         let mut pointer = offset / BLOCK_SIZE;
         let mut bytes_read = 0;
@@ -535,20 +535,13 @@ impl Fs {
         if remaining < to_read {
             to_read = remaining;
         }
-        self.blkdev.read(
-            inode.addresses[pointer] + start,
-            to_read,
-            buffer.as_mut_ptr(),
-        );
-        bytes_read += to_read;
-        remaining -= to_read;
-        pointer += 1;
         while remaining != 0 {
             self.blkdev.read(
-                inode.addresses[pointer],
+                inode.addresses[pointer] + start,
                 to_read,
                 buffer.as_mut_ptr().add(bytes_read),
             );
+            start = 0;
             bytes_read += to_read;
             remaining -= to_read;
             pointer += 1;
