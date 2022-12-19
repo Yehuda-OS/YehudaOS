@@ -18,6 +18,11 @@ pub type DirList = Vec<DirListEntry>;
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
 
+pub enum WriteError {
+    NotEnoughDiskSpace,
+    MaximumSizeExceeded,
+}
+
 pub struct Fs {
     blkdev: BlkDev,
     disk_parts: DiskParts,
@@ -532,7 +537,7 @@ impl Fs {
         } else {
             buffer.len()
         };
-        if remaining < to_read {
+        if to_read > remaining {
             to_read = remaining;
         }
         while remaining != 0 {
@@ -566,11 +571,11 @@ impl Fs {
     /// If the file has been set to a greater length, reading the extra data will return null bytes
     /// until the data is being written.
     /// If the file has been set to a smaller length, the extra data will be lost.
-    /// 
+    ///
     /// # Arguments
     /// `file` - The `Inode` of the file.
     /// `size` - The required size.
-    /// 
+    ///
     /// # Returns
     /// The function returns the updated file's `Inode` or an error if the required size is greater
     /// than the maximum file size.
@@ -598,6 +603,62 @@ impl Fs {
         self.write_inode(&resized);
 
         Ok(resized)
+    }
+
+    /// Write data to a file.
+    ///
+    /// # Arguments
+    /// - `file` - The `Inode` of the file.
+    /// - `buffer` - A buffer containing the data to be written.
+    /// - `offset` - The offset where the data will be written in the file.
+    /// If the offset is at the end of the file or the data after it is written overflows the file's
+    /// length the file will be extended.
+    /// If the offset is beyond the file's size the file will be extended and a "hole" will be
+    /// created in the file. Reading from the hole will return null bytes.
+    pub unsafe fn write(
+        &mut self,
+        file: &Inode,
+        buffer: &[u8],
+        offset: usize,
+    ) -> Result<Inode, WriteError> {
+        let mut updated = *file;
+        let mut start = offset % BLOCK_SIZE;
+        let mut to_write = BLOCK_SIZE - start;
+        let mut pointer = offset / BLOCK_SIZE;
+        let mut written = 0;
+        let mut remaining = buffer.len();
+
+        if offset + remaining > file.size {
+            match self.set_len(file, offset + remaining) {
+                Ok(inode) => updated = inode,
+                Err(()) => return Err(WriteError::MaximumSizeExceeded),
+            }
+        }
+
+        if to_write > remaining {
+            to_write = remaining
+        }
+        while remaining != 0 {
+            if updated.addresses[pointer] == 0 {
+                updated.addresses[pointer] = self.allocate_block();
+            }
+            self.blkdev.write(
+                updated.addresses[pointer] + start,
+                to_write,
+                buffer.as_ptr().add(written),
+            );
+            written += to_write;
+            remaining -= to_write;
+            pointer += 1;
+            to_write = if remaining < BLOCK_SIZE {
+                remaining
+            } else {
+                BLOCK_SIZE
+            };
+            start = 0;
+        }
+
+        Ok(updated)
     }
 
     pub fn get_content(&mut self, path_str: &String) -> String {
