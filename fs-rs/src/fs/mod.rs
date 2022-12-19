@@ -536,11 +536,18 @@ impl Fs {
             to_read = remaining;
         }
         while remaining != 0 {
-            self.blkdev.read(
-                inode.addresses[pointer] + start,
-                to_read,
-                buffer.as_mut_ptr().add(bytes_read),
-            );
+            // If there is no pointer read null bytes
+            if inode.addresses[pointer] == 0 {
+                for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
+                    *i = 0;
+                }
+            } else {
+                self.blkdev.read(
+                    inode.addresses[pointer] + start,
+                    to_read,
+                    buffer.as_mut_ptr().add(bytes_read),
+                );
+            }
             start = 0;
             bytes_read += to_read;
             remaining -= to_read;
