@@ -113,7 +113,7 @@ impl Fs {
         ans
     }
 
-    fn get_inode(&self, mut path: String) -> Inode {
+    fn get_inode(&self, mut path: &str) -> Inode {
         let mut next_delimiter = path.find('/');
         let mut next_folder = String::new();
         let mut inode = self.get_root_dir();
@@ -126,7 +126,7 @@ impl Fs {
 
         while next_delimiter != None {
             dir_content = self.read_dir(&inode);
-            path = path[(next_delimiter.unwrap() + 1)..].to_string();
+            path = &path[(next_delimiter.unwrap() + 1)..];
             next_delimiter = path.find('/');
             next_folder = path[0..next_delimiter.unwrap()].to_string();
             while dir_content[index].name != next_folder {
@@ -503,7 +503,7 @@ impl Fs {
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let mut dir = self.get_inode(path_str[0..(last_delimeter + 1)].to_string());
+        let mut dir = self.get_inode(&path_str[0..(last_delimeter + 1)]);
         let mut file_details = DirEntry {
             name: "".to_string(),
             id: 0,
@@ -662,7 +662,7 @@ impl Fs {
     }
 
     pub fn get_content(&mut self, path_str: &String) -> String {
-        let file: Inode = self.get_inode(path_str.clone());
+        let file: Inode = self.get_inode(path_str);
         let content = self.read_file(&file);
 
         String::from_utf8_lossy(*content).to_string()
@@ -675,7 +675,7 @@ impl Fs {
             is_dir: false,
             file_size: 0,
         };
-        let dir = self.get_inode(path_str.clone());
+        let dir = self.get_inode(path_str);
         let dir_content = self.read_dir(&dir);
         let file = Inode {
             id: 0,
@@ -705,7 +705,7 @@ impl Fs {
         let new_size: usize = content.len();
         let last_pointer: usize = new_size / BLOCK_SIZE;
         let mut str_as_arr: Vec<char> = content.chars().collect();
-        let mut file: Inode = self.get_inode(path_str.clone());
+        let mut file: Inode = self.get_inode(path_str);
         let mut pointer: usize = 0;
         let mut to_write: usize = 0;
         let mut bytes_written: usize = 0;
