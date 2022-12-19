@@ -66,7 +66,7 @@ const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 
 #[derive(Clone, Copy)]
-struct Inode {
+pub struct Inode {
     id: usize,
     directory: bool,
     size: usize,
@@ -515,20 +515,19 @@ impl Fs {
         self.add_file_to_folder(&file_details, &mut dir);
     }
 
-    pub unsafe fn read(&self, file: &str, buffer: &mut [u8], offset: usize) -> usize {
-        let inode = self.get_inode(file.to_string());
+    pub unsafe fn read(&self, file: &Inode, buffer: &mut [u8], offset: usize) -> usize {
         let mut start = offset % BLOCK_SIZE;
         let mut to_read = BLOCK_SIZE - start;
         let mut pointer = offset / BLOCK_SIZE;
         let mut bytes_read = 0;
         let mut remaining;
 
-        if offset >= inode.size {
+        if offset >= file.size {
             return 0;
         }
 
-        remaining = if buffer.len() > inode.size - offset {
-            inode.size - offset
+        remaining = if buffer.len() > file.size - offset {
+            file.size - offset
         } else {
             buffer.len()
         };
@@ -537,13 +536,13 @@ impl Fs {
         }
         while remaining != 0 {
             // If there is no pointer read null bytes
-            if inode.addresses[pointer] == 0 {
+            if file.addresses[pointer] == 0 {
                 for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
                     *i = 0;
                 }
             } else {
                 self.blkdev.read(
-                    inode.addresses[pointer] + start,
+                    file.addresses[pointer] + start,
                     to_read,
                     buffer.as_mut_ptr().add(bytes_read),
                 );
