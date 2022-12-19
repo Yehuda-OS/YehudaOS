@@ -562,6 +562,18 @@ impl Fs {
         bytes_read
     }
 
+    /// Change the length of a file to a specific length.
+    /// If the file has been set to a greater length, reading the extra data will return null bytes
+    /// until the data is being written.
+    /// If the file has been set to a smaller length, the extra data will be lost.
+    /// 
+    /// # Arguments
+    /// `file` - The `Inode` of the file.
+    /// `size` - The required size.
+    /// 
+    /// # Returns
+    /// The function returns the updated file's `Inode` or an error if the required size is greater
+    /// than the maximum file size.
     pub fn set_len(&mut self, file: &Inode, size: usize) -> Result<Inode, ()> {
         let mut resized = *file;
         let last_ptr = file.size / BLOCK_SIZE;
