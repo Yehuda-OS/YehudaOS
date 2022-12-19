@@ -31,7 +31,7 @@ impl BlkDev {
         }
     }
 
-    pub unsafe fn write(&mut self, addr: usize, size: usize, data: *mut u8) {
+    pub unsafe fn write(&mut self, addr: usize, size: usize, data: *const u8) {
         for i in 0..size {
             self.0[addr + i] = *(data.add(i));
         }
