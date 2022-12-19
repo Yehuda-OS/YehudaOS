@@ -62,6 +62,7 @@ impl Copy for DiskParts {}
 const DIRECT_POINTERS: usize = 12;
 const FILE_NAME_LEN: usize = 11;
 const BLOCK_SIZE: usize = 16;
+const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 
@@ -559,6 +560,32 @@ impl Fs {
         }
 
         bytes_read
+    }
+
+    pub fn set_len(&mut self, file: &Inode, size: usize) -> Result<Inode, ()> {
+        let mut resized = *file;
+        let last_ptr = file.size / BLOCK_SIZE;
+        let resized_last_ptr = size / BLOCK_SIZE;
+        let mut current = last_ptr;
+
+        if size > MAX_FILE_SIZE {
+            return Err(());
+        }
+
+        resized.size = size;
+        // If the file has been resized to a smaller size, deallocate the unused blocks.
+        while current > resized_last_ptr {
+            let block = &mut resized.addresses[current];
+
+            if *block != 0 {
+                self.deallocate_block(*block);
+                *block = 0;
+            }
+            current -= 1;
+        }
+        self.write_inode(&resized);
+
+        Ok(resized)
     }
 
     pub fn get_content(&mut self, path_str: &String) -> String {
