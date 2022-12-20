@@ -18,6 +18,11 @@ pub type DirList = Vec<DirListEntry>;
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
 
+pub enum WriteError {
+    NotEnoughDiskSpace,
+    MaximumSizeExceeded,
+}
+
 pub struct Fs {
     blkdev: BlkDev,
     disk_parts: DiskParts,
@@ -62,11 +67,12 @@ impl Copy for DiskParts {}
 const DIRECT_POINTERS: usize = 12;
 const FILE_NAME_LEN: usize = 11;
 const BLOCK_SIZE: usize = 16;
+const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 
 #[derive(Clone, Copy)]
-struct Inode {
+pub struct Inode {
     id: usize,
     directory: bool,
     size: usize,
@@ -81,9 +87,9 @@ pub struct DirListEntry {
 }
 
 #[derive(Clone)]
-pub struct DirEntry {
-    name: [char; 10],
-    id: u16,
+struct DirEntry {
+    name: String,
+    id: usize,
 }
 
 /// private functions
@@ -107,7 +113,7 @@ impl Fs {
         ans
     }
 
-    fn get_inode(&self, mut path: String) -> Inode {
+    fn get_inode(&self, mut path: &str) -> Inode {
         let mut next_delimiter = path.find('/');
         let mut next_folder = String::new();
         let mut inode = self.get_root_dir();
@@ -120,10 +126,10 @@ impl Fs {
 
         while next_delimiter != None {
             dir_content = self.read_dir(&inode);
-            path = path[(next_delimiter.unwrap() + 1)..].to_string();
+            path = &path[(next_delimiter.unwrap() + 1)..];
             next_delimiter = path.find('/');
             next_folder = path[0..next_delimiter.unwrap()].to_string();
-            while dir_content[index].name != next_folder.chars().collect::<Vec<char>>().as_slice() {
+            while dir_content[index].name != next_folder {
                 index += 1;
             }
 
@@ -140,8 +146,8 @@ impl Fs {
         inode
     }
 
-    fn get_inode_address(&self, id: u16) -> usize {
-        self.disk_parts.root + id as usize * core::mem::size_of::<Inode>()
+    fn get_inode_address(&self, id: usize) -> usize {
+        self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
 
     fn read_file(&self, inode: &Inode) -> Box<&[u8]> {
@@ -185,7 +191,7 @@ impl Fs {
     fn write_inode(&mut self, inode: &Inode) {
         unsafe {
             self.blkdev.write(
-                self.get_inode_address(inode.id as u16),
+                self.get_inode_address(inode.id),
                 core::mem::size_of::<Inode>(),
                 inode as *const _ as *mut u8,
             )
@@ -332,7 +338,7 @@ impl Fs {
                 self.blkdev.write(
                     address,
                     to_write,
-                    (&file as *const _ as *mut u8).add(written),
+                    (file as *const _ as *mut u8).add(written),
                 )
             };
 
@@ -395,20 +401,13 @@ impl Fs {
     /// - `containing_folder` - The folder that contains `folder`.
     /// - `folder` - The folder to add to.
     fn add_special_folders(&mut self, containing_folder: &Inode, folder: &mut Inode) {
-        let mut dot_name = [0 as char; 10];
-        dot_name[0] = '.';
         let dot = DirEntry {
-            name: dot_name,
-            id: folder.id as u16,
+            name: String::from("."),
+            id: folder.id,
         };
-
-        let mut dot_dot_name = [0 as char; 10];
-        dot_dot_name[0] = '.';
-        dot_dot_name[1] = '.';
-
         let dot_dot = DirEntry {
-            name: dot_dot_name,
-            id: containing_folder.id as u16,
+            name: String::from(".."),
+            id: containing_folder.id,
         };
 
         self.add_file_to_folder(&dot, folder);
@@ -504,9 +503,9 @@ impl Fs {
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let mut dir = self.get_inode(path_str[0..(last_delimeter + 1)].to_string());
+        let mut dir = self.get_inode(&path_str[0..(last_delimeter + 1)]);
         let mut file_details = DirEntry {
-            name: [0 as char; 10],
+            name: "".to_string(),
             id: 0,
         };
 
@@ -517,21 +516,153 @@ impl Fs {
             self.add_special_folders(&dir, &mut file)
         }
 
-        let mut file_dname: [char; 10] = [0 as char; 10];
-        let mut count = 0;
-
-        for ch in file_name.chars().collect::<Vec<char>>() {
-            file_dname[count] = ch;
-            count += 1;
-        }
-
-        file_details.name = file_dname;
-        file_details.id = file.id as u16;
+        file_details.name = file_name;
+        file_details.id = file.id;
         self.add_file_to_folder(&file_details, &mut dir);
     }
 
+    pub unsafe fn read(&self, file: &Inode, buffer: &mut [u8], offset: usize) -> usize {
+        let mut start = offset % BLOCK_SIZE;
+        let mut to_read = BLOCK_SIZE - start;
+        let mut pointer = offset / BLOCK_SIZE;
+        let mut bytes_read = 0;
+        let mut remaining;
+
+        if offset >= file.size {
+            return 0;
+        }
+
+        remaining = if buffer.len() > file.size - offset {
+            file.size - offset
+        } else {
+            buffer.len()
+        };
+        if to_read > remaining {
+            to_read = remaining;
+        }
+        while remaining != 0 {
+            // If there is no pointer read null bytes
+            if file.addresses[pointer] == 0 {
+                for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
+                    *i = 0;
+                }
+            } else {
+                self.blkdev.read(
+                    file.addresses[pointer] + start,
+                    to_read,
+                    buffer.as_mut_ptr().add(bytes_read),
+                );
+            }
+            start = 0;
+            bytes_read += to_read;
+            remaining -= to_read;
+            pointer += 1;
+            to_read = if remaining < BLOCK_SIZE {
+                remaining
+            } else {
+                BLOCK_SIZE
+            };
+        }
+
+        bytes_read
+    }
+
+    /// Change the length of a file to a specific length.
+    /// If the file has been set to a greater length, reading the extra data will return null bytes
+    /// until the data is being written.
+    /// If the file has been set to a smaller length, the extra data will be lost.
+    ///
+    /// # Arguments
+    /// `file` - The `Inode` of the file.
+    /// `size` - The required size.
+    ///
+    /// # Returns
+    /// The function returns the updated file's `Inode` or an error if the required size is greater
+    /// than the maximum file size.
+    pub fn set_len(&mut self, file: &Inode, size: usize) -> Result<Inode, ()> {
+        let mut resized = *file;
+        let last_ptr = file.size / BLOCK_SIZE;
+        let resized_last_ptr = size / BLOCK_SIZE;
+        let mut current = last_ptr;
+
+        if size > MAX_FILE_SIZE {
+            return Err(());
+        }
+
+        resized.size = size;
+        // If the file has been resized to a smaller size, deallocate the unused blocks.
+        while current > resized_last_ptr {
+            let block = &mut resized.addresses[current];
+
+            if *block != 0 {
+                self.deallocate_block(*block);
+                *block = 0;
+            }
+            current -= 1;
+        }
+        self.write_inode(&resized);
+
+        Ok(resized)
+    }
+
+    /// Write data to a file.
+    ///
+    /// # Arguments
+    /// - `file` - The `Inode` of the file.
+    /// - `buffer` - A buffer containing the data to be written.
+    /// - `offset` - The offset where the data will be written in the file.
+    /// If the offset is at the end of the file or the data after it is written overflows the file's
+    /// length the file will be extended.
+    /// If the offset is beyond the file's size the file will be extended and a "hole" will be
+    /// created in the file. Reading from the hole will return null bytes.
+    pub unsafe fn write(
+        &mut self,
+        file: &Inode,
+        buffer: &[u8],
+        offset: usize,
+    ) -> Result<Inode, WriteError> {
+        let mut updated = *file;
+        let mut start = offset % BLOCK_SIZE;
+        let mut to_write = BLOCK_SIZE - start;
+        let mut pointer = offset / BLOCK_SIZE;
+        let mut written = 0;
+        let mut remaining = buffer.len();
+
+        if offset + remaining > file.size {
+            match self.set_len(file, offset + remaining) {
+                Ok(inode) => updated = inode,
+                Err(()) => return Err(WriteError::MaximumSizeExceeded),
+            }
+        }
+
+        if to_write > remaining {
+            to_write = remaining
+        }
+        while remaining != 0 {
+            if updated.addresses[pointer] == 0 {
+                updated.addresses[pointer] = self.allocate_block();
+            }
+            self.blkdev.write(
+                updated.addresses[pointer] + start,
+                to_write,
+                buffer.as_ptr().add(written),
+            );
+            written += to_write;
+            remaining -= to_write;
+            pointer += 1;
+            to_write = if remaining < BLOCK_SIZE {
+                remaining
+            } else {
+                BLOCK_SIZE
+            };
+            start = 0;
+        }
+
+        Ok(updated)
+    }
+
     pub fn get_content(&mut self, path_str: &String) -> String {
-        let file: Inode = self.get_inode(path_str.clone());
+        let file: Inode = self.get_inode(path_str);
         let content = self.read_file(&file);
 
         String::from_utf8_lossy(*content).to_string()
@@ -544,7 +675,7 @@ impl Fs {
             is_dir: false,
             file_size: 0,
         };
-        let dir = self.get_inode(path_str.clone());
+        let dir = self.get_inode(path_str);
         let dir_content = self.read_dir(&dir);
         let file = Inode {
             id: 0,
@@ -554,7 +685,7 @@ impl Fs {
         };
 
         for i in 0..dir_content.len() {
-            entry.name = String::from_iter(dir_content[i].name);
+            entry.name = dir_content[i].name.clone();
             unsafe {
                 self.blkdev.read(
                     self.get_inode_address(dir_content[i].id),
@@ -574,7 +705,7 @@ impl Fs {
         let new_size: usize = content.len();
         let last_pointer: usize = new_size / BLOCK_SIZE;
         let mut str_as_arr: Vec<char> = content.chars().collect();
-        let mut file: Inode = self.get_inode(path_str.clone());
+        let mut file: Inode = self.get_inode(path_str);
         let mut pointer: usize = 0;
         let mut to_write: usize = 0;
         let mut bytes_written: usize = 0;
