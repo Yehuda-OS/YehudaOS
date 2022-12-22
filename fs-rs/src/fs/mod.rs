@@ -107,37 +107,45 @@ impl Fs {
         ans
     }
 
-    fn get_inode(&self, mut path: &str) -> Inode {
+    /// Returns the `Inode` of a file, or `None` if no file was found.
+    /// 
+    /// # Arguments
+    /// - `path` - The path to the file.
+    /// - `cwd` - The current working directory, used to support relative paths.
+    fn get_inode(&self, mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         let mut next_delimiter = path.find('/');
-        let mut next_folder = String::new();
+        let mut next_folder;
         let mut inode = self.get_root_dir();
         let mut dir_content;
         let mut index: usize = 0;
 
         if path == "/" {
-            return inode;
+            return Some(inode);
         }
 
+        if let Some(cwd) = cwd {
+            inode = cwd;
+        }
         while next_delimiter != None {
             dir_content = self.read_dir(&inode);
             path = &path[(next_delimiter.unwrap() + 1)..];
             next_delimiter = path.find('/');
-            next_folder = path[0..next_delimiter.unwrap()].to_string();
-            while dir_content[index].name != next_folder {
+            next_folder = match next_delimiter {
+                Some(delimeter) => &path[0..delimeter],
+                None => &path[0..],
+            };
+            while index != dir_content.len() && dir_content[index].name != next_folder {
                 index += 1;
             }
+            match self.read_inode(dir_content[index].id) {
+                Some(file) => inode = file,
+                None => return None,
+            }
 
-            unsafe {
-                self.blkdev.read(
-                    self.get_inode_address(dir_content[index].id),
-                    core::mem::size_of::<Inode>(),
-                    &mut inode as *mut Inode as *mut u8,
-                )
-            };
             index = 0;
         }
 
-        inode
+        Some(inode)
     }
 
     fn get_inode_address(&self, id: usize) -> usize {
@@ -529,7 +537,9 @@ impl Fs {
             size: 0,
             addresses: [0; DIRECT_POINTERS],
         };
-        let mut dir = self.get_inode(&path_str[0..(last_delimeter + 1)]);
+        let mut dir = self
+            .get_inode(&path_str[0..(last_delimeter + 1)], None)
+            .unwrap();
         let mut file_details = DirEntry {
             name: "".to_string(),
             id: 0,
@@ -688,7 +698,7 @@ impl Fs {
     }
 
     pub fn get_content(&mut self, path_str: &String) -> String {
-        let file: Inode = self.get_inode(path_str);
+        let file: Inode = self.get_inode(path_str, None).unwrap();
         let content = self.read_file(&file);
 
         String::from_utf8_lossy(*content).to_string()
@@ -701,7 +711,7 @@ impl Fs {
             is_dir: false,
             file_size: 0,
         };
-        let dir = self.get_inode(path_str);
+        let dir = self.get_inode(path_str, None).unwrap();
         let dir_content = self.read_dir(&dir);
         let file = Inode {
             id: 0,
@@ -731,7 +741,7 @@ impl Fs {
         let new_size: usize = content.len();
         let last_pointer: usize = new_size / BLOCK_SIZE;
         let mut str_as_arr: Vec<char> = content.chars().collect();
-        let mut file: Inode = self.get_inode(path_str);
+        let mut file: Inode = self.get_inode(path_str, None).unwrap();
         let mut pointer: usize = 0;
         let mut to_write: usize = 0;
         let mut bytes_written: usize = 0;
