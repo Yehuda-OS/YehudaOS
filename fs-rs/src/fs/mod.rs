@@ -1,8 +1,10 @@
 pub mod blkdev;
+pub mod inode;
 
 extern crate alloc;
 
 use alloc::boxed::Box;
+use inode::Inode;
 use alloc::{
     string::{String, ToString},
     vec,
@@ -70,14 +72,6 @@ const BLOCK_SIZE: usize = 16;
 const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
-
-#[derive(Clone, Copy)]
-pub struct Inode {
-    id: usize,
-    directory: bool,
-    size: usize,
-    addresses: [usize; DIRECT_POINTERS],
-}
 
 #[derive(Clone)]
 pub struct DirListEntry {
@@ -185,6 +179,44 @@ impl Fs {
                 data.as_ptr() as *const DirEntry,
                 data.len() / core::mem::size_of::<DirEntry>(),
             ))
+        }
+    }
+
+    /// Returns `true` if a bit in a bitmap is set to 1.
+    /// 
+    /// # Arguments 
+    /// - `bitmap_start` - The start of the bitmap.
+    /// - `i` - The index in the bitmap.
+    fn is_allocated(&self, bitmap_start: usize, i: usize) -> bool {
+        let byte_address = bitmap_start + i / BITS_IN_BYTE;
+        let offset = i % BITS_IN_BYTE;
+        let mut byte: u8 = 0;
+
+        unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) }
+
+        byte & (1 << offset) == 1
+    }
+
+    /// Returns the `Inode` object with a specific ID, or None if the inode is not
+    /// associated with any file.
+    /// 
+    /// # Arguments
+    /// - `id` - The inode's ID.
+    fn read_inode(&self, id: usize) -> Option<Inode> {
+        let mut inode = Inode::new();
+
+        if self.is_allocated(self.disk_parts.inode_bit_map, id) {
+            unsafe {
+                self.blkdev.read(
+                    self.get_inode_address(id),
+                    core::mem::size_of::<Inode>(),
+                    &mut inode as *mut _ as *mut u8,
+                )
+            }
+
+            Some(inode)
+        } else {
+            None
         }
     }
 
