@@ -26,14 +26,10 @@ impl BlkDev {
     }
 
     pub unsafe fn read(&self, addr: usize, size: usize, ans: *mut u8) {
-        for i in 0..size {
-            *(ans.add(i)) = self.0[addr + i];
-        }
+        core::ptr::copy_nonoverlapping(self.0.as_ptr().add(addr), ans, size);
     }
 
     pub unsafe fn write(&mut self, addr: usize, size: usize, data: *const u8) {
-        for i in 0..size {
-            self.0[addr + i] = *(data.add(i));
-        }
+        core::ptr::copy_nonoverlapping(data, self.0.as_mut_ptr().add(addr), size)
     }
 }

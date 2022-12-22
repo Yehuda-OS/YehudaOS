@@ -137,9 +137,13 @@ fn main() {
                     let mut content: String = String::new();
                     let mut curr_line: String = String::new();
                     std::io::stdin().read_line(&mut curr_line);
-                    while curr_line != "" {
+                    loop {
                         content.push_str(&format!("{}\n", curr_line));
                         std::io::stdin().read_line(&mut curr_line);
+
+                        if !curr_line.is_empty() {
+                            break;
+                        }
                     }
                     fs.set_content(&cmd[1].to_string(), &content);
                 } else {
