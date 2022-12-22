@@ -4,7 +4,6 @@ pub mod inode;
 extern crate alloc;
 
 use alloc::boxed::Box;
-use inode::Inode;
 use alloc::{
     string::{String, ToString},
     vec,
@@ -14,6 +13,7 @@ use blkdev::BlkDev;
 use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
+use inode::Inode;
 
 pub type DirList = Vec<DirListEntry>;
 
@@ -183,8 +183,8 @@ impl Fs {
     }
 
     /// Returns `true` if a bit in a bitmap is set to 1.
-    /// 
-    /// # Arguments 
+    ///
+    /// # Arguments
     /// - `bitmap_start` - The start of the bitmap.
     /// - `i` - The index in the bitmap.
     fn is_allocated(&self, bitmap_start: usize, i: usize) -> bool {
@@ -199,7 +199,7 @@ impl Fs {
 
     /// Returns the `Inode` object with a specific ID, or None if the inode is not
     /// associated with any file.
-    /// 
+    ///
     /// # Arguments
     /// - `id` - The inode's ID.
     fn read_inode(&self, id: usize) -> Option<Inode> {
@@ -282,18 +282,12 @@ impl Fs {
 
     fn deallocate(&mut self, bitmap_start: usize, n: usize) {
         let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;
-        let mut byte: usize = 0;
-        let mut offset: usize = n % BITS_IN_BYTE;
+        let mut byte: u8 = 0;
+        let offset = n % BITS_IN_BYTE;
 
-        unsafe {
-            self.blkdev
-                .read(byte_address, 1, &byte as *const usize as *mut u8)
-        };
+        unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) };
         byte ^= 1 << offset; // flip the bit to mark as unoccupied
-        unsafe {
-            self.blkdev
-                .write(byte_address, 1, &byte as *const usize as *mut u8)
-        };
+        unsafe { self.blkdev.write(byte_address, 1, &mut byte as *mut u8) };
     }
 
     fn reallocate_blocks(&mut self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
