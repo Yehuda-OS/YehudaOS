@@ -111,7 +111,7 @@ impl Fs {
     ///
     /// # Arguments
     /// - `path` - The path to the file.
-    /// - `cwd` - The current working directory, used to support relative paths.
+    /// - `cwd` - The current working directory, used for relative paths.
     fn get_inode(&self, mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         let mut next_delimiter = path.find('/');
         let mut next_folder;
@@ -560,6 +560,15 @@ impl Fs {
         file_details.name = file_name;
         file_details.id = file.id;
         self.add_file_to_folder(&file_details, &mut dir);
+    }
+
+    /// Get a file's `Inode` id.
+    /// 
+    /// # Arugments
+    /// - `path` - The path to the file.
+    /// - `cwd` - The current working directory, used for relative paths.
+    pub fn get_file_id(&self, path: &str, cwd: Option<usize>) -> Option<usize> {
+        Some(self.get_inode(path, self.read_inode(cwd?))?.id)
     }
 
     pub unsafe fn read(&self, file: &Inode, buffer: &mut [u8], offset: usize) -> usize {
