@@ -23,6 +23,12 @@ const CURR_VERSION: u8 = 0x1;
 pub enum WriteError {
     NotEnoughDiskSpace,
     MaximumSizeExceeded,
+    FileNotFound,
+}
+
+pub enum SetLenError {
+    MaximumSizeExceeded,
+    FileNotFound,
 }
 
 pub struct Fs {
@@ -563,7 +569,7 @@ impl Fs {
     }
 
     /// Get a file's `Inode` id.
-    /// 
+    ///
     /// # Arugments
     /// - `path` - The path to the file.
     /// - `cwd` - The current working directory, used for relative paths.
@@ -572,12 +578,12 @@ impl Fs {
     }
 
     /// Read a file.
-    /// 
+    ///
     /// # Arguments
     /// - `file` - The file's id.
     /// - `buffer` - The buffer to read into.
     /// - `offset` - The offset inside the file to read into.
-    /// 
+    ///
     /// # Returns
     /// The amount of bytes read or `None` if the file does not exist.
     pub unsafe fn read(&self, file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
@@ -637,18 +643,25 @@ impl Fs {
     /// `size` - The required size.
     ///
     /// # Returns
-    /// The function returns the updated file's `Inode` or an error if the required size is greater
-    /// than the maximum file size.
-    pub fn set_len(&mut self, file: &Inode, size: usize) -> Result<Inode, ()> {
-        let mut resized = *file;
-        let last_ptr = file.size / BLOCK_SIZE;
-        let resized_last_ptr = size / BLOCK_SIZE;
-        let mut current = last_ptr;
+    /// If the function fails, an error will be returned.
+    pub fn set_len(&mut self, file: usize, size: usize) -> Result<(), SetLenError> {
+        let mut resized;
+        let last_ptr;
+        let resized_last_ptr;
+        let mut current;
 
+        if let Some(inode) = self.read_inode(file) {
+            resized = inode;
+        } else {
+            return Err(SetLenError::FileNotFound);
+        }
         if size > MAX_FILE_SIZE {
-            return Err(());
+            return Err(SetLenError::MaximumSizeExceeded);
         }
 
+        last_ptr = resized.size / BLOCK_SIZE;
+        resized_last_ptr = size / BLOCK_SIZE;
+        current = last_ptr;
         resized.size = size;
         // If the file has been resized to a smaller size, deallocate the unused blocks.
         while current > resized_last_ptr {
@@ -662,7 +675,7 @@ impl Fs {
         }
         self.write_inode(&resized);
 
-        Ok(resized)
+        Ok(())
     }
 
     /// Write data to a file.
@@ -675,23 +688,35 @@ impl Fs {
     /// length the file will be extended.
     /// If the offset is beyond the file's size the file will be extended and a "hole" will be
     /// created in the file. Reading from the hole will return null bytes.
+    ///
+    /// # Returns
+    /// If the function fails, an error will be returned.
     pub unsafe fn write(
         &mut self,
-        file: &Inode,
+        file: usize,
         buffer: &[u8],
         offset: usize,
-    ) -> Result<Inode, WriteError> {
-        let mut updated = *file;
+    ) -> Result<(), WriteError> {
+        let mut updated;
         let mut start = offset % BLOCK_SIZE;
         let mut to_write = BLOCK_SIZE - start;
         let mut pointer = offset / BLOCK_SIZE;
         let mut written = 0;
         let mut remaining = buffer.len();
 
-        if offset + remaining > file.size {
+        if let Some(inode) = self.read_inode(file) {
+            updated = inode;
+        } else {
+            return Err(WriteError::FileNotFound);
+        }
+        if offset + remaining > updated.size {
             match self.set_len(file, offset + remaining) {
-                Ok(inode) => updated = inode,
-                Err(()) => return Err(WriteError::MaximumSizeExceeded),
+                // UNWRAP: We already checked if the file exists.
+                Ok(_) => updated = self.read_inode(file).unwrap(),
+                Err(SetLenError::MaximumSizeExceeded) => {
+                    return Err(WriteError::MaximumSizeExceeded)
+                }
+                Err(SetLenError::FileNotFound) => return Err(WriteError::FileNotFound),
             }
         }
 
@@ -717,8 +742,9 @@ impl Fs {
             };
             start = 0;
         }
+        self.write_inode(&updated);
 
-        Ok(updated)
+        Ok(())
     }
 
     pub fn get_content(&mut self, path_str: &String) -> String {
