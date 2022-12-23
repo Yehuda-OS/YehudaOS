@@ -38,7 +38,7 @@ impl Descriptor {
         }
     }
 
-    pub unsafe fn set_handler(&mut self, addr: VirtAddr) {
+    pub unsafe fn set_handler(&mut self, addr: VirtAddr, flags: u8) {
         let addr = addr.as_u64();
 
         self.ptr_low = addr as u16;
@@ -47,6 +47,6 @@ impl Descriptor {
 
         self.selector = CS::get_reg().0;
 
-        self.flags |= 0b1111_1111;
+        self.flags = flags;
     }
 }
