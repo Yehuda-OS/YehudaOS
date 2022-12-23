@@ -571,19 +571,29 @@ impl Fs {
         Some(self.get_inode(path, self.read_inode(cwd?))?.id)
     }
 
-    pub unsafe fn read(&self, file: &Inode, buffer: &mut [u8], offset: usize) -> usize {
+    /// Read a file.
+    /// 
+    /// # Arguments
+    /// - `file` - The file's id.
+    /// - `buffer` - The buffer to read into.
+    /// - `offset` - The offset inside the file to read into.
+    /// 
+    /// # Returns
+    /// The amount of bytes read or `None` if the file does not exist.
+    pub unsafe fn read(&self, file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
+        let inode = self.read_inode(file)?;
         let mut start = offset % BLOCK_SIZE;
         let mut to_read = BLOCK_SIZE - start;
         let mut pointer = offset / BLOCK_SIZE;
         let mut bytes_read = 0;
         let mut remaining;
 
-        if offset >= file.size {
-            return 0;
+        if offset >= inode.size {
+            return Some(0);
         }
 
-        remaining = if buffer.len() > file.size - offset {
-            file.size - offset
+        remaining = if buffer.len() > inode.size - offset {
+            inode.size - offset
         } else {
             buffer.len()
         };
@@ -592,13 +602,13 @@ impl Fs {
         }
         while remaining != 0 {
             // If there is no pointer read null bytes
-            if file.addresses[pointer] == 0 {
+            if inode.addresses[pointer] == 0 {
                 for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
                     *i = 0;
                 }
             } else {
                 self.blkdev.read(
-                    file.addresses[pointer] + start,
+                    inode.addresses[pointer] + start,
                     to_read,
                     buffer.as_mut_ptr().add(bytes_read),
                 );
@@ -614,7 +624,7 @@ impl Fs {
             };
         }
 
-        bytes_read
+        Some(bytes_read)
     }
 
     /// Change the length of a file to a specific length.
