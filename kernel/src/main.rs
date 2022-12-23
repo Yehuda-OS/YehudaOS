@@ -4,8 +4,11 @@
 
 extern crate alloc;
 
+mod interrupts;
 mod io;
 mod memory;
+
+static mut IDT: [interrupts::idt::Descriptor; 256] = [interrupts::idt::Descriptor::empty(); 256];
 
 /// Kernel Entry Point
 ///
@@ -21,6 +24,7 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
+        interrupts::lidt(IDT.as_ptr());
     }
     println!("Hello world");
 
