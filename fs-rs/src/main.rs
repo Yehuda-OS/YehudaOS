@@ -64,7 +64,7 @@ fn main() {
     // let result = add(2, 2);
     // assert_eq!(result, 4);
 
-    let blkdev = fs::blkdev::BlkDev::new(Vec::<u8>::new()).expect("unknown error");
+    let blkdev = fs::blkdev::BlkDev::new();
     let mut fs = fs::Fs::new(blkdev);
 
     // Declare the `FS_NAME` and `EXIT_CMD` constants
