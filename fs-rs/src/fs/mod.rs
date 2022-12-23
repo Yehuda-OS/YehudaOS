@@ -122,10 +122,15 @@ impl Fs {
         if path == "/" {
             return Some(inode);
         }
-
-        if let Some(cwd) = cwd {
-            inode = cwd;
+        // Check if the path is relative
+        if path.chars().nth(0).unwrap_or(' ') != '/' {
+            if let Some(cwd) = cwd {
+                inode = cwd;
+            } else {
+                return None;
+            }
         }
+
         while next_delimiter != None {
             dir_content = self.read_dir(&inode);
             path = &path[(next_delimiter.unwrap() + 1)..];
