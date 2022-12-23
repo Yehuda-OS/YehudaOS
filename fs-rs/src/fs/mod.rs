@@ -1,5 +1,5 @@
 pub mod blkdev;
-pub mod inode;
+mod inode;
 
 extern crate alloc;
 
@@ -108,7 +108,7 @@ impl Fs {
     }
 
     /// Returns the `Inode` of a file, or `None` if no file was found.
-    /// 
+    ///
     /// # Arguments
     /// - `path` - The path to the file.
     /// - `cwd` - The current working directory, used to support relative paths.
@@ -299,10 +299,10 @@ impl Fs {
     }
 
     fn reallocate_blocks(&mut self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
-        let mut used_blocks: isize = 0;
-        let required_blocks: usize = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
-        let mut blocks_to_allocate: isize = 0;
-        let mut new_addresses: Inode = *inode;
+        let required_blocks = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
+        let blocks_to_allocate;
+        let mut used_blocks = 0;
+        let mut new_addresses = *inode;
 
         if required_blocks > DIRECT_POINTERS {
             return Err("too many blocks are required");
