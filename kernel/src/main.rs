@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 #![feature(alloc_error_handler)]
+#![feature(strict_provenance)]
+#![feature(abi_x86_interrupt)]
+#![feature(const_mut_refs)]
 
 extern crate alloc;
 
@@ -8,7 +11,14 @@ mod interrupts;
 mod io;
 mod memory;
 
-static mut IDT: [interrupts::idt::Descriptor; 256] = [interrupts::idt::Descriptor::MISSING; 256];
+fn test_idt() {
+    unsafe { core::arch::asm!("mov dx, 0; div dx") };
+}
+
+extern "C" fn divide_by_zero_handler() -> ! {
+    println!("tried to devide by zero");
+    loop {}
+}
 
 /// Kernel Entry Point
 ///
@@ -24,6 +34,8 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
+        interrupts::init();
+        test_idt();
     }
     println!("Hello world");
 

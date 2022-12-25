@@ -1,47 +1,38 @@
-use x86_64::instructions::segmentation::{Segment, CS};
+use bit_field::BitField;
 
-#[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
-pub struct Descriptor {
-    ptr_low: u16,
-    selector: u16,
-    ist: u8,   // bits 0..2 holds Interrupt Stack Table offset, rest of bits zero.
-    flags: u8, // gate type, dpl, and p fields
-    ptr_middle: u16,
-    ptr_high: u32,
-    zero: u32, // reserved, always zero
-}
+pub struct DescriptorFlags(u16);
 
-impl Descriptor {
-    pub const MISSING: Descriptor = Descriptor {
-        ptr_low: 0,
-        selector: 0,
-        ist: 0,
-        flags: 0,
-        ptr_middle: 0,
-        ptr_high: 0,
-        zero: 0,
-    };
-
-    pub const fn new(pointer: u64, flags: u8) -> Self {
-        Self {
-            ptr_low: (pointer & 0xffff) as u16,
-            selector: 0x08,
-            ist: 0,
-            flags: flags,
-            ptr_middle: ((pointer >> 16) & 0xffff) as u16,
-            ptr_high: ((pointer >> 32) & 0xffff_ffff) as u32,
-            zero: 0,
-        }
+impl DescriptorFlags {
+    pub fn minimal() -> Self {
+        let mut options = 0;
+        options.set_bits(9..12, 0b111); // 'must-be-one' bits
+        DescriptorFlags(options)
     }
 
-    pub unsafe fn set_handler(&mut self, addr: u64, flags: u8) {
-        self.ptr_low = (addr & 0xffff) as u16;
-        self.selector = CS::get_reg().0;
-        self.ist = 0;
-        self.flags = flags;
-        self.ptr_middle = ((addr >> 16) & 0xffff) as u16;
-        self.ptr_high = ((addr >> 32) & 0xffff_ffff) as u32;
-        self.zero = 0;
+    pub fn new() -> Self {
+        let mut options = Self::minimal();
+        options.set_present(true).disable_interrupts(true);
+        options
+    }
+
+    pub fn set_present(&mut self, present: bool) -> &mut Self {
+        self.0.set_bit(15, present);
+        self
+    }
+
+    pub fn disable_interrupts(&mut self, disable: bool) -> &mut Self {
+        self.0.set_bit(8, !disable);
+        self
+    }
+
+    pub fn set_privilege_level(&mut self, dpl: u16) -> &mut Self {
+        self.0.set_bits(13..15, dpl);
+        self
+    }
+
+    pub fn set_stack_index(&mut self, index: u16) -> &mut Self {
+        self.0.set_bits(0..3, index);
+        self
     }
 }
