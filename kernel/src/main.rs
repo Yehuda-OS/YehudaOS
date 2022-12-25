@@ -8,7 +8,7 @@ mod interrupts;
 mod io;
 mod memory;
 
-static mut IDT: [interrupts::idt::Descriptor; 256] = [interrupts::idt::Descriptor::empty(); 256];
+static mut IDT: [interrupts::idt::Descriptor; 256] = [interrupts::idt::Descriptor::MISSING; 256];
 
 /// Kernel Entry Point
 ///

@@ -1,5 +1,4 @@
 use x86_64::instructions::segmentation::{Segment, CS};
-use x86_64::VirtAddr;
 
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
@@ -14,6 +13,16 @@ pub struct Descriptor {
 }
 
 impl Descriptor {
+    pub const MISSING: Descriptor = Descriptor {
+        ptr_low: 0,
+        selector: 0,
+        ist: 0,
+        flags: 0,
+        ptr_middle: 0,
+        ptr_high: 0,
+        zero: 0,
+    };
+
     pub const fn new(pointer: u64, flags: u8) -> Self {
         Self {
             ptr_low: (pointer & 0xffff) as u16,
@@ -26,25 +35,13 @@ impl Descriptor {
         }
     }
 
-    pub const fn empty() -> Self {
-        Self {
-            ptr_low: 0,
-            selector: 0,
-            ist: 0,
-            flags: 0,
-            ptr_middle: 0,
-            ptr_high: 0,
-            zero: 0,
-        }
-    }
-
     pub unsafe fn set_handler(&mut self, addr: u64, flags: u8) {
         self.ptr_low = (addr & 0xffff) as u16;
-        self.ptr_middle = ((addr & 0xffff) >> 16) as u16;
-        self.ptr_high = ((addr & 0xffff_ffff) >> 32) as u32;
-
         self.selector = CS::get_reg().0;
-
+        self.ist = 0;
         self.flags = flags;
+        self.ptr_middle = ((addr >> 16) & 0xffff) as u16;
+        self.ptr_high = ((addr >> 32) & 0xffff_ffff) as u32;
+        self.zero = 0;
     }
 }
