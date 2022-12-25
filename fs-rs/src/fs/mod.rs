@@ -659,13 +659,13 @@ impl Fs {
         }
         while remaining != 0 {
             // If there is no pointer read null bytes
-            if inode.addresses[pointer] == 0 {
+            if self.get_ptr(&inode, pointer).unwrap() == 0 {
                 for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
                     *i = 0;
                 }
             } else {
                 self.blkdev.read(
-                    inode.addresses[pointer] + start,
+                    self.get_ptr(&inode, pointer).unwrap() + start,
                     to_read,
                     buffer.as_mut_ptr().add(bytes_read),
                 );
@@ -700,6 +700,7 @@ impl Fs {
         let last_ptr;
         let resized_last_ptr;
         let mut current;
+        let mut block;
 
         if let Some(inode) = self.read_inode(file) {
             resized = inode;
@@ -716,11 +717,11 @@ impl Fs {
         resized.size = size;
         // If the file has been resized to a smaller size, deallocate the unused blocks.
         while current > resized_last_ptr {
-            let block = &mut resized.addresses[current];
+            block = self.get_ptr(&resized, current).unwrap();
 
-            if *block != 0 {
-                self.deallocate_block(*block);
-                *block = 0;
+            if block != 0 {
+                self.deallocate_block(block);
+                self.set_ptr(&mut resized, current, 0).unwrap();
             }
             current -= 1;
         }
@@ -775,15 +776,15 @@ impl Fs {
             to_write = remaining
         }
         while remaining != 0 {
-            if updated.addresses[pointer] == 0 {
+            if self.get_ptr(&updated, pointer).unwrap() == 0 {
                 if let Some(block) = self.allocate_block() {
-                    updated.addresses[pointer] = block;
+                    self.set_ptr(&mut updated, pointer, block).unwrap();
                 } else {
                     return Err(WriteError::NotEnoughDiskSpace);
                 }
             }
             self.blkdev.write(
-                updated.addresses[pointer] + start,
+                self.get_ptr(&updated, pointer).unwrap() + start,
                 to_write,
                 buffer.as_ptr().add(written),
             );
