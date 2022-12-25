@@ -158,6 +158,7 @@ impl Fs {
         self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
 
+    #[deprecated]
     fn read_file(&self, inode: &Inode) -> Box<&[u8]> {
         let last_pointer: usize = inode.size / BLOCK_SIZE;
         let mut pointer = 0;
@@ -185,6 +186,7 @@ impl Fs {
         unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
     }
 
+    #[deprecated]
     fn read_dir(&self, inode: &Inode) -> Box<&[DirEntry]> {
         let data = self.read_file(inode);
 
@@ -244,11 +246,12 @@ impl Fs {
         };
     }
 
-    fn allocate_inode(&mut self) -> usize {
-        self.allocate(self.disk_parts.inode_bit_map)
+    fn allocate_inode(&mut self) -> Option<usize> {
+        Some(self.allocate(self.disk_parts.inode_bit_map)?)
     }
 
-    fn allocate(&mut self, bitmap_start: usize) -> usize {
+    // TODO: Return None if no free space was found
+    fn allocate(&mut self, bitmap_start: usize) -> Option<usize> {
         const BITS_IN_BUFFER: usize = 64;
         const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
         const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
@@ -258,11 +261,8 @@ impl Fs {
         // read the bitmap until an unoccupied memory is found
         loop {
             unsafe {
-                self.blkdev.read(
-                    address,
-                    BYTES_IN_BUFFER,
-                    core::mem::transmute(&buffer as *const usize as *mut u8),
-                )
+                self.blkdev
+                    .read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8)
             };
             address += BYTES_IN_BUFFER;
             if buffer != ALL_OCCUPIED {
@@ -291,7 +291,8 @@ impl Fs {
                 break;
             }
         }
-        address
+
+        Some(address)
     }
 
     fn deallocate(&mut self, bitmap_start: usize, n: usize) {
@@ -304,6 +305,7 @@ impl Fs {
         unsafe { self.blkdev.write(byte_address, 1, &mut byte as *mut u8) };
     }
 
+    #[deprecated]
     fn reallocate_blocks(&mut self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
         let required_blocks = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
         let blocks_to_allocate;
@@ -322,7 +324,7 @@ impl Fs {
 
         if blocks_to_allocate > 0 {
             for i in 0..blocks_to_allocate {
-                new_addresses.addresses[used_blocks as usize] = self.allocate_block();
+                new_addresses.addresses[used_blocks as usize] = self.allocate_block().unwrap();
                 used_blocks += 1;
             }
         } else if blocks_to_allocate < 0 {
@@ -336,14 +338,14 @@ impl Fs {
         Ok(new_addresses)
     }
 
-    fn allocate_block(&mut self) -> usize {
-        let mut address: usize = self.allocate(self.disk_parts.block_bit_map);
+    fn allocate_block(&mut self) -> Option<usize> {
+        let mut address = self.allocate(self.disk_parts.block_bit_map)?;
 
         // get physical address of the occupied block
         address *= BLOCK_SIZE;
         address += self.disk_parts.data;
 
-        address
+        Some(address)
     }
 
     fn deallocate_block(&mut self, address: usize) {
@@ -542,7 +544,8 @@ impl Fs {
 
         // create root directory Inode
         root.directory = true;
-        root.id = self.allocate_inode();
+        // UNWRAP: No inodes have been allocated yet.
+        root.id = self.allocate_inode().unwrap();
         unsafe {
             self.blkdev.write(
                 self.disk_parts.root,
@@ -553,6 +556,7 @@ impl Fs {
         self.add_special_folders(&root.clone(), &mut root);
     }
 
+    #[deprecated]
     pub fn create_file(&mut self, path_str: String, directory: bool) {
         let last_delimeter = if path_str.rfind('/').is_some() {
             path_str.rfind('/').unwrap()
@@ -569,7 +573,7 @@ impl Fs {
             id: 0,
         };
 
-        file.id = self.allocate_inode();
+        file.id = self.allocate_inode().unwrap();
         file.directory = directory;
         self.write_inode(&file);
         if file.directory {
@@ -738,7 +742,11 @@ impl Fs {
         }
         while remaining != 0 {
             if updated.addresses[pointer] == 0 {
-                updated.addresses[pointer] = self.allocate_block();
+                if let Some(block) = self.allocate_block() {
+                    updated.addresses[pointer] = block;
+                } else {
+                    return Err(WriteError::NotEnoughDiskSpace);
+                }
             }
             self.blkdev.write(
                 updated.addresses[pointer] + start,
@@ -776,7 +784,7 @@ impl Fs {
         };
         let dir = self.get_inode(path_str, None).unwrap();
         let dir_content = self.read_dir(&dir);
-        let file = Inode::new(); 
+        let file = Inode::new();
 
         for i in 0..dir_content.len() {
             entry.name = dir_content[i].name.clone();
