@@ -435,6 +435,35 @@ impl Fs {
         parts
     }
 
+    /// Returns the `index`th pointer of the inode or `None` if the `index` exceeds the maximum
+    /// file size divided by the block size.
+    ///
+    /// # Arguments
+    /// - `file` - The inode to get the pointer from.
+    /// - `index` - The index of the pointer.
+    fn get_ptr(&self, file: &Inode, index: usize) -> Option<usize> {
+        let offset;
+        let mut ptr: usize = 0;
+
+        if index < DIRECT_POINTERS {
+            return Some(file.addresses[index]);
+        }
+
+        offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
+        if offset > BLOCK_SIZE {
+            return None;
+        }
+        unsafe {
+            self.blkdev.read(
+                file.indirect_pointer + offset,
+                POINTER_SIZE,
+                &mut ptr as *mut _ as *mut u8,
+            );
+        }
+
+        Some(ptr)
+    }
+
     /// Add the "." and ".." special folders to a folder.
     ///
     /// # Arguments
