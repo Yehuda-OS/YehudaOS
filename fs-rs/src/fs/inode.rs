@@ -6,6 +6,7 @@ pub struct Inode {
     pub directory: bool,
     pub size: usize,
     pub addresses: [usize; DIRECT_POINTERS],
+    pub indirect_pointer: usize,
 }
 
 impl Inode {
@@ -15,6 +16,7 @@ impl Inode {
             directory: false,
             size: 0,
             addresses: [0; DIRECT_POINTERS],
+            indirect_pointer: 0,
         }
     }
 }

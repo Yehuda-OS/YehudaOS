@@ -19,6 +19,13 @@ pub type DirList = Vec<DirListEntry>;
 
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
+const DIRECT_POINTERS: usize = 12;
+const FILE_NAME_LEN: usize = 11;
+const BLOCK_SIZE: usize = 16;
+const BITS_IN_BYTE: usize = 8;
+const BYTES_PER_INODE: usize = 16 * 1024;
+const POINTER_SIZE: usize = core::mem::size_of::<usize>();
+const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
 
 pub enum WriteError {
     NotEnoughDiskSpace,
@@ -72,13 +79,6 @@ impl core::clone::Clone for DiskParts {
 
 impl Copy for DiskParts {}
 
-const DIRECT_POINTERS: usize = 12;
-const FILE_NAME_LEN: usize = 11;
-const BLOCK_SIZE: usize = 16;
-const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE;
-const BITS_IN_BYTE: usize = 8;
-const BYTES_PER_INODE: usize = 16 * 1024;
-
 #[derive(Clone)]
 pub struct DirListEntry {
     pub name: String,
@@ -95,12 +95,7 @@ struct DirEntry {
 /// private functions
 impl Fs {
     fn get_root_dir(&self) -> Inode {
-        let mut ans = Inode {
-            id: 0,
-            directory: false,
-            size: 0,
-            addresses: [0; DIRECT_POINTERS],
-        };
+        let mut ans = Inode::new();
 
         unsafe {
             self.blkdev.read(
@@ -492,15 +487,9 @@ impl Fs {
             magic: [0; 4],
             version: 0,
         };
-
         let bit_maps_size = self.disk_parts.root - self.disk_parts.block_bit_map;
         let zeroes_buf = vec![0; bit_maps_size];
-        let mut root: Inode = Inode {
-            id: 0,
-            directory: false,
-            size: 0,
-            addresses: [0; DIRECT_POINTERS],
-        };
+        let mut root = Inode::new();
 
         // put the header in place
         header.magic.copy_from_slice(&FS_MAGIC);
@@ -542,12 +531,7 @@ impl Fs {
             0
         };
         let file_name = path_str[last_delimeter + 1..].to_string();
-        let mut file: Inode = Inode {
-            id: 0,
-            directory: false,
-            size: 0,
-            addresses: [0; DIRECT_POINTERS],
-        };
+        let mut file = Inode::new();
         let mut dir = self
             .get_inode(&path_str[0..(last_delimeter + 1)], None)
             .unwrap();
@@ -763,12 +747,7 @@ impl Fs {
         };
         let dir = self.get_inode(path_str, None).unwrap();
         let dir_content = self.read_dir(&dir);
-        let file = Inode {
-            id: 0,
-            directory: false,
-            size: 0,
-            addresses: [0; DIRECT_POINTERS],
-        };
+        let file = Inode::new(); 
 
         for i in 0..dir_content.len() {
             entry.name = dir_content[i].name.clone();
