@@ -14,14 +14,14 @@ pub struct Descriptor {
 }
 
 impl Descriptor {
-    pub const fn new(pointer: u64, flags: u8, ist: u8) -> Self {
+    pub const fn new(pointer: u64, flags: u8) -> Self {
         Self {
             ptr_low: (pointer & 0xffff) as u16,
             selector: 0x08,
-            ist: ist,
+            ist: 0,
             flags: flags,
-            ptr_middle: ((pointer & 0xffff_0000) >> 16) as u16,
-            ptr_high: ((pointer & 0xffff_ffff_0000_0000) >> 32) as u32,
+            ptr_middle: ((pointer >> 16) & 0xffff) as u16,
+            ptr_high: ((pointer >> 32) & 0xffff_ffff) as u32,
             zero: 0,
         }
     }
@@ -38,12 +38,10 @@ impl Descriptor {
         }
     }
 
-    pub unsafe fn set_handler(&mut self, addr: VirtAddr, flags: u8) {
-        let addr = addr.as_u64();
-
-        self.ptr_low = addr as u16;
-        self.ptr_middle = (addr >> 16) as u16;
-        self.ptr_high = (addr >> 32) as u32;
+    pub unsafe fn set_handler(&mut self, addr: u64, flags: u8) {
+        self.ptr_low = (addr & 0xffff) as u16;
+        self.ptr_middle = ((addr & 0xffff) >> 16) as u16;
+        self.ptr_high = ((addr & 0xffff_ffff) >> 32) as u32;
 
         self.selector = CS::get_reg().0;
 
