@@ -78,7 +78,7 @@ lazy_static! {
     static ref IDT: Idt = {
         let mut idt = Idt::new();
 
-        idt.set_handler(0, crate::divide_by_zero_handler() as u64);
+        idt.set_handler(0, crate::divide_by_zero_handler as u64);
 
         idt
     };
