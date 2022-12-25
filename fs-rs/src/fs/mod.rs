@@ -437,23 +437,23 @@ impl Fs {
         parts
     }
 
-    /// Returns the `index`th pointer of the inode or `None` if the `index` exceeds the maximum
+    /// Returns the `index`th pointer of the inode or `Err` if the `index` exceeds the maximum
     /// file size divided by the block size.
     ///
     /// # Arguments
     /// - `file` - The inode to get the pointer from.
     /// - `index` - The index of the pointer.
-    fn get_ptr(&self, file: &Inode, index: usize) -> Option<usize> {
+    fn get_ptr(&self, file: &Inode, index: usize) -> Result<usize, ()> {
         let offset;
         let mut ptr: usize = 0;
 
         if index < DIRECT_POINTERS {
-            return Some(file.addresses[index]);
+            return Ok(file.addresses[index]);
         }
 
         offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
         if offset > BLOCK_SIZE {
-            return None;
+            return Err(());
         }
         unsafe {
             self.blkdev.read(
@@ -463,7 +463,41 @@ impl Fs {
             );
         }
 
-        Some(ptr)
+        Ok(ptr)
+    }
+
+    /// Set the value of the `index`th pointer.
+    ///
+    /// # Arguments
+    /// - `file` - The file to change.
+    /// - `index` - The index of the pointer.
+    /// - `value` - The value to change to.
+    ///
+    /// # Returns
+    /// `Err` if the pointer exceeds the maximum file size
+    /// divided by the block size and `Ok` otherwise.
+    fn set_ptr(&mut self, file: &mut Inode, index: usize, value: usize) -> Result<(), ()> {
+        let offset;
+
+        if index < DIRECT_POINTERS {
+            file.addresses[index] = value;
+
+            return Ok(());
+        }
+
+        offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
+        if offset > BLOCK_SIZE {
+            return Err(());
+        }
+        unsafe {
+            self.blkdev.write(
+                file.indirect_pointer + offset,
+                POINTER_SIZE,
+                &value as *const _ as *const u8,
+            );
+        };
+
+        Ok(())
     }
 
     /// Add the "." and ".." special folders to a folder.
@@ -488,7 +522,7 @@ impl Fs {
 
 /// public functions
 impl Fs {
-    pub fn new(mut blkdev: BlkDev) -> Self {
+    pub fn new(blkdev: BlkDev) -> Self {
         let mut header = Header {
             magic: [0; 4],
             version: 0,
