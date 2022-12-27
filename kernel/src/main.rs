@@ -12,10 +12,10 @@ mod io;
 mod memory;
 
 fn test_idt() {
-    unsafe { core::arch::asm!("mov dx, 0; div dx") };
+    unsafe { *(5 as *mut u32) = 3 };
 }
 
-extern "C" fn divide_by_zero_handler() -> ! {
+extern "C" fn page_fault_handler() -> ! {
     println!("tried to devide by zero");
     loop {}
 }
@@ -34,7 +34,12 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
-        interrupts::init();
+        interrupts::set_interrupt(
+            0xE,
+            page_fault_handler as u64,
+            x86_64::PrivilegeLevel::Ring0 as u8 | 0 | (1 << 7),
+        );
+        interrupts::load_idt();
         test_idt();
     }
     println!("Hello world");

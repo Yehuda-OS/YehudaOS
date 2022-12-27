@@ -1,38 +1,39 @@
-use bit_field::BitField;
+use x86_64::registers::segmentation::{Segment, CS};
 
-#[derive(Debug, Clone, Copy)]
-pub struct DescriptorFlags(u16);
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct IDTEntry {
+    ptr_low: u16,
+    selector: u16,
+    ist: u8,
+    flags: u8,
+    ptr_mid: u16,
+    ptr_high: u32,
+    reserved: u32, // zero
+}
 
-impl DescriptorFlags {
-    pub fn minimal() -> Self {
-        let mut options = 0;
-        options.set_bits(9..12, 0b111); // 'must-be-one' bits
-        DescriptorFlags(options)
+impl IDTEntry {
+    pub const fn missing() -> Self {
+        Self {
+            ptr_low: 0,
+            selector: 0,
+            ist: 0,
+            flags: 0,
+            ptr_mid: 0,
+            ptr_high: 0,
+            reserved: 0,
+        }
     }
 
-    pub fn new() -> Self {
-        let mut options = Self::minimal();
-        options.set_present(true).disable_interrupts(true);
-        options
-    }
-
-    pub fn set_present(&mut self, present: bool) -> &mut Self {
-        self.0.set_bit(15, present);
-        self
-    }
-
-    pub fn disable_interrupts(&mut self, disable: bool) -> &mut Self {
-        self.0.set_bit(8, !disable);
-        self
-    }
-
-    pub fn set_privilege_level(&mut self, dpl: u16) -> &mut Self {
-        self.0.set_bits(13..15, dpl);
-        self
-    }
-
-    pub fn set_stack_index(&mut self, index: u16) -> &mut Self {
-        self.0.set_bits(0..3, index);
-        self
+    pub fn new(handler: u64, flags: u8) -> Self {
+        Self {
+            ptr_low: (handler & 0xFFFF) as u16,
+            selector: CS::get_reg().0,
+            ist: 0,
+            flags: flags,
+            ptr_mid: ((handler >> 16) & 0xFFFF) as u16,
+            ptr_high: ((handler >> 32) & 0xFFFF_FFFF) as u32,
+            reserved: 0,
+        }
     }
 }
