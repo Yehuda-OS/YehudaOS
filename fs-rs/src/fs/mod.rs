@@ -33,6 +33,7 @@ pub enum WriteError {
     FileNotFound,
 }
 
+#[derive(Debug)]
 pub enum SetLenError {
     MaximumSizeExceeded,
     FileNotFound,
@@ -81,14 +82,14 @@ impl Copy for DiskParts {}
 
 #[derive(Clone)]
 pub struct DirListEntry {
-    pub name: String,
+    pub name: &'static str,
     pub is_dir: bool,
     pub file_size: usize,
 }
 
 #[derive(Clone)]
 struct DirEntry {
-    name: String,
+    name: &'static str,
     id: usize,
 }
 
@@ -133,7 +134,14 @@ impl Fs {
         }
 
         while next_delimiter != None {
-            dir_content = self.read_dir(&inode);
+            let mut data: Vec<u8> = vec![0; inode.size];
+            unsafe { self.read(inode.id, data.as_mut_slice(), 0) };
+            dir_content = unsafe {
+                Box::from(slice::from_raw_parts(
+                    data.as_ptr() as *const DirEntry,
+                    data.len() / core::mem::size_of::<DirEntry>(),
+                ))
+            };
             path = &path[(next_delimiter.unwrap() + 1)..];
             next_delimiter = path.find('/');
             next_folder = match next_delimiter {
@@ -507,11 +515,11 @@ impl Fs {
     /// - `folder` - The folder to add to.
     fn add_special_folders(&mut self, containing_folder: &Inode, folder: &mut Inode) {
         let dot = DirEntry {
-            name: String::from("."),
+            name: ".",
             id: folder.id,
         };
         let dot_dot = DirEntry {
-            name: String::from(".."),
+            name: "..",
             id: containing_folder.id,
         };
 
@@ -602,10 +610,7 @@ impl Fs {
         let mut dir = self
             .get_inode(&path_str[0..(last_delimeter + 1)], None)
             .unwrap();
-        let mut file_details = DirEntry {
-            name: "".to_string(),
-            id: 0,
-        };
+        let mut file_details = DirEntry { name: "", id: 0 };
 
         file.id = self.allocate_inode().unwrap();
         file.directory = directory;
@@ -614,7 +619,7 @@ impl Fs {
             self.add_special_folders(&dir, &mut file)
         }
 
-        file_details.name = file_name;
+        file_details.name = Box::leak(file_name.into_boxed_str());
         file_details.id = file.id;
         self.add_file_to_folder(&file_details, &mut dir);
     }
@@ -803,26 +808,35 @@ impl Fs {
         Ok(())
     }
 
-    pub fn get_content(&mut self, path_str: &String) -> String {
-        let file: Inode = self.get_inode(path_str, None).unwrap();
-        let content = self.read_file(&file);
+    pub fn get_content(&mut self, path_str: &String) -> Option<String> {
+        let file: Inode = self.get_inode(path_str, None)?;
+        let mut content: Vec<u8> = vec![0; file.size];
+        unsafe { self.read(file.id, content.as_mut_slice(), 0) };
 
-        String::from_utf8_lossy(*content).to_string()
+        Some(String::from_utf8_lossy(&*content.as_slice()).to_string())
     }
 
     pub fn list_dir(&self, path_str: &String) -> DirList {
         let mut ans: DirList = vec![];
         let mut entry: &mut DirListEntry = &mut DirListEntry {
-            name: "".to_string(),
+            name: "",
             is_dir: false,
             file_size: 0,
         };
         let dir = self.get_inode(path_str, None).unwrap();
-        let dir_content = self.read_dir(&dir);
+        //let dir_content = self.read_dir(&dir);
+        let mut data: Vec<u8> = vec![0; dir.size];
+        unsafe { self.read(dir.id, data.as_mut_slice(), 0) };
+        let dir_content = unsafe {
+            Box::from(slice::from_raw_parts(
+                data.as_ptr() as *const DirEntry,
+                data.len() / core::mem::size_of::<DirEntry>(),
+            ))
+        };
         let file = Inode::new();
 
         for i in 0..dir_content.len() {
-            entry.name = dir_content[i].name.clone();
+            entry.name = dir_content[i].name;
             unsafe {
                 self.blkdev.read(
                     self.get_inode_address(dir_content[i].id),
@@ -838,17 +852,22 @@ impl Fs {
         ans
     }
 
-    pub fn set_content(&mut self, path_str: &String, content: &String) {
+    pub fn set_content(&mut self, path_str: &String, content: &String) -> Result<(), &'static str> {
         let new_size: usize = content.len();
         let last_pointer: usize = new_size / BLOCK_SIZE;
         let mut str_as_arr: Vec<char> = content.chars().collect();
-        let mut file: Inode = self.get_inode(path_str, None).unwrap();
+        let mut file: Inode;
+        if let Some(f) = self.get_inode(path_str, None) {
+            file = f;
+        } else {
+            return Err("Error: didn't recognize the file");
+        };
+
         let mut pointer: usize = 0;
         let mut to_write: usize = 0;
         let mut bytes_written: usize = 0;
 
-        file = self
-            .reallocate_blocks(&file, new_size)
+        self.set_len(file.id, new_size)
             .expect("Error: could not reallocate the block");
         file.size = new_size;
         while bytes_written != file.size {
@@ -869,5 +888,6 @@ impl Fs {
         }
 
         self.write_inode(&file);
+        Ok(())
     }
 }

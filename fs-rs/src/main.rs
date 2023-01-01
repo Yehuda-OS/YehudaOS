@@ -105,7 +105,8 @@ fn main() {
                 for i in 0..dlist.len() {
                     println!(
                         "{:15}{:10}",
-                        dlist[i].name.clone() + (if dlist[i].is_dir { "/" } else { "" }),
+                        dlist[i].name.clone().to_string()
+                            + (if dlist[i].is_dir { "/" } else { "" }),
                         dlist[i].file_size
                     );
                 }
@@ -123,7 +124,11 @@ fn main() {
 
             CONTENT_CMD => {
                 if cmd.len() == 2 {
-                    println!("{}", fs.get_content(&cmd[1].to_string()));
+                    println!(
+                        "{}",
+                        fs.get_content(&cmd[1].to_string())
+                            .unwrap_or("".to_string())
+                    );
                 } else {
                     println!("{}{}", CONTENT_CMD, ": file path requested")
                 }
@@ -145,7 +150,9 @@ fn main() {
                             break;
                         }
                     }
-                    fs.set_content(&cmd[1].to_string(), &content);
+                    if let Err(e) = fs.set_content(&cmd[1].to_string(), &content) {
+                        println!("{}", e);
+                    }
                 } else {
                     println!("{}{}", EDIT_CMD, ": file path requested");
                 }
