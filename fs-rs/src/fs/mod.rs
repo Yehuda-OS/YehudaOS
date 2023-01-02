@@ -10,6 +10,7 @@ use alloc::{
     vec::Vec,
 };
 use blkdev::BlkDev;
+use core::ops::DerefMut;
 use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
@@ -27,6 +28,7 @@ const BYTES_PER_INODE: usize = 16 * 1024;
 const POINTER_SIZE: usize = core::mem::size_of::<usize>();
 const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
 
+#[derive(Debug)]
 pub enum WriteError {
     NotEnoughDiskSpace,
     MaximumSizeExceeded,
@@ -118,7 +120,6 @@ impl Fs {
         let mut next_delimiter = path.find('/');
         let mut next_folder;
         let mut inode = self.get_root_dir();
-        let mut dir_content;
         let mut index: usize = 0;
 
         if path == "/" {
@@ -135,8 +136,8 @@ impl Fs {
 
         while next_delimiter != None {
             let mut data: Vec<u8> = vec![0; inode.size];
-            unsafe { self.read(inode.id, data.as_mut_slice(), 0) };
-            dir_content = unsafe {
+            unsafe { self.read(inode.id, data.as_mut_slice(), index) };
+            let dir_content = unsafe {
                 Box::from(slice::from_raw_parts(
                     data.as_ptr() as *const DirEntry,
                     data.len() / core::mem::size_of::<DirEntry>(),
@@ -218,7 +219,7 @@ impl Fs {
 
         unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) }
 
-        byte & (1 << offset) == 1
+        byte & (1 << offset) != 0
     }
 
     /// Returns the `Inode` object with a specific ID, or None if the inode is not
@@ -331,12 +332,12 @@ impl Fs {
         blocks_to_allocate = (required_blocks as isize - used_blocks) as isize;
 
         if blocks_to_allocate > 0 {
-            for i in 0..blocks_to_allocate {
+            for _ in 0..blocks_to_allocate {
                 new_addresses.addresses[used_blocks as usize] = self.allocate_block().unwrap();
                 used_blocks += 1;
             }
         } else if blocks_to_allocate < 0 {
-            for i in 0..(-blocks_to_allocate) {
+            for _ in 0..(-blocks_to_allocate) {
                 used_blocks -= 1;
                 self.deallocate_block(new_addresses.addresses[used_blocks as usize]);
                 new_addresses.addresses[used_blocks as usize] = 0;
@@ -852,15 +853,28 @@ impl Fs {
         ans
     }
 
-    pub fn set_content(&mut self, path_str: &String, content: &String) -> Result<(), &'static str> {
+    /// set the content of a file
+    ///
+    /// # Arguments
+    /// - `path_str` - The path of the file
+    /// - `content` - The new content of the file
+    ///
+    /// # Returns
+    /// If the function fails, an error will be returned.
+    pub fn set_content(
+        &mut self,
+        path_str: &String,
+        content: &mut String,
+    ) -> Result<(), &'static str> {
         let new_size: usize = content.len();
         let last_pointer: usize = new_size / BLOCK_SIZE;
-        let mut str_as_arr: Vec<char> = content.chars().collect();
+        let str_as_bytes: &mut [u8] = unsafe { content.as_bytes_mut() };
         let mut file: Inode;
+
         if let Some(f) = self.get_inode(path_str, None) {
             file = f;
         } else {
-            return Err("Error: didn't recognize the file");
+            return Err("Error: could not find the file");
         };
 
         let mut pointer: usize = 0;
@@ -869,6 +883,10 @@ impl Fs {
 
         self.set_len(file.id, new_size)
             .expect("Error: could not reallocate the block");
+
+        file = self
+            .reallocate_blocks(&file, str_as_bytes.len())
+            .expect("Error: failed to reallocate the file");
         file.size = new_size;
         while bytes_written != file.size {
             to_write = if pointer == last_pointer {
@@ -876,13 +894,15 @@ impl Fs {
             } else {
                 BLOCK_SIZE
             };
+
             unsafe {
                 self.blkdev.write(
                     file.addresses[pointer],
                     to_write,
-                    str_as_arr.as_mut_ptr().add(bytes_written) as *mut u8,
-                )
-            };
+                    str_as_bytes.as_mut_ptr().add(bytes_written),
+                );
+            }
+
             bytes_written += to_write;
             pointer += 1;
         }

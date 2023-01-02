@@ -19,27 +19,6 @@ static mut HELP_STRING: String = String::new();
 
 mod fs;
 
-fn recursive_print(fs: &mut Fs, path: String, prefix: String) {
-    let dlist = fs.list_dir(&path);
-    for (i, curr_entry) in dlist.iter().enumerate() {
-        let entry_prefix = if i == dlist.len() - 1 {
-            format!("{}└── ", prefix)
-        } else {
-            format!("{}├── ", prefix)
-        };
-        println!("{}{}", entry_prefix, curr_entry.name);
-
-        if curr_entry.is_dir {
-            let dir_prefix = if i == dlist.len() - 1 {
-                format!("{}    ", prefix)
-            } else {
-                format!("{}│   ", prefix)
-            };
-            recursive_print(fs, format!("{}/{}", path, curr_entry.name), dir_prefix);
-        }
-    }
-}
-
 fn main() {
     unsafe {
         HELP_STRING = format!(
@@ -134,23 +113,24 @@ fn main() {
                 }
             }
 
-            TREE_CMD => recursive_print(&mut fs, "".to_string(), "".to_string()),
-
             EDIT_CMD => {
                 if cmd.len() == 2 {
                     println!("Enter new file content");
                     let mut content: String = String::new();
                     let mut curr_line: String = String::new();
-                    std::io::stdin().read_line(&mut curr_line);
                     loop {
-                        content.push_str(&format!("{}\n", curr_line));
-                        std::io::stdin().read_line(&mut curr_line);
+                        std::io::stdin()
+                            .read_line(&mut curr_line)
+                            .expect("failed to get input");
+                        content.push_str(&format!("{}", curr_line));
 
-                        if !curr_line.is_empty() {
+                        if curr_line.trim().is_empty() {
                             break;
                         }
+
+                        curr_line.clear();
                     }
-                    if let Err(e) = fs.set_content(&cmd[1].to_string(), &content) {
+                    if let Err(e) = fs.set_content(&cmd[1].to_string(), &mut content) {
                         println!("{}", e);
                     }
                 } else {

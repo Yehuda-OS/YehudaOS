@@ -13,4 +13,3 @@ path = "src/lib.rs"
 
 
 [dependencies]
-micromath = "2.0.0"
