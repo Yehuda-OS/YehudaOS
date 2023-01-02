@@ -1,5 +1,84 @@
 use bitflags::bitflags;
 
+static mut GDT: [Entry; 6] = [
+    Entry::zeros(),
+    Entry::zeros(),
+    Entry::zeros(),
+    Entry::zeros(),
+    Entry::zeros(),
+    Entry::zeros(),
+];
+
+/// Create the GDT with the required segments.
+pub fn create() {
+    unsafe {
+        GDT = [
+            // NULL descriptor.
+            Entry::zeros(),
+            // Kernel mode code segment.
+            Entry::new(
+                0,
+                0xfffff,
+                AccessByte::from_bits_truncate(
+                    AccessByte::PRESENT.bits
+                        | AccessByte::CODE_OR_DATA.bits
+                        | AccessByte::EXECUTABLE.bits
+                        | AccessByte::READABLE_WRITEABLE.bits,
+                ),
+                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::LONG_MODE.bits),
+            ),
+            // Kernel mode data segment.
+            Entry::new(
+                0,
+                0xfffff,
+                AccessByte::from_bits_truncate(
+                    AccessByte::PRESENT.bits
+                        | AccessByte::CODE_OR_DATA.bits
+                        | AccessByte::READABLE_WRITEABLE.bits,
+                ),
+                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::DEFAULT_SIZE.bits),
+            ),
+            // User mode code segment.
+            Entry::new(
+                0,
+                0xfffff,
+                AccessByte::from_bits_truncate(
+                    AccessByte::PRESENT.bits
+                        | AccessByte::CODE_OR_DATA.bits
+                        | AccessByte::READABLE_WRITEABLE.bits
+                        | AccessByte::RING3.bits,
+                ),
+                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::LONG_MODE.bits),
+            ),
+            // User mode data segment.
+            Entry::new(
+                0,
+                0xfffff,
+                AccessByte::from_bits_truncate(
+                    AccessByte::PRESENT.bits
+                        | AccessByte::CODE_OR_DATA.bits
+                        | AccessByte::READABLE_WRITEABLE.bits
+                        | AccessByte::RING3.bits,
+                ),
+                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::DEFAULT_SIZE.bits),
+            ),
+            // Task State Segment
+            Entry::new(
+                super::scheduler::get_tss_address(),
+                core::mem::size_of::<super::scheduler::TaskStateSegment>() as u32,
+                AccessByte::from_bits_truncate(
+                    AccessByte::PRESENT.bits | AccessByte::TYPE_TSS.bits,
+                ),
+                Flags::empty(),
+            ),
+        ]
+    }
+}
+
+pub fn load() {
+    // TODO
+}
+
 #[repr(packed)]
 struct Entry {
     limit0: u16,
@@ -29,9 +108,12 @@ bitflags! {
     }
 
     struct Flags: u8 {
+        /// Must be set in 64 bit code segments.
         const LONG_MODE = 1 << 1;
+        /// This is set in data segment.
+        const DEFAULT_SIZE = 1 << 2;
         /// If set, the limit is a count of 4KiB blocks instead of 1 byte blocks.
-        const GRANULARITY = 1 << 3;
+        const GRANULARITY_4KIB = 1 << 3;
     }
 }
 
@@ -45,6 +127,19 @@ impl Entry {
             limit1_flags: flags.bits | (limit >> 16) as u8,
             base2: (base >> 24) as u8,
             base3: (base >> 32) as u32,
+            reserved: 0,
+        }
+    }
+
+    pub const fn zeros() -> Self {
+        Entry {
+            limit0: 0,
+            base0: 0,
+            base1: 0,
+            access: AccessByte { bits: 0 },
+            limit1_flags: 0,
+            base2: 0,
+            base3: 0,
             reserved: 0,
         }
     }
