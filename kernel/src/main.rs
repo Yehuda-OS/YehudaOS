@@ -7,6 +7,7 @@ extern crate alloc;
 mod terminal;
 mod memory;
 mod gdt;
+mod scheduler;
 
 /// Kernel Entry Point
 ///
