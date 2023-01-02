@@ -4,6 +4,7 @@
 #![feature(strict_provenance)]
 #![feature(abi_x86_interrupt)]
 #![feature(const_mut_refs)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 
@@ -12,7 +13,14 @@ mod io;
 mod memory;
 
 fn test_idt() {
-    unsafe { *(5 as *mut u32) = 3 };
+    unsafe {
+        core::arch::asm!(
+            "
+            mov dx, 0;
+            div dx
+            "
+        )
+    };
 }
 
 extern "C" fn page_fault_handler() -> ! {
@@ -34,12 +42,7 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
-        interrupts::set_interrupt(
-            0xE,
-            page_fault_handler as u64,
-            x86_64::PrivilegeLevel::Ring0 as u8 | 0 | (1 << 7),
-        );
-        interrupts::load_idt();
+        interrupts::IDT.load();
         test_idt();
     }
     println!("Hello world");

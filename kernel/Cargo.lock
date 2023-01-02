@@ -27,6 +27,7 @@ dependencies = [
  "bit_field",
  "lazy_static",
  "limine",
+ "pic8259",
  "spin 0.9.4",
  "x86_64",
 ]
@@ -54,6 +55,15 @@ checksum = "435011366fe56583b16cf956f9df0095b405b82d76425bc8981c0e22e60ec4df"
 dependencies = [
  "autocfg",
  "scopeguard",
+]
+
+[[package]]
+name = "pic8259"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24ec21f514e2e16e94649f1d041ca4a7069b512c037ac156360652a775e6229d"
+dependencies = [
+ "x86_64",
 ]
 
 [[package]]
