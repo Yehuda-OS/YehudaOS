@@ -75,7 +75,7 @@ pub fn create() {
     }
 }
 
-pub fn load() {
+pub fn activate() {
     // TODO
 }
 
