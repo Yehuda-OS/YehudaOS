@@ -600,7 +600,7 @@ impl Fs {
     }
 
     #[deprecated]
-    pub fn create_file(&mut self, path_str: String, directory: bool) {
+    pub fn create_file(&mut self, path_str: String, directory: bool) -> Result<(), &'static str> {
         let last_delimeter = if path_str.rfind('/').is_some() {
             path_str.rfind('/').unwrap()
         } else {
@@ -608,9 +608,12 @@ impl Fs {
         };
         let file_name = path_str[last_delimeter + 1..].to_string();
         let mut file = Inode::new();
-        let mut dir = self
-            .get_inode(&path_str[0..(last_delimeter + 1)], None)
-            .unwrap();
+        let mut dir;
+        if let Some(inode) = self.get_inode(&path_str[0..(last_delimeter + 1)], None) {
+            dir = inode
+        } else {
+            return Err("Error: invalid path");
+        }
         let mut file_details = DirEntry { name: "", id: 0 };
 
         file.id = self.allocate_inode().unwrap();
@@ -623,6 +626,7 @@ impl Fs {
         file_details.name = Box::leak(file_name.into_boxed_str());
         file_details.id = file.id;
         self.add_file_to_folder(&file_details, &mut dir);
+        Ok(())
     }
 
     /// Get a file's `Inode` id.

@@ -95,7 +95,9 @@ fn main() {
 
             CREATE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    fs.create_file(cmd[1].to_string(), false);
+                    if let Err(e) = fs.create_file(cmd[1].to_string(), false) {
+                        println!("{}", e);
+                    }
                 } else {
                     println!("{}{}", CREATE_FILE_CMD, ": file path requested")
                 }
