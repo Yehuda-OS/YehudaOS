@@ -38,13 +38,13 @@ bitflags! {
 impl Entry {
     pub const fn new(base: u64, limit: u32, access: AccessByte, flags: Flags) -> Self {
         Entry {
-            limit0: 0,
-            base0: 0,
-            base1: 0,
+            limit0: limit as u16,
+            base0: base as u16,
+            base1: (base >> 16) as u8,
             access,
-            limit1_flags: flags.bits | 0,
-            base2: 0,
-            base3: 0,
+            limit1_flags: flags.bits | (limit >> 16) as u8,
+            base2: (base >> 24) as u8,
+            base3: (base >> 32) as u32,
             reserved: 0,
         }
     }
