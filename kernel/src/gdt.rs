@@ -27,16 +27,22 @@ bitflags! {
         /// `Available 32-bit TSS` type of a system segment.
         const TYPE_TSS = 0x9;
     }
+
+    struct Flags: u8 {
+        const LONG_MODE = 1 << 1;
+        /// If set, the limit is a count of 4KiB blocks instead of 1 byte blocks.
+        const GRANULARITY = 1 << 3;
+    }
 }
 
 impl Entry {
-    pub const fn new() -> Self {
+    pub const fn new(base: u64, limit: u32, access: AccessByte, flags: Flags) -> Self {
         Entry {
             limit0: 0,
             base0: 0,
             base1: 0,
-            access: AccessByte { bits: 0 },
-            limit1_flags: 0,
+            access,
+            limit1_flags: flags.bits | 0,
             base2: 0,
             base3: 0,
             reserved: 0,
