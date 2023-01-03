@@ -363,53 +363,16 @@ impl Fs {
         self.deallocate(self.disk_parts.block_bit_map, block_number);
     }
 
-    fn add_file_to_folder(&mut self, file: &DirEntry, folder: &mut Inode) {
-        let mut pointer = folder.size / BLOCK_SIZE;
-        let mut bytes_left = core::mem::size_of_val(file);
-        let mut address;
-        let space_taken_in_last_block = folder.size % BLOCK_SIZE;
-        let empty_space;
-        let mut to_write;
-        let mut written = 0;
-
-        *folder = self
-            .reallocate_blocks(folder, folder.size + core::mem::size_of_val(file))
-            .unwrap();
-
-        address = folder.addresses[pointer] + space_taken_in_last_block;
-        empty_space = BLOCK_SIZE - space_taken_in_last_block;
-        to_write = if bytes_left > empty_space {
-            empty_space
-        } else {
-            bytes_left
+    fn add_file_to_folder(
+        &mut self,
+        file: &DirEntry,
+        folder: &mut Inode,
+    ) -> Result<Inode, WriteError> {
+        let buffer: &[u8] = unsafe {
+            slice::from_raw_parts(file as *const _ as *const u8, core::mem::size_of_val(file))
         };
 
-        loop {
-            unsafe {
-                self.blkdev.write(
-                    address,
-                    to_write,
-                    (file as *const _ as *mut u8).add(written),
-                )
-            };
-
-            folder.size += to_write;
-            written += to_write;
-            bytes_left -= to_write;
-            pointer += 1;
-            address = folder.addresses[pointer];
-
-            to_write = if bytes_left > BLOCK_SIZE {
-                BLOCK_SIZE
-            } else {
-                bytes_left
-            };
-
-            if bytes_left == 0 {
-                break;
-            }
-        }
-        self.write_inode(folder);
+        unsafe { self.write(folder.id, buffer, folder.size) }
     }
 
     fn calc_parts(device_size: usize) -> DiskParts {
@@ -525,7 +488,7 @@ impl Fs {
             id: containing_folder.id,
         };
 
-        self.add_file_to_folder(&dot, folder);
+        *folder = self.add_file_to_folder(&dot, folder).unwrap();
         self.add_file_to_folder(&dot_dot, folder);
     }
 
@@ -641,8 +604,10 @@ impl Fs {
 
         file_details.name = Box::leak(file_name.into_boxed_str());
         file_details.id = file.id;
-        self.add_file_to_folder(&file_details, &mut dir);
-        Ok(())
+        match self.add_file_to_folder(&file_details, &mut dir) {
+            Ok(_) => Ok(()),
+            Err(_) => Err("Error: failed to add the file to the folder"),
+        }
     }
 
     /// Get a file's `Inode` id.
@@ -784,7 +749,7 @@ impl Fs {
         file: usize,
         buffer: &[u8],
         offset: usize,
-    ) -> Result<(), WriteError> {
+    ) -> Result<Inode, WriteError> {
         let mut updated;
         let mut start = offset % BLOCK_SIZE;
         let mut to_write = BLOCK_SIZE - start;
@@ -836,7 +801,7 @@ impl Fs {
         }
         self.write_inode(&updated);
 
-        Ok(())
+        Ok(updated)
     }
 
     pub fn get_content(&mut self, path_str: &String) -> Option<String> {
@@ -896,19 +861,14 @@ impl Fs {
         content: &mut String,
     ) -> Result<(), &'static str> {
         let new_size: usize = content.len();
-        let last_pointer: usize = new_size / BLOCK_SIZE;
         let str_as_bytes: &mut [u8] = unsafe { content.as_bytes_mut() };
-        let mut file: Inode;
+        let file: Inode;
 
         if let Some(f) = self.get_inode(path_str, None) {
             file = f;
         } else {
             return Err("Error: could not find the file");
         };
-
-        let mut pointer: usize = 0;
-        let mut to_write: usize = 0;
-        let mut bytes_written: usize = 0;
 
         self.set_len(file.id, new_size)
             .expect("Error: could not reallocate the block");
