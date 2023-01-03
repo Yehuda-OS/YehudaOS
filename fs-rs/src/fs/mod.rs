@@ -528,6 +528,21 @@ impl Fs {
         self.add_file_to_folder(&dot, folder);
         self.add_file_to_folder(&dot_dot, folder);
     }
+
+    /// function that checks if an inode is directory
+    ///
+    /// # Arguments
+    ///  - `id` - the id of the Inode
+    ///
+    /// # Returns
+    /// `true` if the inode is directory and `false` if not
+    fn is_dir(&self, id: usize) -> bool {
+        if let Some(inode) = self.read_inode(id) {
+            inode.directory
+        } else {
+            false
+        }
+    }
 }
 
 /// public functions
