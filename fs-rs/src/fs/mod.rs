@@ -855,7 +855,6 @@ impl Fs {
             file_size: 0,
         };
         let dir = self.get_inode(path_str, None).unwrap();
-        //let dir_content = self.read_dir(&dir);
         let mut data: Vec<u8> = vec![0; dir.size];
         unsafe { self.read(dir.id, data.as_mut_slice(), 0) };
         let dir_content = unsafe {
