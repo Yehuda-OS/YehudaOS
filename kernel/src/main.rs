@@ -6,6 +6,7 @@ extern crate alloc;
 
 mod io;
 mod memory;
+mod scheduler;
 
 /// Kernel Entry Point
 ///
