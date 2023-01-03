@@ -498,6 +498,7 @@ impl Fs {
         if offset > BLOCK_SIZE {
             return Err(());
         }
+        // TODO Allocate the indirect pointer if it is needed.
         unsafe {
             self.blkdev.write(
                 file.indirect_pointer + offset,
