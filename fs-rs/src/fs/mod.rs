@@ -635,7 +635,17 @@ impl Fs {
     /// - `path` - The path to the file.
     /// - `cwd` - The current working directory, used for relative paths.
     pub fn get_file_id(&self, path: &str, cwd: Option<usize>) -> Option<usize> {
-        Some(self.get_inode(path, self.read_inode(cwd?))?.id)
+        Some(
+            self.get_inode(
+                path,
+                if let Some(cwd) = cwd {
+                    self.read_inode(cwd)
+                } else {
+                    None
+                },
+            )?
+            .id,
+        )
     }
 
     /// Read a file.
