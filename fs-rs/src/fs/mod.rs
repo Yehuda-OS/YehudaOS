@@ -888,30 +888,10 @@ impl Fs {
         self.set_len(file.id, new_size)
             .expect("Error: could not reallocate the block");
 
-        file = self
-            .reallocate_blocks(&file, str_as_bytes.len())
-            .expect("Error: failed to reallocate the file");
-        file.size = new_size;
-        while bytes_written != file.size {
-            to_write = if pointer == last_pointer {
-                file.size % BLOCK_SIZE
-            } else {
-                BLOCK_SIZE
-            };
-
-            unsafe {
-                self.blkdev.write(
-                    file.addresses[pointer],
-                    to_write,
-                    str_as_bytes.as_mut_ptr().add(bytes_written),
-                );
-            }
-
-            bytes_written += to_write;
-            pointer += 1;
+        if let Err(_) = unsafe { self.write(file.id, str_as_bytes, 0) } {
+            return Err("Error: couldn't write to the file");
         }
 
-        self.write_inode(&file);
         Ok(())
     }
 }

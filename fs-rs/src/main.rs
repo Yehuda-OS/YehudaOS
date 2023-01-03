@@ -61,7 +61,7 @@ fn main() {
         std::io::stdin().read_line(&mut cmdline).unwrap();
 
         // Skip empty command lines
-        if cmdline == "" {
+        if cmdline.trim().is_empty() {
             continue;
         }
 
