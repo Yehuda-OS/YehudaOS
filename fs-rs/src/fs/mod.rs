@@ -97,6 +97,10 @@ struct DirEntry {
 
 /// private functions
 impl Fs {
+    /// function that returns the root dir (/)
+    ///
+    /// # Returns
+    /// the Inode of the root dir
     fn get_root_dir(&self) -> Inode {
         let mut ans = Inode::new();
 
@@ -163,6 +167,13 @@ impl Fs {
         Some(inode)
     }
 
+    /// find the Inode address by id
+    ///
+    /// # Arguments
+    /// - `id` - the Inode's id
+    ///
+    /// # Returns
+    /// the address if the Inode
     fn get_inode_address(&self, id: usize) -> usize {
         self.disk_parts.root + id * core::mem::size_of::<Inode>()
     }
@@ -245,6 +256,10 @@ impl Fs {
         }
     }
 
+    /// a function that writes Inode to the memory
+    ///
+    /// # Arguments
+    /// - `inode` - the Inode that has to be written to the memory
     fn write_inode(&mut self, inode: &Inode) {
         unsafe {
             self.blkdev.write(
@@ -255,10 +270,21 @@ impl Fs {
         };
     }
 
+    /// allocate Inode
+    ///
+    /// # Returns
+    /// the address of the inode if it was allocated or None if no free space was found
     fn allocate_inode(&mut self) -> Option<usize> {
         Some(self.allocate(self.disk_parts.inode_bit_map)?)
     }
 
+    /// allocate a block or Inode
+    ///
+    /// # Arguments
+    /// - `bitmap_start` - the start of the bitmap
+    ///
+    /// # Returns
+    /// the address of the allocated block or Inode
     // TODO: Return None if no free space was found
     fn allocate(&mut self, bitmap_start: usize) -> Option<usize> {
         const BITS_IN_BUFFER: usize = 64;
@@ -304,6 +330,11 @@ impl Fs {
         Some(address)
     }
 
+    /// deallocate a block or inode by his index in the bitmap
+    ///
+    /// # Arguments
+    /// - `bitmap_start` - the start og the bitmap
+    /// - `n` - the index of the block
     fn deallocate(&mut self, bitmap_start: usize, n: usize) {
         let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;
         let mut byte: u8 = 0;
@@ -347,6 +378,10 @@ impl Fs {
         Ok(new_addresses)
     }
 
+    /// allocate a block
+    ///
+    /// # Returns
+    /// the block's address
     fn allocate_block(&mut self) -> Option<usize> {
         let mut address = self.allocate(self.disk_parts.block_bit_map)?;
 
@@ -357,12 +392,24 @@ impl Fs {
         Some(address)
     }
 
+    /// deallocate a block
+    ///
+    /// # Arguments
+    /// - `address` - the block's address
     fn deallocate_block(&mut self, address: usize) {
         let block_number: usize = (address - self.disk_parts.data) / BLOCK_SIZE;
 
         self.deallocate(self.disk_parts.block_bit_map, block_number);
     }
 
+    /// function that adds a file to a folder
+    ///
+    /// # Arguments
+    /// - `file` - the file that has to be added to the folder
+    /// - `folder` - the folder that `file` is going to be added to
+    ///
+    /// # Returns
+    /// Inode of the folder after the file was added or WriteError otherwise
     fn add_file_to_folder(
         &mut self,
         file: &DirEntry,
@@ -375,6 +422,11 @@ impl Fs {
         unsafe { self.write(folder.id, buffer, folder.size) }
     }
 
+    /// Calculate the disk parts for the file system.
+    /// # Arguments
+    /// - `device_size` - the disk device size.
+    /// # Returns
+    ///  a struct with pointers to every segment.
     fn calc_parts(device_size: usize) -> DiskParts {
         let mut parts: DiskParts = DiskParts {
             block_bit_map: 0,
@@ -510,6 +562,13 @@ impl Fs {
 
 /// public functions
 impl Fs {
+    /// funciton that creates new file system
+    ///
+    /// # Arguments
+    /// - `blkdev` - the block device
+    ///
+    /// # Returns
+    /// the file system
     pub fn new(blkdev: BlkDev) -> Self {
         let mut header = Header {
             magic: [0; 4],
@@ -535,6 +594,9 @@ impl Fs {
         instance
     }
 
+    /// format method
+    /// This function discards the current content in the blockdevice and
+    /// create a fresh new MYFS instance in the blockdevice.
     pub fn format(&mut self) {
         let mut header: Header = Header {
             magic: [0; 4],
@@ -743,7 +805,7 @@ impl Fs {
     /// created in the file. Reading from the hole will return null bytes.
     ///
     /// # Returns
-    /// If the function fails, an error will be returned.
+    /// if the function succeeded, If it fails, an error will be returned.
     pub unsafe fn write(
         &mut self,
         file: usize,
@@ -804,14 +866,33 @@ impl Fs {
         Ok(updated)
     }
 
+    /// function that returns the content of a file
+    ///
+    /// # Arguments
+    /// - `path_str` - the path to the file
+    ///
+    /// # Returns
+    /// the content if exists, None if not
     pub fn get_content(&mut self, path_str: &String) -> Option<String> {
         let file: Inode = self.get_inode(path_str, None)?;
         let mut content: Vec<u8> = vec![0; file.size];
         unsafe { self.read(file.id, content.as_mut_slice(), 0) };
 
-        Some(String::from_utf8_lossy(&*content.as_slice()).to_string())
+        let content = String::from_utf8_lossy(&*content.as_slice()).to_string();
+        if content.trim().is_empty() {
+            None
+        } else {
+            Some(content)
+        }
     }
 
+    /// a function that list all the dirs (ls command)
+    ///
+    /// # Arguments
+    /// - `path_str` - the path that need to be listed
+    ///
+    /// # Returns
+    /// list with all the dirs and files
     pub fn list_dir(&self, path_str: &String) -> DirList {
         let mut ans: DirList = vec![];
         let mut entry: &mut DirListEntry = &mut DirListEntry {
