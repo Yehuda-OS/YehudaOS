@@ -1,5 +1,7 @@
 use bitflags::bitflags;
 
+const MAX_LIMIT: u32 = 0xfffff;
+
 static mut GDT: [Entry; 6] = [
     Entry::zeros(),
     Entry::zeros(),
@@ -18,7 +20,7 @@ pub fn create() {
             // Kernel mode code segment.
             Entry::new(
                 0,
-                0xfffff,
+                MAX_LIMIT,
                 AccessByte::from_bits_truncate(
                     AccessByte::PRESENT.bits
                         | AccessByte::CODE_OR_DATA.bits
@@ -30,7 +32,7 @@ pub fn create() {
             // Kernel mode data segment.
             Entry::new(
                 0,
-                0xfffff,
+                MAX_LIMIT,
                 AccessByte::from_bits_truncate(
                     AccessByte::PRESENT.bits
                         | AccessByte::CODE_OR_DATA.bits
@@ -41,7 +43,7 @@ pub fn create() {
             // User mode code segment.
             Entry::new(
                 0,
-                0xfffff,
+                MAX_LIMIT,
                 AccessByte::from_bits_truncate(
                     AccessByte::PRESENT.bits
                         | AccessByte::CODE_OR_DATA.bits
@@ -54,7 +56,7 @@ pub fn create() {
             // User mode data segment.
             Entry::new(
                 0,
-                0xfffff,
+                MAX_LIMIT,
                 AccessByte::from_bits_truncate(
                     AccessByte::PRESENT.bits
                         | AccessByte::CODE_OR_DATA.bits
