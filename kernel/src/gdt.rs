@@ -45,6 +45,7 @@ pub fn create() {
                 AccessByte::from_bits_truncate(
                     AccessByte::PRESENT.bits
                         | AccessByte::CODE_OR_DATA.bits
+                        | AccessByte::EXECUTABLE.bits
                         | AccessByte::READABLE_WRITEABLE.bits
                         | AccessByte::RING3.bits,
                 ),
