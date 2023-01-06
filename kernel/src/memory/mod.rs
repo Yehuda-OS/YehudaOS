@@ -178,7 +178,7 @@ pub fn reclaim_bootloader_memory() {
         if entry.typ == LimineMemoryMapEntryType::Framebuffer {
             map_memmap_entry(VirtAddr::new(entry.base), entry, flags);
         } else if entry.typ == LimineMemoryMapEntryType::BootloaderReclaimable {
-            if entry.base < limine_table && entry.base + entry.len > limine_table {
+            if entry.base <= limine_table && entry.base + entry.len > limine_table {
                 addr = entry.base;
 
                 while addr < entry.base + entry.len {
