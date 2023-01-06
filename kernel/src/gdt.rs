@@ -78,8 +78,32 @@ pub fn create() {
     }
 }
 
-pub fn activate() {
-    // TODO
+/// TODO documentation
+pub unsafe fn reload_segments() {
+}
+
+/// Load the GDT to the GDTR and activate the GDT.
+/// Put the appropriate segment selectors in the appropriate registers.
+///
+/// # Safety
+/// TODO
+pub unsafe fn activate() {
+    let limit = core::mem::size_of_val(&GDT) as u16 - 1;
+    let base = &GDT as *const _ as u64;
+    let mut gdt_descriptor = &limit as *const _ as u64;
+
+    crate::println!(
+        "base: {:p}, limit: {:p}, descriptor: {:#x}\nbase: {:#x}, limit: {:#x}",
+        &base,
+        &limit,
+        gdt_descriptor,
+        base,
+        limit,
+    );
+
+    core::arch::asm!("lgdt [{gdt_descriptor}]", gdt_descriptor=in(reg)gdt_descriptor);
+    reload_segments();
+    loop {}
 }
 
 #[repr(packed)]
