@@ -127,8 +127,7 @@ impl Entry {
             base0: base as u16,
             base1: (base >> 16) as u8,
             access,
-            // Take the upper 4 bits of the upper half of the limit.
-            limit1_flags: flags.bits | ((limit >> 16) << 4) as u8,
+            limit1_flags: flags.bits | (limit >> 16) as u8,
             base2: (base >> 24) as u8,
             base3: (base >> 32) as u32,
             reserved: 0,
