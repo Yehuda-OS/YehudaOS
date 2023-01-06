@@ -150,9 +150,6 @@ pub fn create() {
 
 /// Loads new values to the segment registers.
 /// Performs a far return to update the `cs` register.
-/// To perform the far return, the function pops the value of `rbp` that was pushed when the
-/// stack frame was created and then pops the return address then and pushes the new value of the
-/// `cs` register and pushes the return address and then performs the far return.
 ///
 /// # Safety
 /// This function is unsafe because loading new values to the segment registers requires
@@ -160,20 +157,19 @@ pub fn create() {
 #[allow(unreachable_code)]
 unsafe fn reload_segments() {
     core::arch::asm!("
-    pop rbp
-    pop rcx
-
-    mov ds, dx
-    mov es, dx
-    mov fs, dx
-    mov gs, dx
-    mov ss, dx
-
-    push ax
-    push rcx
+    push rax
+    lea rax, [2f]
+    push rax
     retfq
+
+    2:
+        mov ds, dx
+        mov es, dx
+        mov fs, dx
+        mov gs, dx
+        mov ss, dx
     "
-    , in("ax")KERNEL_CODE, in("dx")KERNEL_DATA);
+    , in("rax")KERNEL_CODE, in("dx")KERNEL_DATA);
 }
 
 /// Load the GDT to the GDTR and activate the GDT.
