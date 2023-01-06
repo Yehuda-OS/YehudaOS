@@ -79,6 +79,35 @@ impl Entry {
             base2: 0,
         }
     }
+
+    #[allow(unused)]
+    fn print(&self) {
+        use crate::println;
+
+        println!(
+            "Base: {:#x}",
+            self.base0 as u64 | ((self.base1 as u64) << 16) | ((self.base2 as u64) << 24)
+        );
+        println!(
+            "Limit: {:#x}",
+            self.limit0 as u32 | ((self.limit1_flags as u32 & 0xf) << 16)
+        );
+        println!("Access: {:?}", self.access);
+        println!(
+            "Flags: {:?}",
+            Flags::from_bits_truncate(self.limit1_flags & 0xf0 >> 4)
+        );
+        println!("Entry bits: {:#x}", self.bits())
+    }
+
+    fn bits(&self) -> u64 {
+        self.limit0 as u64
+            | ((self.base0 as u64) << 16)
+            | ((self.base1 as u64) << 32)
+            | ((self.access.bits as u64) << 40)
+            | ((self.limit1_flags as u64) << 48)
+            | ((self.base2 as u64) << 56)
+    }
 }
 
 /// Create the GDT with the required segments.
