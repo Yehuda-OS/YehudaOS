@@ -91,8 +91,6 @@ struct Entry {
     access: AccessByte,
     limit1_flags: u8,
     base2: u8,
-    base3: u32,
-    reserved: u32,
 }
 
 bitflags! {
@@ -130,8 +128,6 @@ impl Entry {
             access,
             limit1_flags: (flags.bits << 4) | (limit >> 16) as u8,
             base2: (base >> 24) as u8,
-            base3: (base >> 32) as u32,
-            reserved: 0,
         }
     }
 
@@ -143,8 +139,6 @@ impl Entry {
             access: AccessByte { bits: 0 },
             limit1_flags: 0,
             base2: 0,
-            base3: 0,
-            reserved: 0,
         }
     }
 }
