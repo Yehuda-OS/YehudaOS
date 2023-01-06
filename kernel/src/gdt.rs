@@ -14,7 +14,6 @@ static mut GDT: [Entry; 6] = [
     Entry::zeros(),
 ];
 
-
 #[repr(packed)]
 #[allow(unused)]
 struct Entry {
@@ -24,6 +23,12 @@ struct Entry {
     access: AccessByte,
     limit1_flags: u8,
     base2: u8,
+}
+
+#[repr(packed)]
+struct GDTDescriptor {
+    limit: u16,
+    base: u64,
 }
 
 bitflags! {
@@ -148,7 +153,7 @@ pub fn create() {
 /// To perform the far return, the function pops the value of `rbp` that was pushed when the
 /// stack frame was created and then pops the return address then and pushes the new value of the
 /// `cs` register and pushes the return address and then performs the far return.
-/// 
+///
 /// # Safety
 /// This function is unsafe because loading new values to the segment registers requires
 /// a valid GDT to be already loaded.
@@ -169,7 +174,6 @@ unsafe fn reload_segments() {
     retfq
     "
     , in("ax")KERNEL_CODE, in("dx")KERNEL_DATA);
-    loop {};
 }
 
 /// Load the GDT to the GDTR and activate the GDT.
@@ -178,20 +182,11 @@ unsafe fn reload_segments() {
 /// # Safety
 /// This function is unsafe because it changes the segment registers.
 pub unsafe fn activate() {
-    let limit = core::mem::size_of_val(&GDT) as u16 - 1;
-    let base = &GDT as *const _ as u64;
-    let gdt_descriptor = &limit as *const _ as u64;
+    let gdt_descriptor = GDTDescriptor {
+        limit: core::mem::size_of_val(&GDT) as u16 - 1,
+        base: &GDT as *const _ as u64,
+    };
 
-    crate::println!(
-        "base: {:p}, limit: {:p}, descriptor: {:#x}\nbase: {:#x}, limit: {:#x}",
-        &base,
-        &limit,
-        gdt_descriptor,
-        base,
-        limit,
-    );
-
-    core::arch::asm!("lgdt [{gdt_descriptor}]", gdt_descriptor=in(reg)gdt_descriptor);
+    core::arch::asm!("lgdt [{gdt_descriptor}]", gdt_descriptor=in(reg)(&gdt_descriptor as *const _ as u64));
     reload_segments();
-    loop {}
 }
