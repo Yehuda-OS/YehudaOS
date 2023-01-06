@@ -23,6 +23,8 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
+        gdt::create();
+        gdt::activate();
     }
     println!("Hello world");
 

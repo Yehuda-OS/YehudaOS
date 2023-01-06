@@ -143,7 +143,15 @@ pub fn create() {
     }
 }
 
-/// TODO documentation
+/// Loads new values to the segment registers.
+/// Performs a far return to update the `cs` register.
+/// To perform the far return, the function pops the value of `rbp` that was pushed when the
+/// stack frame was created and then pops the return address then and pushes the new value of the
+/// `cs` register and pushes the return address and then performs the far return.
+/// 
+/// # Safety
+/// This function is unsafe because loading new values to the segment registers requires
+/// a valid GDT to be already loaded.
 #[allow(unreachable_code)]
 unsafe fn reload_segments() {
     core::arch::asm!("
@@ -168,7 +176,7 @@ unsafe fn reload_segments() {
 /// Put the appropriate segment selectors in the appropriate registers.
 ///
 /// # Safety
-/// TODO
+/// This function is unsafe because it changes the segment registers.
 pub unsafe fn activate() {
     let limit = core::mem::size_of_val(&GDT) as u16 - 1;
     let base = &GDT as *const _ as u64;
