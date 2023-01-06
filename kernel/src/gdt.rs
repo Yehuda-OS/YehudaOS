@@ -83,6 +83,7 @@ pub fn activate() {
 }
 
 #[repr(packed)]
+#[allow(unused)]
 struct Entry {
     limit0: u16,
     base0: u16,
@@ -127,7 +128,7 @@ impl Entry {
             base0: base as u16,
             base1: (base >> 16) as u8,
             access,
-            limit1_flags: flags.bits | (limit >> 16) as u8,
+            limit1_flags: (flags.bits << 4) | (limit >> 16) as u8,
             base2: (base >> 24) as u8,
             base3: (base >> 32) as u32,
             reserved: 0,
