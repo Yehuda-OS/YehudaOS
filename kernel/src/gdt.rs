@@ -2,6 +2,9 @@ use bitflags::bitflags;
 
 const MAX_LIMIT: u32 = 0xfffff;
 
+pub const KERNEL_CODE: u16 = 0x8;
+pub const KERNEL_DATA: u16 = 0x10;
+
 static mut GDT: [Entry; 6] = [
     Entry::zeros(),
     Entry::zeros(),
@@ -79,7 +82,24 @@ pub fn create() {
 }
 
 /// TODO documentation
-pub unsafe fn reload_segments() {
+#[allow(unreachable_code)]
+unsafe fn reload_segments() {
+    core::arch::asm!("
+    pop rbp
+    pop rcx
+
+    mov ds, dx
+    mov es, dx
+    mov fs, dx
+    mov gs, dx
+    mov ss, dx
+
+    push ax
+    push rcx
+    retfq
+    "
+    , in("ax")KERNEL_CODE, in("dx")KERNEL_DATA);
+    loop {};
 }
 
 /// Load the GDT to the GDTR and activate the GDT.
@@ -90,7 +110,7 @@ pub unsafe fn reload_segments() {
 pub unsafe fn activate() {
     let limit = core::mem::size_of_val(&GDT) as u16 - 1;
     let base = &GDT as *const _ as u64;
-    let mut gdt_descriptor = &limit as *const _ as u64;
+    let gdt_descriptor = &limit as *const _ as u64;
 
     crate::println!(
         "base: {:p}, limit: {:p}, descriptor: {:#x}\nbase: {:#x}, limit: {:#x}",
