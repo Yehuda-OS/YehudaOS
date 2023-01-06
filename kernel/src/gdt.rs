@@ -2,10 +2,14 @@ use bitflags::bitflags;
 
 const MAX_LIMIT: u32 = 0xfffff;
 
-pub const KERNEL_CODE: u16 = 0x8;
-pub const KERNEL_DATA: u16 = 0x10;
+pub const KERNEL_CODE: u16 = 0x28;
+pub const KERNEL_DATA: u16 = 0x30;
 
-static mut GDT: [Entry; 6] = [
+static mut GDT: [Entry; 10] = [
+    Entry::zeros(),
+    Entry::zeros(),
+    Entry::zeros(),
+    Entry::zeros(),
     Entry::zeros(),
     Entry::zeros(),
     Entry::zeros(),
@@ -26,6 +30,7 @@ struct Entry {
 }
 
 #[repr(packed)]
+#[allow(unused)]
 struct GDTDescriptor {
     limit: u16,
     base: u64,
@@ -36,11 +41,12 @@ bitflags! {
         /// If set on a data segment, the segment will be writable and if it is set on a code
         /// segment the segment will be readable.
         const READABLE_WRITEABLE = 1 << 1;
+        const CONFORMING = 1 << 2;
         const EXECUTABLE = 1 << 3;
         /// If not set, the segment will be a system segment.
         const CODE_OR_DATA = 1 << 4;
         /// If set, the segment will be accessible from ring 3.
-        const RING3 = 1 << 4 | 1 << 5;
+        const RING3 = 1 << 6 | 1 << 5;
         const PRESENT = 1 << 7;
 
         /// `Available 32-bit TSS` type of a system segment.
@@ -112,57 +118,82 @@ impl Entry {
 
 /// Create the GDT with the required segments.
 pub fn create() {
+    // The 16 bit and 32 bit code and data segments are needed to use limine's terminal.
     unsafe {
         GDT = [
             // NULL descriptor.
             Entry::zeros(),
+            // 16 bit code segment.
+            Entry::new(
+                0,
+                0xffff,
+                AccessByte::PRESENT
+                    | AccessByte::CODE_OR_DATA
+                    | AccessByte::EXECUTABLE
+                    | AccessByte::READABLE_WRITEABLE,
+                Flags::empty(),
+            ),
+            // 16 bit data segment.
+            Entry::new(
+                0,
+                0xffff,
+                AccessByte::PRESENT | AccessByte::CODE_OR_DATA | AccessByte::READABLE_WRITEABLE,
+                Flags::empty(),
+            ),
+            // 32 bit code segment.
+            Entry::new(
+                0,
+                MAX_LIMIT,
+                AccessByte::PRESENT
+                    | AccessByte::CODE_OR_DATA
+                    | AccessByte::EXECUTABLE
+                    | AccessByte::READABLE_WRITEABLE,
+                Flags::GRANULARITY_4KIB | Flags::DEFAULT_SIZE,
+            ),
+            // 32 bit data segment
+            Entry::new(
+                0,
+                MAX_LIMIT,
+                AccessByte::PRESENT | AccessByte::CODE_OR_DATA | AccessByte::READABLE_WRITEABLE,
+                Flags::GRANULARITY_4KIB | Flags::DEFAULT_SIZE,
+            ),
             // Kernel mode code segment.
             Entry::new(
                 0,
                 MAX_LIMIT,
-                AccessByte::from_bits_truncate(
-                    AccessByte::PRESENT.bits
-                        | AccessByte::CODE_OR_DATA.bits
-                        | AccessByte::EXECUTABLE.bits
-                        | AccessByte::READABLE_WRITEABLE.bits,
-                ),
-                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::LONG_MODE.bits),
+                AccessByte::PRESENT
+                    | AccessByte::CODE_OR_DATA
+                    | AccessByte::EXECUTABLE
+                    | AccessByte::READABLE_WRITEABLE,
+                Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
             ),
             // Kernel mode data segment.
             Entry::new(
                 0,
                 MAX_LIMIT,
-                AccessByte::from_bits_truncate(
-                    AccessByte::PRESENT.bits
-                        | AccessByte::CODE_OR_DATA.bits
-                        | AccessByte::READABLE_WRITEABLE.bits,
-                ),
-                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::DEFAULT_SIZE.bits),
+                AccessByte::PRESENT | AccessByte::CODE_OR_DATA | AccessByte::READABLE_WRITEABLE,
+                Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
             ),
             // User mode code segment.
             Entry::new(
                 0,
                 MAX_LIMIT,
-                AccessByte::from_bits_truncate(
-                    AccessByte::PRESENT.bits
-                        | AccessByte::CODE_OR_DATA.bits
-                        | AccessByte::EXECUTABLE.bits
-                        | AccessByte::READABLE_WRITEABLE.bits
-                        | AccessByte::RING3.bits,
-                ),
-                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::LONG_MODE.bits),
+                AccessByte::PRESENT
+                    | AccessByte::CODE_OR_DATA
+                    | AccessByte::EXECUTABLE
+                    | AccessByte::READABLE_WRITEABLE
+                    | AccessByte::RING3,
+                Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
             ),
             // User mode data segment.
             Entry::new(
                 0,
                 MAX_LIMIT,
-                AccessByte::from_bits_truncate(
-                    AccessByte::PRESENT.bits
-                        | AccessByte::CODE_OR_DATA.bits
-                        | AccessByte::READABLE_WRITEABLE.bits
-                        | AccessByte::RING3.bits,
-                ),
-                Flags::from_bits_truncate(Flags::GRANULARITY_4KIB.bits | Flags::DEFAULT_SIZE.bits),
+                AccessByte::PRESENT
+                    | AccessByte::CODE_OR_DATA
+                    | AccessByte::READABLE_WRITEABLE
+                    | AccessByte::RING3,
+                Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
             ),
             // Task State Segment
             Entry::new(
@@ -183,7 +214,6 @@ pub fn create() {
 /// # Safety
 /// This function is unsafe because loading new values to the segment registers requires
 /// a valid GDT to be already loaded.
-#[allow(unreachable_code)]
 unsafe fn reload_segments() {
     core::arch::asm!("
     push rax
