@@ -1,11 +1,14 @@
 #![no_std]
 #![no_main]
 #![feature(alloc_error_handler)]
+#![feature(strict_provenance)]
 
 extern crate alloc;
 
 mod io;
 mod memory;
+
+use crate::memory::allocator::{Allocator, Locked, ALLOCATOR, HEAP_START};
 
 /// Kernel Entry Point
 ///
@@ -21,8 +24,8 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
+        ALLOCATOR = Locked::<Allocator>::new(Allocator::new(HEAP_START, memory::PAGE_TABLE));
     }
-    println!("Hello world");
 
     hcf();
 }

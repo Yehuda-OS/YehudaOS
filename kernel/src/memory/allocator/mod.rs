@@ -9,6 +9,8 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
+use crate::println;
+
 mod heap_block;
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
@@ -92,6 +94,35 @@ fn alloc_node(
     };
 
     Some(allocated)
+}
+
+/// function that deallocate a node
+/// # Arguments
+/// - `allocator` - The `Allocator` instance that is being used.
+/// - `block` - The block to deallocate.
+/// - `size` - the size to deallocate
+/// # Returns
+/// A pointer to the created `HeapBlock`, or [`None`] if the allocation failed.
+unsafe fn dealloc_node(allocator: &mut Allocator, block: *mut HeapBlock, size: usize) {
+    let mut curr_size = 0;
+    let mut block_addr = block.addr();
+    let last_addr = (allocator.heap_start + allocator.pages * Size4KiB::SIZE) as usize;
+
+    // run while the block's address if lower or equal to the last address of the heap
+    // or until it goes over the whole size
+    while curr_size <= size * (Size4KiB::SIZE as usize) && block_addr <= last_addr {
+        if unsafe { (*(block_addr as *mut HeapBlock)).free() } {
+            super::virtual_memory_manager::unmap_address(
+                allocator.page_table,
+                VirtAddr::new(block_addr as u64),
+            );
+
+            allocator.pages -= 1;
+        }
+
+        block_addr += Size4KiB::SIZE as usize;
+        curr_size += Size4KiB::SIZE as usize;
+    }
 }
 
 /// Returns a usable heap block for a specific allocation request
@@ -210,6 +241,8 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
             block = resize_block(block, size, align);
             adjustment = get_adjustment(block, align);
 
+            (*block).set_free(false);
+
             (block as usize + HEADER_SIZE + adjustment) as *mut u8
         } else {
             null_mut()
@@ -217,7 +250,19 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        panic!("dealloc should be never called")
+        let mut allocator = self.lock();
+        let block = (_ptr as usize) as *mut HeapBlock;
+
+        // layout adjustments for the deallocation
+        let size = _layout
+            .align_to(core::mem::align_of::<HeapBlock>())
+            .expect("adjusting alignment failed")
+            .pad_to_align()
+            .size()
+            .max(core::mem::size_of::<HeapBlock>());
+
+        // use dealloc_node function
+        dealloc_node(&mut allocator, block, size);
     }
 }
 
