@@ -52,6 +52,7 @@ fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
 ///
 /// # Arguments
 /// - `allocator` - The `Allocator` instance that is being used.
+/// - `last` - The last heap block.
 /// - `size` - The required allocation size.
 /// - `align` - The required alignment for the allocation's start address.
 ///
@@ -83,6 +84,7 @@ fn alloc_node(
             return None;
         }
     }
+    // Allocation succeeded, add the allocated block to the list.
     allocated = start.as_mut_ptr::<HeapBlock>();
     unsafe {
         if !last.is_null() {
@@ -120,11 +122,7 @@ unsafe fn find_usable_block(
         let curr_adjustment = get_adjustment(curr, align);
 
         if curr.is_null() || !(*curr).has_next() {
-            return if let Some(allocated) = alloc_node(allocator, curr, size, align) {
-                Some(allocated)
-            } else {
-                None
-            };
+            return alloc_node(allocator, curr, size, align);
         } else if (*curr).free() && (*curr).size() as usize >= size + curr_adjustment {
             return Some(curr);
         }
