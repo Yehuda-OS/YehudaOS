@@ -14,7 +14,7 @@ mod heap_block;
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
 pub const MAX_PAGES: u64 = 25; // 100 KiB
 
-const HEADER_SIZE: usize = core::mem::size_of::<HeapBlock>();
+const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
 #[global_allocator]
 pub static mut ALLOCATOR: Locked<Allocator> =
@@ -41,8 +41,8 @@ impl Allocator {
 /// # Arguments
 /// - `addr` - Pointer to the heap block.
 /// - `align` - The required alignment.
-fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
-    let data_start_address = unsafe { addr.offset(1) } as usize;
+fn get_adjustment(addr: *mut HeapBlock, align: u64) -> u64 {
+    let data_start_address = unsafe { addr.add(1) } as u64;
 
     align - data_start_address % align
 }
@@ -61,8 +61,8 @@ fn get_adjustment(addr: *mut HeapBlock, align: usize) -> usize {
 fn alloc_node(
     allocator: &mut Allocator,
     last: *mut HeapBlock,
-    size: usize,
-    align: usize,
+    size: u64,
+    align: u64,
 ) -> Option<*mut HeapBlock> {
     let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
     let mut current_size = 0;
@@ -79,7 +79,7 @@ fn alloc_node(
                 page,
                 flags,
             );
-            current_size += Size4KiB::SIZE as usize;
+            current_size += Size4KiB::SIZE;
         } else {
             return None;
         }
@@ -108,8 +108,8 @@ fn alloc_node(
 /// This function is unsafe because the heap must not be corrupted.
 unsafe fn find_usable_block(
     allocator: &mut Allocator,
-    size: usize,
-    align: usize,
+    size: u64,
+    align: u64,
 ) -> Option<*mut HeapBlock> {
     let start = if allocator.pages == 0 {
         null_mut()
@@ -123,7 +123,7 @@ unsafe fn find_usable_block(
 
         if curr.is_null() || !(*curr).has_next() {
             return alloc_node(allocator, curr, size, align);
-        } else if (*curr).free() && (*curr).size() as usize >= size + curr_adjustment {
+        } else if (*curr).free() && (*curr).size() >= size + curr_adjustment {
             return Some(curr);
         }
         curr = (*curr).next();
@@ -153,9 +153,9 @@ unsafe fn merge_blocks(block: *mut HeapBlock) {
 /// # Safety
 /// This function is unsafe because the block must have enough space to contain a `HeapBlock` header
 /// for the next block.
-unsafe fn shrink_block(block: *mut HeapBlock, size: usize) {
+unsafe fn shrink_block(block: *mut HeapBlock, size: u64) {
     let has_next = (*block).has_next();
-    let extra = (*block).size() as usize - size;
+    let extra = (*block).size() - size;
 
     (*block).set_size(size as u64);
     (*block).set_has_next(true);
@@ -172,10 +172,10 @@ unsafe fn shrink_block(block: *mut HeapBlock, size: usize) {
 ///
 /// # Safety
 /// This function is unsafe because the heap must not be corrupted and the block must be valid.
-unsafe fn resize_block(mut block: *mut HeapBlock, size: usize, align: usize) -> *mut HeapBlock {
+unsafe fn resize_block(mut block: *mut HeapBlock, size: u64, align: u64) -> *mut HeapBlock {
     let mut adjustment = get_adjustment(block, align);
 
-    if (*block).size() as usize > size + adjustment {
+    if (*block).size() > size + adjustment {
         // Check if the current block can be merged with the next one.
         if (*block).has_next() && (*(*block).next()).free() {
             merge_blocks(block);
@@ -189,7 +189,7 @@ unsafe fn resize_block(mut block: *mut HeapBlock, size: usize, align: usize) -> 
             shrink_block(block, size + adjustment);
         }
         // Check if there's enough free space to split the current block.
-        else if (*block).size() as usize > size + adjustment + HEADER_SIZE {
+        else if (*block).size() > size + adjustment + HEADER_SIZE {
             shrink_block(block, size + adjustment);
         }
     }
@@ -200,15 +200,15 @@ unsafe fn resize_block(mut block: *mut HeapBlock, size: usize, align: usize) -> 
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         let mut allocator = self.lock();
-        let size = _layout.size();
-        let align = _layout.align();
+        let size = _layout.size() as u64;
+        let align = _layout.align() as u64;
         let adjustment;
 
         if let Some(mut block) = find_usable_block(&mut allocator, size, align) {
             block = resize_block(block, size, align);
             adjustment = get_adjustment(block, align);
 
-            (block as usize + HEADER_SIZE + adjustment) as *mut u8
+            (block as u64 + HEADER_SIZE + adjustment) as *mut u8
         } else {
             null_mut()
         }
