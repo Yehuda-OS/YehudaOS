@@ -5,7 +5,7 @@ use core::{
 
 use heap_block::HeapBlock;
 use x86_64::{
-    structures::paging::{PageSize, PageTableFlags, Size4KiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
 };
 
@@ -69,8 +69,17 @@ fn alloc_node(
     let adjustment = get_adjustment(start.as_mut_ptr(), align);
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let allocated;
+    let required_pages = if (size + adjustment) % Size4KiB::SIZE == 0 {
+        (size + adjustment) / Size4KiB::SIZE
+    } else {
+        (size + adjustment) / Size4KiB::SIZE + 1
+    };
 
-    while current_size < size + adjustment {
+    if allocator.pages + required_pages > MAX_PAGES {
+        return None;
+    }
+
+    for _ in 0..required_pages {
         if let Some(page) = super::page_allocator::allocate() {
             allocator.pages += 1;
             super::virtual_memory_manager::map_address(
@@ -81,6 +90,29 @@ fn alloc_node(
             );
             current_size += Size4KiB::SIZE;
         } else {
+            // If the allocation fails, unmap everything we mapped so far.
+            while current_size > 0 {
+                allocator.pages -= 1;
+                // SAFETY: The page is aligned because we allocated it with `allocate`.
+                unsafe {
+                    super::page_allocator::free(
+                        PhysFrame::from_start_address(
+                            super::virtual_memory_manager::virtual_to_physical(
+                                allocator.page_table,
+                                start + current_size,
+                            ),
+                        )
+                        // UNWRAP: The page is aligned.
+                        .unwrap(),
+                    );
+                }
+                super::virtual_memory_manager::unmap_address(
+                    allocator.page_table,
+                    start + current_size,
+                );
+                current_size -= Size4KiB::SIZE;
+            }
+
             return None;
         }
     }
