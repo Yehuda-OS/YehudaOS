@@ -199,9 +199,7 @@ pub fn create() {
             Entry::new(
                 super::scheduler::get_tss_address(),
                 core::mem::size_of::<super::scheduler::TaskStateSegment>() as u32,
-                AccessByte::from_bits_truncate(
-                    AccessByte::PRESENT.bits | AccessByte::TYPE_TSS.bits,
-                ),
+                AccessByte::PRESENT | AccessByte::TYPE_TSS,
                 Flags::empty(),
             ),
         ]
