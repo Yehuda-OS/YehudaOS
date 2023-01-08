@@ -4,10 +4,10 @@
 
 extern crate alloc;
 
-mod terminal;
-mod memory;
 mod gdt;
+mod memory;
 mod scheduler;
+mod terminal;
 
 /// Kernel Entry Point
 ///
@@ -21,8 +21,10 @@ pub extern "C" fn _start() -> ! {
         memory::PAGE_TABLE = memory::virtual_memory_manager::create_page_table();
         memory::map_kernel_address(memory::PAGE_TABLE);
         memory::create_hhdm(memory::PAGE_TABLE);
+        memory::map_bootloader_memory();
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
-        memory::reclaim_bootloader_memory();
+        gdt::create();
+        gdt::activate();
     }
     println!("Hello world");
 
