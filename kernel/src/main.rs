@@ -25,6 +25,9 @@ pub extern "C" fn _start() -> ! {
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         gdt::create();
         gdt::activate();
+        memory::allocator::ALLOCATOR
+            .lock()
+            .set_page_table(memory::PAGE_TABLE);
     }
     println!("Hello world");
 

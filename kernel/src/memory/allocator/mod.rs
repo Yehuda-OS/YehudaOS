@@ -18,7 +18,7 @@ const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
 #[global_allocator]
 pub static mut ALLOCATOR: Locked<Allocator> =
-    Locked::<Allocator>::new(Allocator::new(HEAP_START, unsafe { super::PAGE_TABLE }));
+    Locked::<Allocator>::new(Allocator::new(HEAP_START, PhysAddr::zero()));
 
 pub struct Allocator {
     heap_start: u64,
@@ -33,6 +33,10 @@ impl Allocator {
             pages: 0,
             page_table,
         }
+    }
+
+    pub fn set_page_table(&mut self, page_table: PhysAddr) {
+        self.page_table = page_table;
     }
 }
 
