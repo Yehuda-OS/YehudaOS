@@ -97,10 +97,7 @@ fn map_memmap_entry(virtual_addr: VirtAddr, entry: &LimineMemmapEntry, flags: Pa
 }
 
 /// Map the kernel's virtual address.
-///
-/// # Arguments
-/// * `pml4` - The page map level 4, the highest page table.
-pub fn map_kernel_address(pml4: PhysAddr) {
+pub fn map_kernel_address() {
     let memmap = get_memmap();
     let flags = PageTableFlags::GLOBAL | PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let mut entry;
