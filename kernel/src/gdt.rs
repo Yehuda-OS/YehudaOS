@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use x86_64::VirtAddr;
 
 const MAX_LIMIT: u32 = 0xfffff;
 
@@ -33,7 +34,7 @@ struct Entry {
 #[allow(unused)]
 struct GDTDescriptor {
     limit: u16,
-    base: u64,
+    base: VirtAddr,
 }
 
 bitflags! {
@@ -237,7 +238,7 @@ unsafe fn reload_segments() {
 pub unsafe fn activate() {
     let gdt_descriptor = GDTDescriptor {
         limit: core::mem::size_of_val(&GDT) as u16 - 1,
-        base: &GDT as *const _ as u64,
+        base: VirtAddr::new(&GDT as *const _ as u64),
     };
 
     core::arch::asm!("lgdt [{gdt_descriptor}]", gdt_descriptor=in(reg)(&gdt_descriptor as *const _ as u64));
