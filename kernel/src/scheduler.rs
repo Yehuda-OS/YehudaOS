@@ -17,6 +17,7 @@ static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
 };
 
 #[repr(packed)]
+#[allow(unused)]
 pub struct TaskStateSegment {
     reserved0: u32,
     rsp0: u64,
