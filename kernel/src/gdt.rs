@@ -7,28 +7,25 @@ pub const KERNEL_CODE: u16 = 0x28;
 pub const KERNEL_DATA: u16 = 0x30;
 pub const TSS: u16 = 0x48;
 
-static mut GDT: [Entry; 10] = [
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-    Entry::zeros(),
-];
+static mut GDT: [u64; 11] = [0; 11];
 
 #[repr(packed)]
 #[allow(unused)]
-struct Entry {
+struct UserSegmentDescriptor {
     limit0: u16,
     base0: u16,
     base1: u8,
     access: AccessByte,
     limit1_flags: u8,
     base2: u8,
+}
+
+#[repr(packed)]
+#[allow(unused)]
+struct SystemSegmentDescriptor {
+    low: UserSegmentDescriptor,
+    base_high: u32,
+    reserved: u32,
 }
 
 #[repr(packed)]
@@ -65,9 +62,9 @@ bitflags! {
     }
 }
 
-impl Entry {
-    pub const fn new(base: u64, limit: u32, access: AccessByte, flags: Flags) -> Self {
-        Entry {
+impl UserSegmentDescriptor {
+    const fn new(base: u64, limit: u32, access: AccessByte, flags: Flags) -> Self {
+        UserSegmentDescriptor {
             limit0: limit as u16,
             base0: base as u16,
             base1: (base >> 16) as u8,
@@ -77,8 +74,8 @@ impl Entry {
         }
     }
 
-    pub const fn zeros() -> Self {
-        Entry {
+    const fn zeros() -> Self {
+        UserSegmentDescriptor {
             limit0: 0,
             base0: 0,
             base1: 0,
@@ -118,15 +115,32 @@ impl Entry {
     }
 }
 
+impl SystemSegmentDescriptor {
+    const fn new(base: u64, limit: u32, access: AccessByte, flags: Flags) -> Self {
+        SystemSegmentDescriptor {
+            low: UserSegmentDescriptor::new(base, limit, access, flags),
+            base_high: (base >> 32) as u32,
+            reserved: 0,
+        }
+    }
+}
+
 /// Create the GDT with the required segments.
 pub fn create() {
+    let tss_segment = SystemSegmentDescriptor::new(
+        super::scheduler::get_tss_address(),
+        core::mem::size_of::<super::scheduler::TaskStateSegment>() as u32 - 1,
+        AccessByte::PRESENT | AccessByte::TYPE_TSS,
+        Flags::empty(),
+    );
+
     // The 16 bit and 32 bit code and data segments are needed to use limine's terminal.
     unsafe {
         GDT = [
             // NULL descriptor.
-            Entry::zeros(),
+            UserSegmentDescriptor::zeros().bits(),
             // 16 bit code segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 0xffff,
                 AccessByte::PRESENT
@@ -134,16 +148,18 @@ pub fn create() {
                     | AccessByte::EXECUTABLE
                     | AccessByte::READABLE_WRITEABLE,
                 Flags::empty(),
-            ),
+            )
+            .bits(),
             // 16 bit data segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 0xffff,
                 AccessByte::PRESENT | AccessByte::CODE_OR_DATA | AccessByte::READABLE_WRITEABLE,
                 Flags::empty(),
-            ),
+            )
+            .bits(),
             // 32 bit code segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 MAX_LIMIT,
                 AccessByte::PRESENT
@@ -151,16 +167,18 @@ pub fn create() {
                     | AccessByte::EXECUTABLE
                     | AccessByte::READABLE_WRITEABLE,
                 Flags::GRANULARITY_4KIB | Flags::DEFAULT_SIZE,
-            ),
+            )
+            .bits(),
             // 32 bit data segment
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 MAX_LIMIT,
                 AccessByte::PRESENT | AccessByte::CODE_OR_DATA | AccessByte::READABLE_WRITEABLE,
                 Flags::GRANULARITY_4KIB | Flags::DEFAULT_SIZE,
-            ),
+            )
+            .bits(),
             // Kernel mode code segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 MAX_LIMIT,
                 AccessByte::PRESENT
@@ -168,16 +186,18 @@ pub fn create() {
                     | AccessByte::EXECUTABLE
                     | AccessByte::READABLE_WRITEABLE,
                 Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
-            ),
+            )
+            .bits(),
             // Kernel mode data segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 MAX_LIMIT,
                 AccessByte::PRESENT | AccessByte::CODE_OR_DATA | AccessByte::READABLE_WRITEABLE,
                 Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
-            ),
+            )
+            .bits(),
             // User mode code segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 MAX_LIMIT,
                 AccessByte::PRESENT
@@ -186,9 +206,10 @@ pub fn create() {
                     | AccessByte::READABLE_WRITEABLE
                     | AccessByte::RING3,
                 Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
-            ),
+            )
+            .bits(),
             // User mode data segment.
-            Entry::new(
+            UserSegmentDescriptor::new(
                 0,
                 MAX_LIMIT,
                 AccessByte::PRESENT
@@ -196,14 +217,11 @@ pub fn create() {
                     | AccessByte::READABLE_WRITEABLE
                     | AccessByte::RING3,
                 Flags::GRANULARITY_4KIB | Flags::LONG_MODE,
-            ),
+            )
+            .bits(),
             // Task State Segment
-            Entry::new(
-                super::scheduler::get_tss_address(),
-                core::mem::size_of::<super::scheduler::TaskStateSegment>() as u32 - 1,
-                AccessByte::PRESENT | AccessByte::TYPE_TSS,
-                Flags::empty(),
-            ),
+            tss_segment.low.bits(),
+            tss_segment.base_high as u64,
         ]
     }
 }
