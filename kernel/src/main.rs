@@ -23,11 +23,12 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::map_bootloader_memory();
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
-        gdt::create();
-        gdt::activate();
         memory::allocator::ALLOCATOR
             .lock()
             .set_page_table(memory::PAGE_TABLE);
+        gdt::create();
+        gdt::activate();
+        scheduler::load_tss();
     }
     println!("Hello world");
 

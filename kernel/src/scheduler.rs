@@ -40,3 +40,7 @@ pub struct TaskStateSegment {
 pub fn get_tss_address() -> u64 {
     unsafe { &TSS_ENTRY as *const _ as u64 }
 }
+
+pub unsafe fn load_tss() {
+    core::arch::asm!("ltr ax", in("ax")super::gdt::TSS);
+}

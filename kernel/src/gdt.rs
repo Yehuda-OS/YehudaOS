@@ -5,6 +5,7 @@ const MAX_LIMIT: u32 = 0xfffff;
 
 pub const KERNEL_CODE: u16 = 0x28;
 pub const KERNEL_DATA: u16 = 0x30;
+pub const TSS: u16 = 0x48;
 
 static mut GDT: [Entry; 10] = [
     Entry::zeros(),
@@ -199,7 +200,7 @@ pub fn create() {
             // Task State Segment
             Entry::new(
                 super::scheduler::get_tss_address(),
-                core::mem::size_of::<super::scheduler::TaskStateSegment>() as u32,
+                core::mem::size_of::<super::scheduler::TaskStateSegment>() as u32 - 1,
                 AccessByte::PRESENT | AccessByte::TYPE_TSS,
                 Flags::empty(),
             ),
