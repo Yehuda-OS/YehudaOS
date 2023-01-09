@@ -288,14 +288,12 @@ impl Fs {
     ///
     /// # Returns
     /// the address of the allocated block or Inode
-    // TODO: Return None if no free space was found
     fn allocate(&mut self, bitmap_start: usize) -> Option<usize> {
         const BITS_IN_BUFFER: usize = 64;
         const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
         const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
         let mut buffer: usize = 0;
         let mut address: usize = bitmap_start;
-
         // read the bitmap until an unoccupied memory is found
         loop {
             unsafe {
@@ -305,6 +303,10 @@ impl Fs {
             address += BYTES_IN_BUFFER;
             if buffer != ALL_OCCUPIED {
                 break;
+            }
+
+            if address >= self.disk_parts.data {
+                return None;
             }
         }
         address -= BYTES_IN_BUFFER;
@@ -537,7 +539,13 @@ impl Fs {
         if offset > BLOCK_SIZE {
             return Err(());
         }
-        // TODO Allocate the indirect pointer if it is needed.
+        if file.indirect_pointer == 0 {
+            if let Some(indirect_pointer) = self.allocate_block() {
+                file.indirect_pointer = indirect_pointer;
+            } else {
+                return Err(());
+            }
+        }
         unsafe {
             self.blkdev.write(
                 file.indirect_pointer + offset,
