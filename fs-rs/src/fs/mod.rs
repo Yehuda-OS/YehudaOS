@@ -156,6 +156,9 @@ impl Fs {
             while index != dir_content.len() && dir_content[index].name != next_folder {
                 index += 1;
             }
+            if index >= dir_content.len() {
+                return None;
+            }
             match self.read_inode(dir_content[index].id) {
                 Some(file) => inode = file,
                 None => return None,
@@ -397,7 +400,8 @@ impl Fs {
     /// # Arguments
     /// - `address` - the block's address
     fn deallocate_block(&mut self, address: usize) {
-        let block_number: usize = (address - self.disk_parts.data) / BLOCK_SIZE;
+        let block_number: usize =
+            ((address - self.disk_parts.data / BLOCK_SIZE) as isize).abs() as usize;
 
         self.deallocate(self.disk_parts.block_bit_map, block_number);
     }
@@ -420,6 +424,26 @@ impl Fs {
         };
 
         unsafe { self.write(folder.id, buffer, folder.size) }
+    }
+
+    /// function that removes a file from a folder
+    ///
+    /// # Arguments
+    /// - `file` - the file that has to be removed from the folder
+    /// - `folder` - the folder that `file` is going to be removed from
+    ///
+    /// # Returns
+    /// Inode of the folder after the file was removed or WriteError otherwise
+    fn remove_file_from_folder(
+        &mut self,
+        file: &DirEntry,
+        folder: &mut Inode,
+    ) -> Result<Inode, WriteError> {
+        let buffer: Vec<u8> = vec![0; core::mem::size_of_val(file)];
+
+        let res = unsafe { self.write(folder.id, buffer.as_slice(), folder.size - buffer.len()) };
+        self.set_len(folder.id, folder.size - buffer.len());
+        res
     }
 
     /// Calculate the disk parts for the file system.
@@ -669,6 +693,50 @@ impl Fs {
         match self.add_file_to_folder(&file_details, &mut dir) {
             Ok(_) => Ok(()),
             Err(_) => Err("Error: failed to add the file to the folder"),
+        }
+    }
+
+    /// function that removes a file
+    ///
+    /// # Arguments
+    /// - `path_str` - the path to the file
+    /// - `directory` - if the file is a directory
+    ///
+    /// # Returns
+    /// `Ok(())` if the file was removed successfully and `Err` if not
+    pub fn remove_file(&mut self, path_str: String, directory: bool) -> Result<(), &'static str> {
+        let last_delimeter = if path_str.rfind('/').is_some() {
+            path_str.rfind('/').unwrap()
+        } else {
+            0
+        };
+        let file_name = path_str[last_delimeter + 1..].to_string();
+        let mut dir;
+        if let Some(inode) = self.get_inode(&path_str[0..(last_delimeter + 1)], None) {
+            dir = inode
+        } else {
+            return Err("Error: invalid path");
+        }
+
+        let mut file_details = DirEntry { name: "", id: 0 };
+        // check if file exists
+        if self.get_file_id(&path_str, None).is_none() {
+            return Err("Error: file does not exist");
+        }
+        file_details.name = Box::leak(file_name.into_boxed_str());
+        file_details.id = self.get_file_id(&path_str, None).unwrap();
+        // the size of empty folder is 48
+        if directory == true && self.read_inode(file_details.id).unwrap().size > 48 {
+            return Err("Error: folder is not empty");
+        } else if directory == false && self.is_dir(file_details.id) == true {
+            return Err("Error: rm is used for file, not for directories");
+        } else if directory == true && self.is_dir(file_details.id) == false {
+            return Err("Error: rmdir is used for directories, not for files");
+        }
+
+        match self.remove_file_from_folder(&file_details, &mut dir) {
+            Ok(_) => Ok(()),
+            Err(_) => Err("Error: failed to remove the file from the folder"),
         }
     }
 

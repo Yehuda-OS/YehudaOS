@@ -14,6 +14,8 @@ const EDIT_CMD: &str = "edit";
 const TREE_CMD: &str = "tree";
 const HELP_CMD: &str = "help";
 const EXIT_CMD: &str = "exit";
+const REMOVE_FILE_CMD: &str = "rm";
+const REMOVE_DIR_CMD: &str = "rmdir";
 
 static mut HELP_STRING: String = String::new();
 
@@ -143,6 +145,26 @@ fn main() {
             CREATE_DIR_CMD => {
                 if cmd.len() == 2 {
                     fs.create_file((&cmd[1]).to_string(), true);
+                } else {
+                    println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
+                }
+            }
+
+            REMOVE_FILE_CMD => {
+                if cmd.len() == 2 {
+                    if let Err(e) = fs.remove_file((&cmd[1]).to_string(), false) {
+                        println!("{}", e);
+                    }
+                } else {
+                    println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
+                }
+            }
+
+            REMOVE_DIR_CMD => {
+                if cmd.len() == 2 {
+                    if let Err(e) = fs.remove_file((&cmd[1]).to_string(), true) {
+                        println!("{}", e);
+                    }
                 } else {
                     println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
                 }
