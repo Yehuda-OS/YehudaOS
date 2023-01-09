@@ -6,8 +6,8 @@ unsafe fn inb(port: u16) -> u8 {
 
     asm!(
     "in al, dx",
-    in("dx") (port),
     out("al") (res),
+    in("dx") (port),
     );
 
     res
@@ -19,8 +19,8 @@ unsafe fn inw(port: u16) -> u16 {
 
     asm!(
     "in ax, dx",
-    in("dx") (port),
     out("ax") (res),
+    in("dx") (port),
     );
 
     res
@@ -32,8 +32,8 @@ unsafe fn inl(port: u16) -> u32 {
 
     asm!(
     "in eax, dx",
-    in("dx") (port),
     out("eax") (res),
+    in("dx") (port),
     );
 
     res
