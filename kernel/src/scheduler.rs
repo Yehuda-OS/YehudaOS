@@ -41,6 +41,10 @@ pub fn get_tss_address() -> u64 {
     unsafe { &TSS_ENTRY as *const _ as u64 }
 }
 
+/// Load the tss segment selector to the task register.
+/// 
+/// # Safety
+/// This function is unsafe because it requires a valid GDT with a TSS segment descriptor.
 pub unsafe fn load_tss() {
     core::arch::asm!("ltr ax", in("ax")super::gdt::TSS);
 }
