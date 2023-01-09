@@ -40,7 +40,7 @@ unsafe fn inl(port: u16) -> u32 {
 }
 
 #[inline]
-pub unsafe fn outb(value: u8, port: u16) {
+pub unsafe fn outb(port: u16, value: u8) {
     asm!(
        "out dx, al",
        in("dx") port,
@@ -49,7 +49,7 @@ pub unsafe fn outb(value: u8, port: u16) {
 }
 
 #[inline]
-unsafe fn outw(value: u16, port: u16) {
+unsafe fn outw(port: u16, value: u16) {
     asm!(
        "out dx, ax",
        in("dx") port,
@@ -58,7 +58,7 @@ unsafe fn outw(value: u16, port: u16) {
 }
 
 #[inline]
-unsafe fn outl(value: u32, port: u16) {
+unsafe fn outl(port: u16, value: u32) {
     asm!(
        "out dx, eax",
        in("dx") port,
