@@ -1,7 +1,7 @@
 use core::arch::asm;
 
 #[inline]
-unsafe fn inb(port: u16) -> u8 {
+pub unsafe fn inb(port: u16) -> u8 {
     let res: u8;
 
     asm!(
@@ -14,7 +14,7 @@ unsafe fn inb(port: u16) -> u8 {
 }
 
 #[inline]
-unsafe fn inw(port: u16) -> u16 {
+pub unsafe fn inw(port: u16) -> u16 {
     let res: u16;
 
     asm!(
@@ -27,7 +27,7 @@ unsafe fn inw(port: u16) -> u16 {
 }
 
 #[inline]
-unsafe fn inl(port: u16) -> u32 {
+pub unsafe fn inl(port: u16) -> u32 {
     let res: u32;
 
     asm!(
@@ -49,7 +49,7 @@ pub unsafe fn outb(port: u16, value: u8) {
 }
 
 #[inline]
-unsafe fn outw(port: u16, value: u16) {
+pub unsafe fn outw(port: u16, value: u16) {
     asm!(
        "out dx, ax",
        in("dx") port,
@@ -58,7 +58,7 @@ unsafe fn outw(port: u16, value: u16) {
 }
 
 #[inline]
-unsafe fn outl(port: u16, value: u32) {
+pub unsafe fn outl(port: u16, value: u32) {
     asm!(
        "out dx, eax",
        in("dx") port,
