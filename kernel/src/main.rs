@@ -5,6 +5,7 @@
 extern crate alloc;
 
 mod gdt;
+mod io;
 mod memory;
 mod scheduler;
 mod terminal;
