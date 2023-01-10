@@ -3,7 +3,7 @@ use x86_64::{
     PhysAddr,
 };
 
-use super::memory::virtual_memory_manager;
+use super::memory::vmm;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -65,7 +65,7 @@ pub unsafe fn load_tss() {
 /// # Safety
 /// A valid kernel's page table is required.
 unsafe fn create_page_table() -> Option<PhysAddr> {
-    let table = virtual_memory_manager::create_page_table()?;
+    let table = vmm::create_page_table()?;
 
     core::ptr::copy_nonoverlapping(
         (super::memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,

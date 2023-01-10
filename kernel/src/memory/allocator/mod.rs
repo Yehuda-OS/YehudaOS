@@ -87,7 +87,7 @@ fn alloc_node(
     for _ in 0..required_pages {
         if let Some(page) = super::page_allocator::allocate() {
             allocator.pages += 1;
-            if super::virtual_memory_manager::map_address(
+            if super::vmm::map_address(
                 allocator.page_table,
                 start + current_size,
                 page,
@@ -114,7 +114,7 @@ fn alloc_node(
             unsafe {
                 super::page_allocator::free(
                     PhysFrame::from_start_address(
-                        super::virtual_memory_manager::virtual_to_physical(
+                        super::vmm::virtual_to_physical(
                             allocator.page_table,
                             start + current_size,
                         ),
@@ -123,7 +123,7 @@ fn alloc_node(
                     .unwrap(),
                 );
             }
-            super::virtual_memory_manager::unmap_address(
+            super::vmm::unmap_address(
                 allocator.page_table,
                 start + current_size,
             );
