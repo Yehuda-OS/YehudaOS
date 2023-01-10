@@ -26,6 +26,12 @@ pub enum MapError {
     EntryAlreadyUsed,
 }
 
+#[derive(Debug)]
+pub enum UnmapError {
+    NullPageTable,
+    EntryAlreadyUnused,
+}
+
 impl fmt::Display for MapError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -40,6 +46,15 @@ impl fmt::Display for MapError {
                 "the physical frame is 2MiB or 1GiB but the huge page flag is not set"
             ),
             MapError::EntryAlreadyUsed => write!(f, "the virtual address is already in use"),
+        }
+    }
+}
+
+impl fmt::Display for UnmapError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            UnmapError::NullPageTable => write!(f, "{}", MapError::NullPageTable),
+            UnmapError::EntryAlreadyUnused => write!(f, "the virtual address is already unused"),
         }
     }
 }
@@ -259,13 +274,15 @@ fn is_page_table_free(table_addr: &PhysAddr) -> bool {
 /// ### panics if:
 /// - `pml4` is 0.
 /// - The virtual address is already unused.
-pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) {
+pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) -> Result<(), UnmapError> {
     let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
     let mut level_counter: u8 = 0;
 
-    assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
+    if pml4.is_null() {
+        return Err(UnmapError::NullPageTable);
+    }
 
     for _ in 0..PAGE_TABLE_LEVELS {
         let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
@@ -287,7 +304,9 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) {
 
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
-        assert!(!(*entry).is_unused(), "entry already unused");
+        if (*entry).is_unused() {
+            return Err(UnmapError::EntryAlreadyUnused);
+        }
         (*entry).set_unused();
     };
 
@@ -300,4 +319,6 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) {
             break;
         }
     }
+
+    Ok(())
 }

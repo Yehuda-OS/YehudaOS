@@ -87,13 +87,8 @@ fn alloc_node(
     for _ in 0..required_pages {
         if let Some(page) = super::page_allocator::allocate() {
             allocator.pages += 1;
-            if super::vmm::map_address(
-                allocator.page_table,
-                start + current_size,
-                page,
-                flags,
-            )
-            .is_err()
+            if super::vmm::map_address(allocator.page_table, start + current_size, page, flags)
+                .is_err()
             {
                 success = false;
 
@@ -113,20 +108,18 @@ fn alloc_node(
             // SAFETY: The page is aligned because we allocated it with `allocate`.
             unsafe {
                 super::page_allocator::free(
-                    PhysFrame::from_start_address(
-                        super::vmm::virtual_to_physical(
-                            allocator.page_table,
-                            start + current_size,
-                        ),
-                    )
+                    PhysFrame::from_start_address(super::vmm::virtual_to_physical(
+                        allocator.page_table,
+                        start + current_size,
+                    ))
                     // UNWRAP: The page is aligned.
                     .unwrap(),
                 );
             }
-            super::vmm::unmap_address(
-                allocator.page_table,
-                start + current_size,
-            );
+            // The entry is not unused because we just mapped it
+            // so the only error that can occur is that the page table is null
+            // which in this case we will return `None`.
+            super::vmm::unmap_address(allocator.page_table, start + current_size).ok()?;
             current_size -= Size4KiB::SIZE;
         }
 
