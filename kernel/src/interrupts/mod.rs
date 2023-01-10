@@ -1,35 +1,46 @@
+mod macros;
+
 use crate::{print, println};
 use bit_field::BitField;
 use core::arch::asm;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
-use x86_64::instructions::segmentation;
+use x86_64::registers::segmentation::{Segment, CS};
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::PrivilegeLevel;
 
-////////////////////////////////////////Variables///////////////////////////////////////
-enum idt_indexes {
-    div_0 = 0,
-    breakpoint = 3,
-    double_fault = 8,
-    timer = 32,
-}
+const DIV_0: u8 = 0;
+const BREAKPOINT: u8 = 3;
+const DOUBLE_FAULT: u8 = 8;
+const PAGE_FAULT: u8 = 0xE;
 
-pub static pics: spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe { ChainedPics::new(32, 40) });
+#[allow(dead_code)]
+pub static PICS: spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe { ChainedPics::new(32, 40) });
 
 lazy_static! {
     pub static ref IDT: Idt = {
         let mut idt = Idt::new();
 
-        idt.set_handler(idt_indexes::div_0 as u8, divide_by_zero_wrapper as u64);
-        idt.set_handler(idt_indexes::breakpoint as u8, breakpoint_wrapper as u64);
-        idt.set_handler(idt_indexes::double_fault as u8, double_fault_wrapper as u64);
-        idt.set_handler(idt_indexes::timer as u8, timer_wrapper as u64);
+        idt.set_handler(
+            DIV_0,
+            crate::interrupt_handler!(div_0, divide_by_zero_handler) as u64,
+        );
+        idt.set_handler(
+            BREAKPOINT,
+            crate::interrupt_handler!(breakpoint, breakpoint_handler) as u64,
+        );
+        idt.set_handler(
+            DOUBLE_FAULT,
+            crate::interrupt_handler!(d_fault, double_fault_handler) as u64,
+        );
+        idt.set_handler(
+            PAGE_FAULT,
+            crate::interrupt_handler!(p_fault, page_fault_handler) as u64,
+        );
         idt
     };
 }
-///////////////////////////////////////////////////Structs///////////////////////////////////////
 
 #[derive(Debug)]
 #[repr(C)]
@@ -56,10 +67,6 @@ pub struct Idt([Entry; 256]);
 
 #[derive(Debug, Clone, Copy)]
 pub struct EntryOptions(u16);
-
-pub type HandlerFunc = extern "C" fn() -> !;
-
-///////////////////////////////////////////////////impl's//////////////////////////////////////////
 
 impl EntryOptions {
     fn minimal() -> Self {
@@ -125,36 +132,20 @@ impl Idt {
         Idt([Entry::missing(); 256])
     }
 
-    pub fn set_handler(&mut self, entry: u8, handler: u64) -> EntryOptions {
-        self.0[entry as usize] = Entry::new(segmentation::cs(), handler);
-        let mut options = self.0[entry as usize].options;
-        options
+    pub fn set_handler(&mut self, entry: u8, handler: u64) {
+        self.0[entry as usize] = Entry::new(CS::get_reg(), handler);
     }
 
     pub fn load(&'static self) {
         use core::mem::size_of;
-        use x86_64::instructions::tables::{lidt, DescriptorTablePointer};
 
         unsafe {
-            let ptr = DescriptorTablePointer {
+            let ptr = x86_64::structures::DescriptorTablePointer {
                 base: VirtAddr::new_unsafe(self as *const _ as u64),
                 limit: (size_of::<Self>() - 1) as u16,
             };
-            lidt(&ptr)
+            x86_64::instructions::tables::lidt(&ptr)
         };
-    }
-}
-
-///////////////////////////////////////////////////handlers and other functions////////////////////////////////////////
-
-#[naked]
-#[no_mangle]
-pub extern "C" fn divide_by_zero_wrapper() -> ! {
-    unsafe {
-        asm!(
-            "mov rdi, rsp; call divide_by_zero_handler",
-            options(noreturn)
-        );
     }
 }
 
@@ -166,131 +157,9 @@ pub extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> !
     loop {}
 }
 
-#[naked]
-#[no_mangle]
-pub extern "C" fn breakpoint_wrapper() -> ! {
-    unsafe {
-        asm!(
-            "
-            push rax;
-            push rcx;
-            push rdx;
-            push rsi;
-            push rdi;
-            push r8;
-            push r9;
-            push r10;
-            push r11;
-    
-            mov rdi, rsp; 
-            add rdi, 9*8
-            call breakpoint_handler;
-            
-            pop r11;
-            pop r10;
-            pop r9;
-            pop r8;
-            pop rdi;
-            pop rsi;
-            pop rdx;
-            pop rcx;
-            pop rax;
-            iretq",
-            options(noreturn)
-        );
-    }
-}
-
 #[no_mangle]
 extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
     print!("EXCEPTION: BREAKPOINT");
-}
-
-#[naked]
-#[no_mangle]
-pub extern "C" fn timer_wrapper() -> ! {
-    unsafe {
-        asm!(
-            "
-            push rax;
-            push rcx;
-            push rdx;
-            push rsi;
-            push rdi;
-            push r8;
-            push r9;
-            push r10;
-            push r11;
-    
-            mov rdi, rsp; 
-            add rdi, 9*8
-            call timer_handler;
-            
-            pop r11;
-            pop r10;
-            pop r9;
-            pop r8;
-            pop rdi;
-            pop rsi;
-            pop rdx;
-            pop rcx;
-            pop rax;
-            iretq",
-            options(noreturn)
-        );
-    }
-}
-
-#[naked]
-#[no_mangle]
-pub extern "C" fn keyboard_wrapper() -> ! {
-    unsafe {
-        asm!(
-            "
-            push rax;
-            push rcx;
-            push rdx;
-            push rsi;
-            push rdi;
-            push r8;
-            push r9;
-            push r10;
-            push r11;
-    
-            mov rdi, rsp; 
-            add rdi, 9*8
-            call keyboard_handler;
-            
-            pop r11;
-            pop r10;
-            pop r9;
-            pop r8;
-            pop rdi;
-            pop rsi;
-            pop rdx;
-            pop rcx;
-            pop rax;
-            iretq",
-            options(noreturn)
-        );
-    }
-}
-
-#[no_mangle]
-extern "C" fn timer_handler() {
-    //print!("4");
-    unsafe {
-        pics.lock()
-            .notify_end_of_interrupt(idt_indexes::timer as u8);
-    }
-}
-
-#[naked]
-#[no_mangle]
-pub extern "C" fn double_fault_wrapper() -> ! {
-    unsafe {
-        asm!("mov rdi, rsp; call double_fault_handler", options(noreturn));
-    }
 }
 
 #[no_mangle]
@@ -299,6 +168,15 @@ extern "C" fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
     loop {}
 }
 
-pub fn init() {
-    IDT.load();
+extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+    println!("============");
+    println!("|Page Fault|");
+    println!("============");
+    println!(
+        "Page fault at address {:#x}",
+        x86_64::registers::control::Cr2::read().as_u64()
+    );
+    println!("Stack Frame: {:#x?}", stack_frame);
+
+    loop {}
 }

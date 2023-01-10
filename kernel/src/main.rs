@@ -12,22 +12,6 @@ mod interrupts;
 mod io;
 mod memory;
 
-fn test_idt() {
-    unsafe {
-        core::arch::asm!(
-            "
-            mov dx, 0;
-            div dx
-            "
-        )
-    };
-}
-
-extern "C" fn page_fault_handler() -> ! {
-    println!("tried to devide by zero");
-    loop {}
-}
-
 /// Kernel Entry Point
 ///
 /// `_start` is defined in the linker script as the entry point for the ELF file.
@@ -43,7 +27,6 @@ pub extern "C" fn _start() -> ! {
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
         interrupts::IDT.load();
-        test_idt();
     }
     println!("Hello world");
 
