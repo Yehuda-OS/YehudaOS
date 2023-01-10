@@ -1,3 +1,10 @@
+use x86_64::{
+    structures::paging::{PageSize, Size4KiB},
+    PhysAddr,
+};
+
+use super::memory::virtual_memory_manager;
+
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
     rsp0: 0,
@@ -42,9 +49,29 @@ pub fn get_tss_address() -> u64 {
 }
 
 /// Load the tss segment selector to the task register.
-/// 
+///
 /// # Safety
 /// This function is unsafe because it requires a valid GDT with a TSS segment descriptor.
 pub unsafe fn load_tss() {
     core::arch::asm!("ltr ax", in("ax")super::gdt::TSS);
+}
+
+/// Create a page table for a process and copy the higher half of the kernel's page table to it
+/// because the kernel's memory is at the higher half of the address space.
+///
+/// # Returns
+/// The address of the new page table.
+///
+/// # Safety
+/// A valid kernel's page table is required.
+unsafe fn create_page_table() -> PhysAddr {
+    let table = virtual_memory_manager::create_page_table();
+
+    core::ptr::copy_nonoverlapping(
+        (super::memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
+        table.as_u64() as *mut u8,
+        Size4KiB::SIZE as usize / 2,
+    );
+
+    table
 }
