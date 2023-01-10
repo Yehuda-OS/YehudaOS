@@ -44,29 +44,29 @@ pub struct TaskStateSegment {
 
 #[repr(packed)]
 pub struct Registers {
-    pub rax: u64,
-    pub rbx: u64,
-    pub rcx: u64,
-    pub rdx: u64,
-    pub rsi: u64,
-    pub rdi: u64,
-    pub rbp: u64,
-    pub r8: u64,
-    pub r9: u64,
-    pub r10: u64,
-    pub r11: u64,
-    pub r12: u64,
-    pub r13: u64,
-    pub r14: u64,
-    pub r15: u64,
+    rax: u64,
+    rbx: u64,
+    rcx: u64,
+    rdx: u64,
+    rsi: u64,
+    rdi: u64,
+    rbp: u64,
+    r8: u64,
+    r9: u64,
+    r10: u64,
+    r11: u64,
+    r12: u64,
+    r13: u64,
+    r14: u64,
+    r15: u64,
 }
 
 pub struct Process {
-    pub registers: Registers,
-    pub page_table: PhysAddr,
-    pub stack_pointer: u64,
-    pub instruction_pointer: u64,
-    pub flags: u64,
+    registers: Registers,
+    page_table: PhysAddr,
+    stack_pointer: u64,
+    instruction_pointer: u64,
+    flags: u64,
 }
 
 /// Returns the address of the Task State Segment.
@@ -84,7 +84,17 @@ pub unsafe fn load_tss() {
     asm!("ltr ax", in("ax")super::gdt::TSS);
 }
 
+/// Start running a user process in ring 3.
+/// 
+/// # Arguments
+/// - `p` - The process' data structure.
+/// 
+/// # Safety
+/// This function is unsafe because it jumps to a code at a specific
+/// address and deletes the entire call stack.
 pub unsafe fn load_context(p: &Process) {
+    // Move the user data segment selector to the segment registers and push
+    // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
     mov ds, {0:x}
     mov es, {0:x}
@@ -100,6 +110,7 @@ pub unsafe fn load_context(p: &Process) {
         in(reg)DATA_SEGMENT, in(reg)CODE_SEGMENT,
         rsp=in(reg)p.stack_pointer, rip=in(reg)p.instruction_pointer
     );
+    // Push the future `rbx` and `rbp` to later pop them.
     asm!("
     push {rbx}
     push {rbp}
@@ -107,7 +118,8 @@ pub unsafe fn load_context(p: &Process) {
             rbx=in(reg)p.registers.rbx,
             rbp=in(reg)p.registers.rbp,
     );
-
+    // Pop `rbx` and `rbp` that we pushed earlier and perform the return
+    // after loading the general purpose register with the appropriate values.
     asm!("
     pop rbp
     pop rbx
