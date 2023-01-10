@@ -19,10 +19,10 @@ mod terminal;
 pub extern "C" fn _start() -> ! {
     memory::page_allocator::initialize();
     unsafe {
-        memory::PAGE_TABLE = memory::virtual_memory_manager::create_page_table();
-        memory::map_kernel_address();
-        memory::create_hhdm(memory::PAGE_TABLE);
-        memory::map_bootloader_memory();
+        memory::PAGE_TABLE = memory::virtual_memory_manager::create_page_table().unwrap();
+        memory::map_kernel_address().unwrap();
+        memory::create_hhdm(memory::PAGE_TABLE).unwrap();
+        memory::map_bootloader_memory().unwrap();
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::allocator::ALLOCATOR
             .lock()

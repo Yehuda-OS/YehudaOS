@@ -1,3 +1,5 @@
+use core::fmt;
+
 use x86_64::{
     registers,
     structures::paging::{
@@ -9,6 +11,38 @@ use x86_64::{
 
 const PAGE_TABLE_ENTRIES: isize = 512;
 const PAGE_TABLE_LEVELS: u8 = 4;
+
+#[derive(Debug)]
+pub enum MapError {
+    /// Not enough memory for a page table.
+    OutOfMemory,
+    /// `pml4` is 0
+    NullPageTable,
+    /// The physical frame is 4KiB but the `HUGE_PAGE` flag is set.
+    InvalidHugePageFlag,
+    /// The physical frame is 2MiB or 1GiB but `flags` does not contain the `HUGE_PAGE` flag.
+    MissingHugePageFlag,
+    /// The virtual address is already in use.
+    EntryAlreadyUsed,
+}
+
+impl fmt::Display for MapError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            MapError::OutOfMemory => write!(f, "not enough memory for a page table"),
+            MapError::NullPageTable => write!(f, "the provided page table is null"),
+            MapError::InvalidHugePageFlag => write!(
+                f,
+                "the physical frame is 4KiB but the huge page flag is set"
+            ),
+            MapError::MissingHugePageFlag => write!(
+                f,
+                "the physical frame is 2MiB or 1GiB but the huge page flag is not set"
+            ),
+            MapError::EntryAlreadyUsed => write!(f, "the virtual address is already in use"),
+        }
+    }
+}
 
 /// Get an entry in a page table.
 ///
@@ -31,10 +65,8 @@ unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut Page
 ///
 /// # Returns
 /// The physical address of the page table.
-pub fn create_page_table() -> PhysAddr {
-    let page_table = super::page_allocator::allocate()
-        .expect("No free memory for a page table")
-        .start_address();
+pub fn create_page_table() -> Option<PhysAddr> {
+    let page_table = super::page_allocator::allocate()?.start_address();
 
     for i in 0..PAGE_TABLE_ENTRIES {
         // SAFETY: the page table was allocated and the offset is in the page table range.
@@ -43,7 +75,7 @@ pub fn create_page_table() -> PhysAddr {
         }
     }
 
-    return page_table;
+    return Some(page_table);
 }
 
 /// Returns the physical addresses a virtual address is mapped to.
@@ -84,54 +116,52 @@ pub fn virtual_to_physical(pml4: PhysAddr, virtual_address: VirtAddr) -> PhysAdd
 /// Maps a virtual address to a physical address.
 ///
 /// # Arguments
-/// * `pml4` - The address of the Page Map Level 4.
-/// * `virtual_address` - The virtual address to map.
-/// * `physical_address` - The physical frame to map the virtual address to.
+/// - `pml4` - The address of the Page Map Level 4.
+/// - `virtual_address` - The virtual address to map.
+/// - `physical_address` - The physical frame to map the virtual address to.
 /// The function supports 2MiB and 1GiB pages.
-/// * `flags` - The flags of the last entry.
-///
-/// ### Panics if:
-/// - `pml4` is 0.
-/// - The virtual address is already in use.
-/// - The physical frame is 4KiB but the `HUGE_PAGE` flag is set.
-/// - The physical frame is 2MiB or 1GiB but `flags` does not contain the `HUGE_PAGE` flag.
+/// - `flags` - The flags of the last entry.
 pub fn map_address<T: PageSize>(
     pml4: PhysAddr,
     virtual_address: VirtAddr,
     physical_address: PhysFrame<T>,
     flags: PageTableFlags,
-) {
+) -> Result<(), MapError> {
     let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
     let tables = match physical_address.size() {
         Size4KiB::SIZE => {
-            assert!(
-                !flags.contains(PageTableFlags::HUGE_PAGE),
-                "Huge page flag on 4KiB page"
-            );
-            4
+            if flags.contains(PageTableFlags::HUGE_PAGE) {
+                Err(MapError::InvalidHugePageFlag)
+            } else {
+                Ok(4)
+            }
         }
         Size2MiB::SIZE => {
             assert!(
                 flags.contains(PageTableFlags::HUGE_PAGE),
                 "Missing huge page flag"
             );
-
-            3 // When the page size is 2MiB we stop iterating at p2 table
+            if flags.contains(PageTableFlags::HUGE_PAGE) {
+                Ok(3) // When the page size is 2MiB we stop iterating at p2 table
+            } else {
+                Err(MapError::MissingHugePageFlag)
+            }
         }
         Size1GiB::SIZE => {
-            assert!(
-                flags.contains(PageTableFlags::HUGE_PAGE),
-                "Missing huge page flag"
-            );
-
-            2 // When the apge size is 1GiB we stop iterating at p3 table
+            if flags.contains(PageTableFlags::HUGE_PAGE) {
+                Ok(2) // When the apge size is 1GiB we stop iterating at p3 table
+            } else {
+                Err(MapError::MissingHugePageFlag)
+            }
         }
-        _ => 0, // size always returns one of the above
-    };
+        _ => Ok(0), // size always returns one of the above
+    }?;
 
-    assert!(!pml4.is_null(), "Invalid page table: address 0 was given");
+    if pml4.is_null() {
+        return Err(MapError::NullPageTable);
+    }
 
     for _ in 0..tables {
         // The offset is 9 bits. To get the offset we shift to the left all the bits we already
@@ -142,7 +172,7 @@ pub fn map_address<T: PageSize>(
         if page_table == 0 {
             // SAFETY: Entry is not null because pml4 has been asserted to be not null
             unsafe {
-                page_table = create_page_table().as_u64();
+                page_table = create_page_table().ok_or(MapError::OutOfMemory)?.as_u64();
                 // Update the previous entry
                 (*entry).set_addr(
                     PhysAddr::new(page_table),
@@ -164,9 +194,14 @@ pub fn map_address<T: PageSize>(
 
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
-        assert!((*entry).is_unused(), "Virtual address is already in use");
-        (*entry).set_addr(physical_address.start_address(), flags);
+        if (*entry).is_unused() {
+            (*entry).set_addr(physical_address.start_address(), flags);
+        } else {
+            return Err(MapError::EntryAlreadyUsed);
+        }
     }
+
+    Ok(())
 }
 
 /// Get a page table a virtual address is using.

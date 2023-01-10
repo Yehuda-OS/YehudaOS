@@ -60,12 +60,12 @@ pub unsafe fn load_tss() {
 /// because the kernel's memory is at the higher half of the address space.
 ///
 /// # Returns
-/// The address of the new page table.
+/// The address of the new page table or `None` if there is no free space for a page table.
 ///
 /// # Safety
 /// A valid kernel's page table is required.
-unsafe fn create_page_table() -> PhysAddr {
-    let table = virtual_memory_manager::create_page_table();
+unsafe fn create_page_table() -> Option<PhysAddr> {
+    let table = virtual_memory_manager::create_page_table()?;
 
     core::ptr::copy_nonoverlapping(
         (super::memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
@@ -73,5 +73,5 @@ unsafe fn create_page_table() -> PhysAddr {
         Size4KiB::SIZE as usize / 2,
     );
 
-    table
+    Some(table)
 }
