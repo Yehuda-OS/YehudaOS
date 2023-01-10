@@ -105,7 +105,7 @@ fn alloc_node(
         // If the allocation fails, unmap everything we mapped so far.
         while current_size > 0 {
             allocator.pages -= 1;
-            // SAFETY: The page is aligned because we allocated it with `allocate`.
+            // SAFETY: The page is valid because we allocated it with `allocate`.
             unsafe {
                 super::page_allocator::free(
                     PhysFrame::from_start_address(super::vmm::virtual_to_physical(
