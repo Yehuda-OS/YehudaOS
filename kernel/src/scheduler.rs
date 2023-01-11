@@ -1,9 +1,8 @@
-use x86_64::{
-    structures::paging::{PageSize, Size4KiB},
-    PhysAddr,
-};
+use core::arch::asm;
+use x86_64::PhysAddr;
 
-use super::memory::vmm;
+const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
+const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -43,17 +42,104 @@ pub struct TaskStateSegment {
     io_permission_bitmap: u16,
 }
 
+pub struct Registers {
+    rax: u64,
+    rbx: u64,
+    rcx: u64,
+    rdx: u64,
+    rsi: u64,
+    rdi: u64,
+    rbp: u64,
+    r8: u64,
+    r9: u64,
+    r10: u64,
+    r11: u64,
+    r12: u64,
+    r13: u64,
+    r14: u64,
+    r15: u64,
+}
+
+pub struct Process {
+    registers: Registers,
+    page_table: PhysAddr,
+    stack_pointer: u64,
+    instruction_pointer: u64,
+    flags: u64,
+}
+
 /// Returns the address of the Task State Segment.
 pub fn get_tss_address() -> u64 {
     unsafe { &TSS_ENTRY as *const _ as u64 }
 }
 
-/// Load the tss segment selector to the task register.
+/// Load kernel's stack pointer to the TSS and load the
+/// TSS segment selector to the task register.
 ///
 /// # Safety
 /// This function is unsafe because it requires a valid GDT with a TSS segment descriptor.
 pub unsafe fn load_tss() {
-    core::arch::asm!("ltr ax", in("ax")super::gdt::TSS);
+    asm!("mov {0}, rsp", out(reg)TSS_ENTRY.rsp0);
+    asm!("ltr ax", in("ax")super::gdt::TSS);
+}
+
+/// Start running a user process in ring 3.
+///
+/// # Arguments
+/// - `p` - The process' data structure.
+///
+/// # Safety
+/// This function is unsafe because it jumps to a code at a specific
+/// address and deletes the entire call stack.
+pub unsafe fn load_context(p: &Process) -> ! {
+    super::memory::load_tables_to_cr3(p.page_table);
+    // Move the user data segment selector to the segment registers and push
+    // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
+    asm!("
+    mov ds, {0:x}
+    mov es, {0:x}
+    mov fs, {0:x}
+    mov gs, {0:x}
+
+    push {0:r}
+    push {rsp}
+    pushfq
+    push {1:r}
+    push {rip}
+    ",
+        in(reg)DATA_SEGMENT, in(reg)CODE_SEGMENT,
+        rsp=in(reg)p.stack_pointer, rip=in(reg)p.instruction_pointer
+    );
+    // Push the future `rbx` and `rbp` to later pop them.
+    asm!("
+    push {rbx}
+    push {rbp}
+    ",
+            rbx=in(reg)p.registers.rbx,
+            rbp=in(reg)p.registers.rbp,
+    );
+    // Pop `rbx` and `rbp` that we pushed earlier and perform the return
+    // after loading the general purpose register with the appropriate values.
+    asm!("
+    pop rbp
+    pop rbx
+    iretq",
+        in("rax")p.registers.rax,
+        in("rcx")p.registers.rcx,
+        in("rdx")p.registers.rdx,
+        in("rsi")p.registers.rsi,
+        in("rdi")p.registers.rdi,
+        in("r8")p.registers.r8,
+        in("r9")p.registers.r9,
+        in("r10")p.registers.r10,
+        in("r11")p.registers.r11,
+        in("r12")p.registers.r12,
+        in("r13")p.registers.r13,
+        in("r14")p.registers.r14,
+        in("r15")p.registers.r15,
+    );
+
+    loop {} // The function will never run this line because of 'iretq'.
 }
 
 /// Create a page table for a process and copy the higher half of the kernel's page table to it
