@@ -116,7 +116,7 @@ fn alloc_node(
                     .unwrap(),
                 );
             }
-            // The entry is not unused because we just mapped it
+            // UNWRAP: The entry is not unused because we just mapped it
             // and if the page table is null the call to `map_address` would
             // return `None` and this code would never run.
             super::vmm::unmap_address(allocator.page_table, start + current_size).unwrap();
