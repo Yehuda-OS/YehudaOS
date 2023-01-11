@@ -42,7 +42,6 @@ pub struct TaskStateSegment {
     io_permission_bitmap: u16,
 }
 
-#[repr(packed)]
 pub struct Registers {
     rax: u64,
     rbx: u64,
