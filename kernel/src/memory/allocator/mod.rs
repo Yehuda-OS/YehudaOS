@@ -82,43 +82,48 @@ fn alloc_node(
     if allocator.pages + required_pages > MAX_PAGES {
         return None;
     }
+    let mut success = true;
 
     for _ in 0..required_pages {
         if let Some(page) = super::page_allocator::allocate() {
             allocator.pages += 1;
-            super::virtual_memory_manager::map_address(
-                allocator.page_table,
-                start + current_size,
-                page,
-                flags,
-            );
+            if super::vmm::map_address(allocator.page_table, start + current_size, page, flags)
+                .is_err()
+            {
+                success = false;
+
+                break;
+            }
             current_size += Size4KiB::SIZE;
         } else {
-            // If the allocation fails, unmap everything we mapped so far.
-            while current_size > 0 {
-                allocator.pages -= 1;
-                // SAFETY: The page is aligned because we allocated it with `allocate`.
-                unsafe {
-                    super::page_allocator::free(
-                        PhysFrame::from_start_address(
-                            super::virtual_memory_manager::virtual_to_physical(
-                                allocator.page_table,
-                                start + current_size,
-                            ),
-                        )
-                        // UNWRAP: The page is aligned.
-                        .unwrap(),
-                    );
-                }
-                super::virtual_memory_manager::unmap_address(
-                    allocator.page_table,
-                    start + current_size,
-                );
-                current_size -= Size4KiB::SIZE;
-            }
+            success = false;
 
-            return None;
+            break;
         }
+    }
+    if !success {
+        // If the allocation fails, unmap everything we mapped so far.
+        while current_size > 0 {
+            allocator.pages -= 1;
+            // SAFETY: The page is valid because we allocated it with `allocate`.
+            unsafe {
+                super::page_allocator::free(
+                    PhysFrame::from_start_address(super::vmm::virtual_to_physical(
+                        allocator.page_table,
+                        start + current_size,
+                    ))
+                    // UNWRAP: The page is aligned.
+                    .unwrap(),
+                );
+            }
+            // UNWRAP: The entry is not unused because we just mapped it
+            // and if the page table is null the call to `map_address` would
+            // return `None` and this code would never run.
+            super::vmm::unmap_address(allocator.page_table, start + current_size).unwrap();
+            current_size -= Size4KiB::SIZE;
+        }
+
+        return None;
     }
     // Allocation succeeded, add the allocated block to the list.
     allocated = start.as_mut_ptr::<HeapBlock>();
