@@ -158,7 +158,7 @@ unsafe fn create_page_table() -> Option<PhysAddr> {
     let table = memory::vmm::create_page_table()?;
 
     core::ptr::copy_nonoverlapping(
-        (super::memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
+        (memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
         table.as_u64() as *mut u8,
         Size4KiB::SIZE as usize / 2,
     );
