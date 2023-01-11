@@ -85,14 +85,14 @@ pub unsafe fn load_tss() {
 }
 
 /// Start running a user process in ring 3.
-/// 
+///
 /// # Arguments
 /// - `p` - The process' data structure.
-/// 
+///
 /// # Safety
 /// This function is unsafe because it jumps to a code at a specific
 /// address and deletes the entire call stack.
-pub unsafe fn load_context(p: &Process) {
+pub unsafe fn load_context(p: &Process) -> ! {
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
@@ -138,4 +138,6 @@ pub unsafe fn load_context(p: &Process) {
         in("r14")p.registers.r14,
         in("r15")p.registers.r15,
     );
+
+    loop {} // The function will never run this line because of 'iretq'.
 }
