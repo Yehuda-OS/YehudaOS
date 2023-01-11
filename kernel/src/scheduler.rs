@@ -92,6 +92,7 @@ pub unsafe fn load_tss() {
 /// This function is unsafe because it jumps to a code at a specific
 /// address and deletes the entire call stack.
 pub unsafe fn load_context(p: &Process) -> ! {
+    super::memory::load_tables_to_cr3(p.page_table);
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
