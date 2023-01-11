@@ -117,9 +117,9 @@ fn alloc_node(
                 );
             }
             // The entry is not unused because we just mapped it
-            // so the only error that can occur is that the page table is null
-            // which in this case we will return `None`.
-            super::vmm::unmap_address(allocator.page_table, start + current_size).ok()?;
+            // and if the page table is null the call to `map_address` would
+            // return `None` and this code would never run.
+            super::vmm::unmap_address(allocator.page_table, start + current_size).unwrap();
             current_size -= Size4KiB::SIZE;
         }
 
