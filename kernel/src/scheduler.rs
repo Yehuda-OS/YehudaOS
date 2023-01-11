@@ -1,5 +1,9 @@
+use super::memory;
 use core::arch::asm;
-use x86_64::PhysAddr;
+use x86_64::{
+    structures::paging::{PageSize, Size4KiB},
+    PhysAddr,
+};
 
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
@@ -92,7 +96,7 @@ pub unsafe fn load_tss() {
 /// This function is unsafe because it jumps to a code at a specific
 /// address and deletes the entire call stack.
 pub unsafe fn load_context(p: &Process) -> ! {
-    super::memory::load_tables_to_cr3(p.page_table);
+    memory::load_tables_to_cr3(p.page_table);
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
@@ -151,7 +155,7 @@ pub unsafe fn load_context(p: &Process) -> ! {
 /// # Safety
 /// A valid kernel's page table is required.
 unsafe fn create_page_table() -> Option<PhysAddr> {
-    let table = vmm::create_page_table()?;
+    let table = memory::vmm::create_page_table()?;
 
     core::ptr::copy_nonoverlapping(
         (super::memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
