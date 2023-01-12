@@ -93,14 +93,22 @@ pub fn create_page_table() -> Option<PhysAddr> {
     return Some(page_table);
 }
 
-/// Returns the physical addresses a virtual address is mapped to.
+/// Returns the physical addresses a virtual address is mapped to or an error if `pml4`
+/// is null or the virtual address is unused.
 ///
 /// # Arguments
-/// * `pml4` - The page map level 4, the highest page table.
-/// * `virtual_address` - The virtual address to translate.
-pub fn virtual_to_physical(pml4: PhysAddr, virtual_address: VirtAddr) -> PhysAddr {
+/// - `pml4` - The page map level 4, the highest page table.
+/// - `virtual_address` - The virtual address to translate.
+pub fn virtual_to_physical(
+    pml4: PhysAddr,
+    virtual_address: VirtAddr,
+) -> Result<PhysAddr, UnmapError> {
     let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
+
+    if pml4.is_null() {
+        return Err(UnmapError::NullPageTable);
+    }
 
     for _ in 0..PAGE_TABLE_LEVELS {
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
@@ -110,6 +118,10 @@ pub fn virtual_to_physical(pml4: PhysAddr, virtual_address: VirtAddr) -> PhysAdd
         // SAFETY: the offset is valid because it is 9 bits.
         let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
         let entry_flags = entry.flags();
+
+        if entry.is_unused() {
+            return Err(UnmapError::EntryUnused);
+        }
 
         // Get the physical address from the page table entry
         page_table = entry.addr().as_u64();
@@ -123,9 +135,9 @@ pub fn virtual_to_physical(pml4: PhysAddr, virtual_address: VirtAddr) -> PhysAdd
     }
 
     // Use all the unused bits as the offset in the physical page
-    return PhysAddr::new(
-        page_table + (virtual_address.as_u64() & (0xffff_ffff_ffff_ffff >> used_bits)),
-    );
+    Ok(PhysAddr::new(
+        page_table + (virtual_address.as_u64() & (!0 >> used_bits)),
+    ))
 }
 
 /// Maps a virtual address to a physical address.

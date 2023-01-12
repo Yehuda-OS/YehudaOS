@@ -107,18 +107,19 @@ fn alloc_node(
             allocator.pages -= 1;
             // SAFETY: The page is valid because we allocated it with `allocate`.
             unsafe {
+                // UNWRAP: The entry is not unused because we just mapped it
+                // and if the page table is null the call to `map_address` would
+                // return `None` and this code would never run.
                 super::page_allocator::free(
-                    PhysFrame::from_start_address(super::vmm::virtual_to_physical(
-                        allocator.page_table,
-                        start + current_size,
-                    ))
+                    PhysFrame::from_start_address(
+                        super::vmm::virtual_to_physical(allocator.page_table, start + current_size)
+                            .unwrap(),
+                    )
                     // UNWRAP: The page is aligned.
                     .unwrap(),
                 );
             }
-            // UNWRAP: The entry is not unused because we just mapped it
-            // and if the page table is null the call to `map_address` would
-            // return `None` and this code would never run.
+            // UNWRAP: Same as above.
             super::vmm::unmap_address(allocator.page_table, start + current_size).unwrap();
             current_size -= Size4KiB::SIZE;
         }
