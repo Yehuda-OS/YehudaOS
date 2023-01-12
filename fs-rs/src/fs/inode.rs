@@ -33,9 +33,9 @@ impl Inode {
     /// 
     /// # Returns
     /// Returns a `MaximumSizeExceeded` error if the new size exceeds the maximum file size.
-    pub fn set_size(&mut self, value: usize) -> Result<(), super::SetLenError> {
+    pub fn set_size(&mut self, value: usize) -> Result<(), super::FsError> {
         if value > MAX_FILE_SIZE {
-            return Err(super::SetLenError::MaximumSizeExceeded)
+            return Err(super::FsError::MaximumSizeExceeded)
         }
 
         self.size = value;

@@ -25,14 +25,8 @@ const BYTES_PER_INODE: usize = 16 * 1024;
 const DISK_PARTS: DiskParts = calc_parts(blkdev::DEVICE_SIZE);
 
 #[derive(Debug)]
-pub enum WriteError {
+pub enum FsError {
     NotEnoughDiskSpace,
-    MaximumSizeExceeded,
-    FileNotFound,
-}
-
-#[derive(Debug)]
-pub enum SetLenError {
     MaximumSizeExceeded,
     FileNotFound,
 }
@@ -379,7 +373,7 @@ fn deallocate_block(address: usize) {
 ///
 /// # Returns
 /// Inode of the folder after the file was added or WriteError otherwise
-fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, WriteError> {
+fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, FsError> {
     let buffer: &[u8] = unsafe {
         slice::from_raw_parts(file as *const _ as *const u8, core::mem::size_of_val(file))
     };
@@ -394,8 +388,8 @@ fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, Writ
 /// - `folder` - the folder that `file` is going to be removed from
 ///
 /// # Returns
-/// Inode of the folder after the file was removed or WriteError otherwise
-fn remove_file_from_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, WriteError> {
+/// Inode of the folder after the file was removed or FsError otherwise.
+fn remove_file_from_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, FsError> {
     let buffer: Vec<u8> = vec![0; core::mem::size_of_val(file)];
 
     let res = unsafe { write(folder.id, buffer.as_slice(), folder.size() - buffer.len()) };
@@ -706,8 +700,8 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
 /// `size` - The required size.
 ///
 /// # Returns
-/// If the function fails, an error will be returned.
-pub fn set_len(file: usize, size: usize) -> Result<(), SetLenError> {
+/// The function returns the `FileNotFound` or `MaximumSizeExceeded` error.
+pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
     let mut resized;
     let last_ptr;
     let resized_last_ptr;
@@ -717,10 +711,10 @@ pub fn set_len(file: usize, size: usize) -> Result<(), SetLenError> {
     if let Some(inode) = read_inode(file) {
         resized = inode;
     } else {
-        return Err(SetLenError::FileNotFound);
+        return Err(FsError::FileNotFound);
     }
     if size > inode::MAX_FILE_SIZE {
-        return Err(SetLenError::MaximumSizeExceeded);
+        return Err(FsError::MaximumSizeExceeded);
     }
 
     last_ptr = resized.size() / BLOCK_SIZE;
@@ -755,7 +749,7 @@ pub fn set_len(file: usize, size: usize) -> Result<(), SetLenError> {
 ///
 /// # Returns
 /// if the function succeeded, If it fails, an error will be returned.
-pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, WriteError> {
+pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, FsError> {
     let mut updated;
     let mut start = offset % BLOCK_SIZE;
     let mut to_write = BLOCK_SIZE - start;
@@ -766,14 +760,13 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, 
     if let Some(inode) = read_inode(file) {
         updated = inode;
     } else {
-        return Err(WriteError::FileNotFound);
+        return Err(FsError::FileNotFound);
     }
     if offset + remaining > updated.size() {
         match set_len(file, offset + remaining) {
             // UNWRAP: We already checked if the file exists.
             Ok(_) => updated = read_inode(file).unwrap(),
-            Err(SetLenError::MaximumSizeExceeded) => return Err(WriteError::MaximumSizeExceeded),
-            Err(SetLenError::FileNotFound) => return Err(WriteError::FileNotFound),
+            Err(e) => return Err(e),
         }
     }
 
@@ -785,7 +778,7 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, 
             if let Some(block) = allocate_block() {
                 updated.set_ptr(pointer, block).unwrap();
             } else {
-                return Err(WriteError::NotEnoughDiskSpace);
+                return Err(FsError::NotEnoughDiskSpace);
             }
         }
         blkdev::write(
