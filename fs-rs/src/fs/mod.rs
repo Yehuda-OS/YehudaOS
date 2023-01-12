@@ -502,7 +502,6 @@ pub fn format() {
         version: 0,
     };
     let bit_maps_size = DISK_PARTS.root - DISK_PARTS.block_bit_map;
-    let zeroes_buf = vec![0; bit_maps_size];
     let mut root = Inode::new();
 
     // put the header in place
@@ -518,11 +517,7 @@ pub fn format() {
 
     // zero out bit maps
     unsafe {
-        blkdev::write(
-            DISK_PARTS.block_bit_map,
-            bit_maps_size,
-            zeroes_buf.as_ptr() as *mut u8,
-        )
+        blkdev::set(DISK_PARTS.block_bit_map, bit_maps_size, 0);
     };
 
     // create root directory Inode

@@ -12,6 +12,14 @@ pub fn init() {
     unsafe { DATA = vec![0; DEVICE_SIZE] }
 }
 
+/// Set `size` bytes starting in offset `addr` to `value`.
+/// 
+/// # Safety
+/// This operation is unsafe because it uses raw pointers.
+pub unsafe fn set(addr: usize, size: usize, value: u8) {
+    core::ptr::write(DATA.as_mut_ptr(), value);
+}
+
 /// Read from the block device.
 ///
 /// # Arguments
@@ -20,7 +28,7 @@ pub fn init() {
 /// - `ans` - The buffer to read into.
 ///
 /// # Safety
-/// This operation is unafe because it uses pointers.
+/// This operation is unsafe because it uses raw pointers.
 pub unsafe fn read(addr: usize, size: usize, ans: *mut u8) {
     core::ptr::copy_nonoverlapping(DATA.as_ptr().add(addr), ans, size);
 }
