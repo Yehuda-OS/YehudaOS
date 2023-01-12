@@ -1,9 +1,11 @@
 use super::blkdev;
+use super::FsError;
 use super::BLOCK_SIZE;
 
 pub const DIRECT_POINTERS: usize = 12;
 const POINTER_SIZE: usize = core::mem::size_of::<usize>();
-pub const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
+pub const MAX_FILE_SIZE: usize =
+    DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
 
 #[derive(Clone, Copy)]
 pub struct Inode {
@@ -30,12 +32,12 @@ impl Inode {
     }
 
     /// Set the size of an inode to `value`.
-    /// 
+    ///
     /// # Returns
     /// Returns a `MaximumSizeExceeded` error if the new size exceeds the maximum file size.
-    pub fn set_size(&mut self, value: usize) -> Result<(), super::FsError> {
+    pub fn set_size(&mut self, value: usize) -> Result<(), FsError> {
         if value > MAX_FILE_SIZE {
-            return Err(super::FsError::MaximumSizeExceeded)
+            return Err(super::FsError::MaximumSizeExceeded);
         }
 
         self.size = value;
@@ -43,12 +45,12 @@ impl Inode {
         Ok(())
     }
 
-    /// Returns the `index`th pointer of the inode or `Err` if the `index` exceeds the maximum
-    /// file size divided by the block size.
+    /// Returns the `index`th pointer of the inode or `MaximumSizeExceeded` if the `index`
+    /// exceeds the maximum file size divided by the block size.
     ///
     /// # Arguments
     /// - `index` - The index of the pointer.
-    pub fn get_ptr(&self, index: usize) -> Result<usize, ()> {
+    pub fn get_ptr(&self, index: usize) -> Result<usize, FsError> {
         let offset;
         let mut ptr: usize = 0;
 
@@ -58,7 +60,7 @@ impl Inode {
 
         offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
         if offset > BLOCK_SIZE {
-            return Err(());
+            return Err(FsError::MaximumSizeExceeded);
         }
         unsafe {
             blkdev::read(
@@ -78,9 +80,11 @@ impl Inode {
     /// - `value` - The value to change to.
     ///
     /// # Returns
-    /// `Err` if the pointer exceeds the maximum file size
-    /// divided by the block size and `Ok` otherwise.
-    pub fn set_ptr(&mut self, index: usize, value: usize) -> Result<(), ()> {
+    /// - `MaximumSizeExceeded` if the pointer exceeds the maximum file size
+    /// divided by the block size and
+    /// - `NotEnoughDiskSpace` if there is no free space for the pointer.
+    /// - `Ok` otherwise.
+    pub fn set_ptr(&mut self, index: usize, value: usize) -> Result<(), FsError> {
         let offset;
 
         if index < DIRECT_POINTERS {
@@ -91,14 +95,10 @@ impl Inode {
 
         offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
         if offset > BLOCK_SIZE {
-            return Err(());
+            return Err(FsError::MaximumSizeExceeded);
         }
         if self.indirect_pointer == 0 {
-            if let Some(indirect_pointer) = super::allocate_block() {
-                self.indirect_pointer = indirect_pointer;
-            } else {
-                return Err(());
-            }
+            self.indirect_pointer = super::allocate_block().ok_or(FsError::NotEnoughDiskSpace)?;
         }
         unsafe {
             blkdev::write(
