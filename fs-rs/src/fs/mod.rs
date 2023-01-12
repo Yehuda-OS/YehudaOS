@@ -18,13 +18,10 @@ pub type DirList = Vec<DirListEntry>;
 
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
-const DIRECT_POINTERS: usize = 12;
 const FILE_NAME_LEN: usize = 11;
 const BLOCK_SIZE: usize = 16;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
-const POINTER_SIZE: usize = core::mem::size_of::<usize>();
-const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
 const DISK_PARTS: DiskParts = calc_parts(blkdev::DEVICE_SIZE);
 
 #[derive(Debug)]
@@ -324,7 +321,7 @@ fn reallocate_blocks(inode: &Inode, new_size: usize) -> Result<Inode, &'static s
     let mut used_blocks = 0;
     let mut new_addresses = *inode;
 
-    if required_blocks > DIRECT_POINTERS {
+    if required_blocks > inode::DIRECT_POINTERS {
         return Err("too many blocks are required");
     }
 
@@ -442,76 +439,6 @@ const fn calc_parts(device_size: usize) -> DiskParts {
     parts.data = parts.unused + (device_size - parts.unused) % BLOCK_SIZE;
 
     parts
-}
-
-/// Returns the `index`th pointer of the inode or `Err` if the `index` exceeds the maximum
-/// file size divided by the block size.
-///
-/// # Arguments
-/// - `file` - The inode to get the pointer from.
-/// - `index` - The index of the pointer.
-fn get_ptr(file: &Inode, index: usize) -> Result<usize, ()> {
-    let offset;
-    let mut ptr: usize = 0;
-
-    if index < DIRECT_POINTERS {
-        return Ok(file.addresses[index]);
-    }
-
-    offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
-    if offset > BLOCK_SIZE {
-        return Err(());
-    }
-    unsafe {
-        blkdev::read(
-            file.indirect_pointer + offset,
-            POINTER_SIZE,
-            &mut ptr as *mut _ as *mut u8,
-        );
-    }
-
-    Ok(ptr)
-}
-
-/// Set the value of the `index`th pointer.
-///
-/// # Arguments
-/// - `file` - The file to change.
-/// - `index` - The index of the pointer.
-/// - `value` - The value to change to.
-///
-/// # Returns
-/// `Err` if the pointer exceeds the maximum file size
-/// divided by the block size and `Ok` otherwise.
-fn set_ptr(file: &mut Inode, index: usize, value: usize) -> Result<(), ()> {
-    let offset;
-
-    if index < DIRECT_POINTERS {
-        file.addresses[index] = value;
-
-        return Ok(());
-    }
-
-    offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
-    if offset > BLOCK_SIZE {
-        return Err(());
-    }
-    if file.indirect_pointer == 0 {
-        if let Some(indirect_pointer) = allocate_block() {
-            file.indirect_pointer = indirect_pointer;
-        } else {
-            return Err(());
-        }
-    }
-    unsafe {
-        blkdev::write(
-            file.indirect_pointer + offset,
-            POINTER_SIZE,
-            &value as *const _ as *const u8,
-        );
-    };
-
-    Ok(())
 }
 
 /// Add the "." and ".." special folders to a folder.
@@ -744,13 +671,13 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
     }
     while remaining != 0 {
         // If there is no pointer read null bytes
-        if get_ptr(&inode, pointer).unwrap() == 0 {
+        if inode.get_ptr(pointer).unwrap() == 0 {
             for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
                 *i = 0;
             }
         } else {
             blkdev::read(
-                get_ptr(&inode, pointer).unwrap() + start,
+                inode.get_ptr(pointer).unwrap() + start,
                 to_read,
                 buffer.as_mut_ptr().add(bytes_read),
             );
@@ -792,7 +719,7 @@ pub fn set_len(file: usize, size: usize) -> Result<(), SetLenError> {
     } else {
         return Err(SetLenError::FileNotFound);
     }
-    if size > MAX_FILE_SIZE {
+    if size > inode::MAX_FILE_SIZE {
         return Err(SetLenError::MaximumSizeExceeded);
     }
 
@@ -802,11 +729,11 @@ pub fn set_len(file: usize, size: usize) -> Result<(), SetLenError> {
     resized.size = size;
     // If the file has been resized to a smaller size, deallocate the unused blocks.
     while current > resized_last_ptr {
-        block = get_ptr(&resized, current).unwrap();
+        block = resized.get_ptr(current).unwrap();
 
         if block != 0 {
             deallocate_block(block);
-            set_ptr(&mut resized, current, 0).unwrap();
+            resized.set_ptr(current, 0).unwrap();
         }
         current -= 1;
     }
@@ -854,15 +781,15 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, 
         to_write = remaining
     }
     while remaining != 0 {
-        if get_ptr(&updated, pointer).unwrap() == 0 {
+        if updated.get_ptr(pointer).unwrap() == 0 {
             if let Some(block) = allocate_block() {
-                set_ptr(&mut updated, pointer, block).unwrap();
+                updated.set_ptr(pointer, block).unwrap();
             } else {
                 return Err(WriteError::NotEnoughDiskSpace);
             }
         }
         blkdev::write(
-            get_ptr(&updated, pointer).unwrap() + start,
+            updated.get_ptr(pointer).unwrap() + start,
             to_write,
             buffer.as_ptr().add(written),
         );
