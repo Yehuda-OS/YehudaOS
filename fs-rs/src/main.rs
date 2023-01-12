@@ -2,8 +2,6 @@
 
 use std::vec::Vec;
 
-use fs::Fs;
-
 const FS_NAME: &str = "fs";
 
 const LIST_CMD: &str = "ls";
@@ -42,12 +40,6 @@ fn main() {
             " - gracefully exit. \n"
         )
     };
-    // let result = add(2, 2);
-    // assert_eq!(result, 4);
-
-    let blkdev = fs::blkdev::BlkDev::new();
-    let mut fs = fs::Fs::new(blkdev);
-
     // Declare the `FS_NAME` and `EXIT_CMD` constants
     const FS_NAME: &str = "fs";
     const EXIT_CMD: &str = "exit";
@@ -55,6 +47,7 @@ fn main() {
     // Declare `exit` as a mutable boolean
     let mut exit = false;
 
+    fs::init();
     // Start the main loop
     while !exit {
         println!("{}$ ", FS_NAME);
@@ -75,9 +68,9 @@ fn main() {
             // If the `list` command was entered, print the directory listing
             LIST_CMD => {
                 let dlist = if cmd.len() == 1 {
-                    fs.list_dir(&"/".to_string())
+                    fs::list_dir(&"/".to_string())
                 } else if cmd.len() == 2 {
-                    fs.list_dir(&cmd[1].to_string())
+                    fs::list_dir(&cmd[1].to_string())
                 } else {
                     println!("{}: one or zero arguments requested", LIST_CMD);
                     continue;
@@ -97,7 +90,7 @@ fn main() {
 
             CREATE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs.create_file(cmd[1].to_string(), false) {
+                    if let Err(e) = fs::create_file(cmd[1].to_string(), false) {
                         println!("{}", e);
                     }
                 } else {
@@ -109,7 +102,7 @@ fn main() {
                 if cmd.len() == 2 {
                     println!(
                         "{}",
-                        fs.get_content(&cmd[1].to_string())
+                        fs::get_content(&cmd[1].to_string())
                             .unwrap_or("".to_string())
                     );
                 } else {
@@ -134,7 +127,7 @@ fn main() {
 
                         curr_line.clear();
                     }
-                    if let Err(e) = fs.set_content(&cmd[1].to_string(), &mut content) {
+                    if let Err(e) = fs::set_content(&cmd[1].to_string(), &mut content) {
                         println!("{}", e);
                     }
                 } else {
@@ -144,7 +137,7 @@ fn main() {
 
             CREATE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    fs.create_file((&cmd[1]).to_string(), true);
+                    fs::create_file((&cmd[1]).to_string(), true);
                 } else {
                     println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
                 }
@@ -152,7 +145,7 @@ fn main() {
 
             REMOVE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs.remove_file((&cmd[1]).to_string(), false) {
+                    if let Err(e) = fs::remove_file((&cmd[1]).to_string(), false) {
                         println!("{}", e);
                     }
                 } else {
@@ -162,7 +155,7 @@ fn main() {
 
             REMOVE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs.remove_file((&cmd[1]).to_string(), true) {
+                    if let Err(e) = fs::remove_file((&cmd[1]).to_string(), true) {
                         println!("{}", e);
                     }
                 } else {
