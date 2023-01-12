@@ -1,4 +1,4 @@
-pub mod blkdev;
+mod blkdev;
 mod inode;
 
 extern crate alloc;
