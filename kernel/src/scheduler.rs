@@ -141,9 +141,8 @@ pub unsafe fn load_context(p: &Process) -> ! {
         in("r13")p.registers.r13,
         in("r14")p.registers.r14,
         in("r15")p.registers.r15,
+        options(noreturn)
     );
-
-    loop {} // The function will never run this line because of 'iretq'.
 }
 
 /// Create a page table for a process and copy the higher half of the kernel's page table to it
