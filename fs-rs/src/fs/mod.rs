@@ -713,14 +713,10 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
     } else {
         return Err(FsError::FileNotFound);
     }
-    if size > inode::MAX_FILE_SIZE {
-        return Err(FsError::MaximumSizeExceeded);
-    }
 
     last_ptr = resized.size() / BLOCK_SIZE;
     resized_last_ptr = size / BLOCK_SIZE;
     current = last_ptr;
-    resized.set_size(size)?;
     // If the file has been resized to a smaller size, deallocate the unused blocks.
     while current > resized_last_ptr {
         block = resized.get_ptr(current).unwrap();
@@ -731,6 +727,7 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
         }
         current -= 1;
     }
+    resized.set_size(size)?;
     write_inode(&resized);
 
     Ok(())
