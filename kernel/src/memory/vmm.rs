@@ -29,7 +29,7 @@ pub enum MapError {
 #[derive(Debug)]
 pub enum UnmapError {
     NullPageTable,
-    EntryAlreadyUnused,
+    EntryUnused,
 }
 
 impl fmt::Display for MapError {
@@ -54,7 +54,7 @@ impl fmt::Display for UnmapError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             UnmapError::NullPageTable => write!(f, "{}", MapError::NullPageTable),
-            UnmapError::EntryAlreadyUnused => write!(f, "the virtual address is already unused"),
+            UnmapError::EntryUnused => write!(f, "the virtual address is unused"),
         }
     }
 }
@@ -305,7 +305,7 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) -> Result<(), Un
     // SAFETY: `entry` is not null because the loop is guarenteed to be ran at least once.
     unsafe {
         if (*entry).is_unused() {
-            return Err(UnmapError::EntryAlreadyUnused);
+            return Err(UnmapError::EntryUnused);
         }
         (*entry).set_unused();
     };
