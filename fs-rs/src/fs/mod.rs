@@ -106,7 +106,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     }
 
     while next_delimiter != None {
-        let mut data: Vec<u8> = vec![0; inode.size];
+        let mut data: Vec<u8> = vec![0; inode.size()];
         unsafe { read(inode.id, data.as_mut_slice(), index) };
         let dir_content = unsafe {
             Box::from(slice::from_raw_parts(
@@ -150,15 +150,15 @@ fn get_inode_address(id: usize) -> usize {
 
 #[deprecated]
 fn read_file(inode: &Inode) -> Box<&[u8]> {
-    let last_pointer: usize = inode.size / BLOCK_SIZE;
+    let last_pointer: usize = inode.size() / BLOCK_SIZE;
     let mut pointer = 0;
     let mut to_read;
     let mut bytes_read = 0;
-    let mut buffer = Box::new(vec![0; inode.size]);
+    let mut buffer = Box::new(vec![0; inode.size()]);
 
-    while bytes_read != inode.size {
+    while bytes_read != inode.size() {
         to_read = if pointer == last_pointer {
-            inode.size % BLOCK_SIZE
+            inode.size() % BLOCK_SIZE
         } else {
             BLOCK_SIZE
         };
@@ -384,7 +384,7 @@ fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, Writ
         slice::from_raw_parts(file as *const _ as *const u8, core::mem::size_of_val(file))
     };
 
-    unsafe { write(folder.id, buffer, folder.size) }
+    unsafe { write(folder.id, buffer, folder.size()) }
 }
 
 /// function that removes a file from a folder
@@ -398,8 +398,8 @@ fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, Writ
 fn remove_file_from_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, WriteError> {
     let buffer: Vec<u8> = vec![0; core::mem::size_of_val(file)];
 
-    let res = unsafe { write(folder.id, buffer.as_slice(), folder.size - buffer.len()) };
-    set_len(folder.id, folder.size - buffer.len());
+    let res = unsafe { write(folder.id, buffer.as_slice(), folder.size() - buffer.len()) };
+    set_len(folder.id, folder.size() - buffer.len());
     res
 }
 
@@ -419,7 +419,7 @@ const fn calc_parts(device_size: usize) -> DiskParts {
 
     let mut remaining_space: usize = device_size - core::mem::size_of::<Header>();
     let mut amount_of_blocks: usize = remaining_space / BLOCK_SIZE;
-    let mut amount_of_inodes: usize = 0;
+    let amount_of_inodes: usize;
 
     parts.block_bit_map = core::mem::size_of::<Header>();
     parts.inode_bit_map = parts.block_bit_map;
@@ -607,7 +607,7 @@ pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str
     file_details.name = Box::leak(file_name.into_boxed_str());
     file_details.id = get_file_id(&path_str, None).unwrap();
     // the size of empty folder is 48
-    if directory == true && read_inode(file_details.id).unwrap().size > 48 {
+    if directory == true && read_inode(file_details.id).unwrap().size() > 48 {
         return Err("Error: folder is not empty");
     } else if directory == false && is_dir(file_details.id) == true {
         return Err("Error: rm is used for file, not for directories");
@@ -657,12 +657,12 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
     let mut bytes_read = 0;
     let mut remaining;
 
-    if offset >= inode.size {
+    if offset >= inode.size() {
         return Some(0);
     }
 
-    remaining = if buffer.len() > inode.size - offset {
-        inode.size - offset
+    remaining = if buffer.len() > inode.size() - offset {
+        inode.size() - offset
     } else {
         buffer.len()
     };
@@ -723,10 +723,10 @@ pub fn set_len(file: usize, size: usize) -> Result<(), SetLenError> {
         return Err(SetLenError::MaximumSizeExceeded);
     }
 
-    last_ptr = resized.size / BLOCK_SIZE;
+    last_ptr = resized.size() / BLOCK_SIZE;
     resized_last_ptr = size / BLOCK_SIZE;
     current = last_ptr;
-    resized.size = size;
+    resized.set_size(size)?;
     // If the file has been resized to a smaller size, deallocate the unused blocks.
     while current > resized_last_ptr {
         block = resized.get_ptr(current).unwrap();
@@ -768,7 +768,7 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, 
     } else {
         return Err(WriteError::FileNotFound);
     }
-    if offset + remaining > updated.size {
+    if offset + remaining > updated.size() {
         match set_len(file, offset + remaining) {
             // UNWRAP: We already checked if the file exists.
             Ok(_) => updated = read_inode(file).unwrap(),
@@ -817,7 +817,7 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, 
 /// the content if exists, None if not
 pub fn get_content(path_str: &String) -> Option<String> {
     let file: Inode = get_inode(path_str, None)?;
-    let mut content: Vec<u8> = vec![0; file.size];
+    let mut content: Vec<u8> = vec![0; file.size()];
     unsafe { read(file.id, content.as_mut_slice(), 0) };
 
     let content = String::from_utf8_lossy(&*content.as_slice()).to_string();
@@ -843,7 +843,7 @@ pub fn list_dir(path_str: &String) -> DirList {
         file_size: 0,
     };
     let dir = get_inode(path_str, None).unwrap();
-    let mut data: Vec<u8> = vec![0; dir.size];
+    let mut data: Vec<u8> = vec![0; dir.size()];
     unsafe { read(dir.id, data.as_mut_slice(), 0) };
     let dir_content = unsafe {
         Box::from(slice::from_raw_parts(
@@ -862,7 +862,7 @@ pub fn list_dir(path_str: &String) -> DirList {
                 &file as *const _ as *mut u8,
             )
         };
-        entry.file_size = file.size;
+        entry.file_size = file.size();
         entry.is_dir = file.directory;
         ans.push(entry.clone());
     }

@@ -9,7 +9,7 @@ pub const MAX_FILE_SIZE: usize = DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POI
 pub struct Inode {
     pub id: usize,
     pub directory: bool,
-    pub size: usize,
+    size: usize,
     pub addresses: [usize; DIRECT_POINTERS],
     pub indirect_pointer: usize,
 }
@@ -23,6 +23,24 @@ impl Inode {
             addresses: [0; DIRECT_POINTERS],
             indirect_pointer: 0,
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    /// Set the size of an inode to `value`.
+    /// 
+    /// # Returns
+    /// Returns a `MaximumSizeExceeded` error if the new size exceeds the maximum file size.
+    pub fn set_size(&mut self, value: usize) -> Result<(), super::SetLenError> {
+        if value > MAX_FILE_SIZE {
+            return Err(super::SetLenError::MaximumSizeExceeded)
+        }
+
+        self.size = value;
+
+        Ok(())
     }
 
     /// Returns the `index`th pointer of the inode or `Err` if the `index` exceeds the maximum
