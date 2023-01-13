@@ -26,6 +26,7 @@ pub extern "C" fn _start() -> ! {
         memory::reclaim_bootloader_memory();
         ALLOCATOR = Locked::<Allocator>::new(Allocator::new(HEAP_START, memory::PAGE_TABLE));
     }
+    println!("Hello world");
 
     hcf();
 }

@@ -5,7 +5,7 @@ use core::{
 
 use heap_block::HeapBlock;
 use x86_64::{
-    structures::paging::{PageSize, PageTableFlags, Size4KiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
 };
 
@@ -101,28 +101,56 @@ fn alloc_node(
 /// - `allocator` - The `Allocator` instance that is being used.
 /// - `block` - The block to deallocate.
 /// - `size` - the size to deallocate
-/// # Returns
-/// A pointer to the created `HeapBlock`, or [`None`] if the allocation failed.
 unsafe fn dealloc_node(allocator: &mut Allocator, block: *mut HeapBlock, size: usize) {
-    let mut curr_size = 0;
-    let mut block_addr = block.addr();
-    let last_addr = (allocator.heap_start + allocator.pages * Size4KiB::SIZE) as usize;
-
-    // run while the block's address if lower or equal to the last address of the heap
-    // or until it goes over the whole size
-    while curr_size <= size * (Size4KiB::SIZE as usize) && block_addr <= last_addr {
-        if unsafe { (*(block_addr as *mut HeapBlock)).free() } {
-            super::virtual_memory_manager::unmap_address(
-                allocator.page_table,
-                VirtAddr::new(block_addr as u64),
-            );
-
-            allocator.pages -= 1;
-        }
-
-        block_addr += Size4KiB::SIZE as usize;
-        curr_size += Size4KiB::SIZE as usize;
+    (*block).set_free(true);
+    if (*block).has_next() && (*(*block).next()).free() {
+        merge_blocks(block);
+        dealloc_node(allocator, block, size);
     }
+    if (*block).has_prev() && (*(*block).prev()).free() {
+        merge_blocks((*block).prev());
+        dealloc_node(allocator, (*block).prev(), size);
+    }
+
+    if is_there_a_block_with_more_size(block) {
+        crate::memory::page_allocator::free(
+            PhysFrame::from_start_address(
+                crate::memory::virtual_memory_manager::virtual_to_physical(
+                    allocator.page_table,
+                    VirtAddr::new(block.addr() as u64),
+                ),
+            )
+            .expect("Error: failed to get block PhysFrame when freeing"),
+        );
+
+        crate::memory::virtual_memory_manager::unmap_address(
+            allocator.page_table,
+            VirtAddr::new(block.addr() as u64),
+        );
+    }
+}
+
+/// function that checks if there is a block with more size than the current block
+///
+/// # Arguments
+/// - `block` - The block to check.
+///
+/// # Returns
+/// true if there is a block with more size than the current block, false otherwise
+unsafe fn is_there_a_block_with_more_size(block: *mut HeapBlock) -> bool {
+    if (*block).has_prev() && (*(*block).prev()).size() > (*block).size() {
+        return true;
+    } else if (*block).has_prev() && (*(*block).prev()).size() <= (*block).size() {
+        is_there_a_block_with_more_size((*block).prev());
+    }
+
+    if (*block).has_next() && (*(*block).next()).size() > (*block).size() {
+        return true;
+    } else if (*block).has_next() && (*(*block).next()).size() <= (*block).size() {
+        is_there_a_block_with_more_size((*block).next());
+    }
+
+    false
 }
 
 /// Returns a usable heap block for a specific allocation request
@@ -252,17 +280,12 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
         let mut allocator = self.lock();
         let block = (_ptr as usize) as *mut HeapBlock;
+        let adjustment = get_adjustment(block, _layout.align());
 
-        // layout adjustments for the deallocation
-        let size = _layout
-            .align_to(core::mem::align_of::<HeapBlock>())
-            .expect("adjusting alignment failed")
-            .pad_to_align()
-            .size()
-            .max(core::mem::size_of::<HeapBlock>());
+        let new_block = (block as usize - HEADER_SIZE - adjustment) as *mut HeapBlock;
 
         // use dealloc_node function
-        dealloc_node(&mut allocator, block, size);
+        dealloc_node(&mut allocator, new_block, (*block).size() as usize);
     }
 }
 
