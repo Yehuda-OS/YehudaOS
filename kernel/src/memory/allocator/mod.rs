@@ -282,10 +282,12 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         let block = (_ptr as usize) as *mut HeapBlock;
         let adjustment = get_adjustment(block, _layout.align());
 
-        let new_block = (block as usize - HEADER_SIZE - adjustment) as *mut HeapBlock;
-
         // use dealloc_node function
-        dealloc_node(&mut allocator, new_block, (*block).size() as usize);
+        dealloc_node(
+            &mut allocator,
+            (block as usize - HEADER_SIZE - adjustment) as *mut HeapBlock,
+            (*block).size() as usize,
+        );
     }
 }
 
