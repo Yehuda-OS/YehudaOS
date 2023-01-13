@@ -1,7 +1,6 @@
 #[macro_export]
 macro_rules! interrupt_handler {
     ($name:ident, $handler:ident) => {{
-        //#[naked]
         #[no_mangle]
         pub extern "C" fn $name() -> ! {
             unsafe {

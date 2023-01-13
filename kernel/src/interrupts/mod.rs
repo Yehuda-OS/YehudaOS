@@ -8,6 +8,7 @@ use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
 use x86_64::registers::segmentation::{Segment, CS};
 use x86_64::structures::gdt::SegmentSelector;
+use x86_64::structures::idt::PageFaultErrorCode;
 use x86_64::PrivilegeLevel;
 
 const DIV_0: u8 = 0;
@@ -168,7 +169,10 @@ extern "C" fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
     loop {}
 }
 
-extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+extern "C" fn page_fault_handler(
+    stack_frame: &ExceptionStackFrame,
+    error_code: PageFaultErrorCode,
+) -> ! {
     println!("============");
     println!("|Page Fault|");
     println!("============");
@@ -177,6 +181,7 @@ extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
         x86_64::registers::control::Cr2::read().as_u64()
     );
     println!("Stack Frame: {:#x?}", stack_frame);
+    println!("Error Code: {:#x?}", error_code);
 
     loop {}
 }
