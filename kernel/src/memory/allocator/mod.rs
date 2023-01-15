@@ -264,7 +264,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         let block = (_ptr as usize - HEADER_SIZE - adjustment) as *mut HeapBlock;
 
         // use dealloc_node function
-        dealloc_node(&mut allocator, block, (*block).size() as usize);
+        dealloc_node(&mut allocator, block);
     }
 }
 
