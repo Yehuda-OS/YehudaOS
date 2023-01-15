@@ -1,9 +1,14 @@
 #![no_std]
 #![no_main]
 #![feature(alloc_error_handler)]
+#![feature(strict_provenance)]
+#![feature(abi_x86_interrupt)]
+#![feature(const_mut_refs)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 
+mod interrupts;
 mod io;
 mod memory;
 
@@ -21,6 +26,7 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
+        interrupts::IDT.load();
     }
     println!("Hello world");
 
