@@ -112,45 +112,21 @@ unsafe fn dealloc_node(allocator: &mut Allocator, block: *mut HeapBlock, size: u
         dealloc_node(allocator, (*block).prev(), size);
     }
 
-    if is_there_a_block_with_more_size(block) {
-        crate::memory::page_allocator::free(
-            PhysFrame::from_start_address(
-                crate::memory::virtual_memory_manager::virtual_to_physical(
-                    allocator.page_table,
-                    VirtAddr::new(block.addr() as u64),
-                ),
-            )
-            .expect("Error: failed to get block PhysFrame when freeing"),
-        );
+    if !(*block).has_next() {
+        while (*block).size() > Size4KiB::SIZE {
+            crate::memory::page_allocator::free(
+                PhysFrame::from_start_address(
+                    crate::memory::virtual_memory_manager::virtual_to_physical(
+                        allocator.page_table,
+                        VirtAddr::new(block.addr() as u64),
+                    ),
+                )
+                .expect("Error: failed to get block physical address"),
+            );
 
-        crate::memory::virtual_memory_manager::unmap_address(
-            allocator.page_table,
-            VirtAddr::new(block.addr() as u64),
-        );
+            (*block).set_size((*block).size() - Size4KiB::SIZE);
+        }
     }
-}
-
-/// function that checks if there is a block with more size than the current block
-///
-/// # Arguments
-/// - `block` - The block to check.
-///
-/// # Returns
-/// true if there is a block with more size than the current block, false otherwise
-unsafe fn is_there_a_block_with_more_size(block: *mut HeapBlock) -> bool {
-    if (*block).has_prev() && (*(*block).prev()).size() > (*block).size() {
-        return true;
-    } else if (*block).has_prev() && (*(*block).prev()).size() <= (*block).size() {
-        is_there_a_block_with_more_size((*block).prev());
-    }
-
-    if (*block).has_next() && (*(*block).next()).size() > (*block).size() {
-        return true;
-    } else if (*block).has_next() && (*(*block).next()).size() <= (*block).size() {
-        is_there_a_block_with_more_size((*block).next());
-    }
-
-    false
 }
 
 /// Returns a usable heap block for a specific allocation request
@@ -279,15 +255,11 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
         let mut allocator = self.lock();
-        let block = (_ptr as usize) as *mut HeapBlock;
-        let adjustment = get_adjustment(block, _layout.align());
+        let adjustment = get_adjustment(_ptr as *mut HeapBlock, _layout.align());
+        let block = (_ptr as usize - HEADER_SIZE - adjustment) as *mut HeapBlock;
 
         // use dealloc_node function
-        dealloc_node(
-            &mut allocator,
-            (block as usize - HEADER_SIZE - adjustment) as *mut HeapBlock,
-            (*block).size() as usize,
-        );
+        dealloc_node(&mut allocator, block, (*block).size() as usize);
     }
 }
 
