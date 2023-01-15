@@ -116,14 +116,17 @@ unsafe fn dealloc_node(allocator: &mut Allocator, block: *mut HeapBlock, size: u
                 PhysFrame::from_start_address(
                     crate::memory::virtual_memory_manager::virtual_to_physical(
                         allocator.page_table,
-                        VirtAddr::new(block.addr() as u64),
+                        VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * allocator.pages),
                     ),
                 )
                 .expect("Error: failed to get block physical address"),
             );
 
             (*block).set_size((*block).size() - Size4KiB::SIZE);
+            allocator.pages -= 1;
         }
+
+        (*(*block).prev()).set_has_next(false);
 
         crate::memory::virtual_memory_manager::unmap_address(
             allocator.page_table,
