@@ -101,6 +101,10 @@ fn alloc_node(
 /// - `allocator` - The `Allocator` instance that is being used.
 /// - `block` - The block to deallocate.
 unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
+    if (*block).size() == 0 {
+        return;
+    }
+
     (*block).set_free(true);
     if (*block).has_next() && (*(*block).next()).free() {
         merge_blocks(block);
