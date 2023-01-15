@@ -105,11 +105,9 @@ unsafe fn dealloc_node(allocator: &mut Allocator, block: *mut HeapBlock, size: u
     (*block).set_free(true);
     if (*block).has_next() && (*(*block).next()).free() {
         merge_blocks(block);
-        dealloc_node(allocator, block, size);
     }
     if (*block).has_prev() && (*(*block).prev()).free() {
         merge_blocks((*block).prev());
-        dealloc_node(allocator, (*block).prev(), size);
     }
 
     if !(*block).has_next() {
