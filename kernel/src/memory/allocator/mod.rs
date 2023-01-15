@@ -101,10 +101,6 @@ fn alloc_node(
 /// - `allocator` - The `Allocator` instance that is being used.
 /// - `block` - The block to deallocate.
 unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
-    if (*block).size() == 0 {
-        return;
-    }
-
     (*block).set_free(true);
     if (*block).has_next() && (*(*block).next()).free() {
         merge_blocks(block);
@@ -129,8 +125,10 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
             (*block).set_size((*block).size() - Size4KiB::SIZE);
             allocator.pages -= 1;
         }
-        (*(*block).prev()).set_has_next(false);
 
+        if (*block).size() == 0 {
+            (*(*block).prev()).set_has_next(false);
+        }
         crate::memory::virtual_memory_manager::unmap_address(
             allocator.page_table,
             VirtAddr::new(block.addr() as u64),
