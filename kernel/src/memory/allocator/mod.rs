@@ -124,14 +124,14 @@ unsafe fn dealloc_node(allocator: &mut Allocator, block: *mut HeapBlock, size: u
 
             (*block).set_size((*block).size() - Size4KiB::SIZE);
             allocator.pages -= 1;
+
+            (*(*block).prev()).set_has_next(false);
+
+            crate::memory::virtual_memory_manager::unmap_address(
+                allocator.page_table,
+                VirtAddr::new(block.addr() as u64),
+            );
         }
-
-        (*(*block).prev()).set_has_next(false);
-
-        crate::memory::virtual_memory_manager::unmap_address(
-            allocator.page_table,
-            VirtAddr::new(block.addr() as u64),
-        );
     }
 }
 
