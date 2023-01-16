@@ -1,14 +1,21 @@
 #![no_std]
 #![no_main]
 #![feature(alloc_error_handler)]
+#![feature(strict_provenance)]
+#![feature(abi_x86_interrupt)]
+#![feature(const_mut_refs)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 
 mod gdt;
+mod interrupts;
 mod io;
 mod memory;
 mod scheduler;
 mod terminal;
+
+use crate::memory::allocator::{Allocator, Locked, ALLOCATOR, HEAP_START};
 
 /// Kernel Entry Point
 ///
