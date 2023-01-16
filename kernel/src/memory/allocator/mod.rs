@@ -249,6 +249,10 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
         if let Some(mut block) = find_usable_block(&mut allocator, size, align) {
             block = resize_block(block, size, align);
             adjustment = get_adjustment(block, align);
+            // Zero out all the unused bytes.
+            for i in (block as u64 + HEADER_SIZE)..(block as u64 + HEADER_SIZE + adjustment) {
+                *(i as *mut u8) = 0;
+            }
 
             (block as u64 + HEADER_SIZE + adjustment) as *mut u8
         } else {
