@@ -158,12 +158,16 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
         while (*block).size() > Size4KiB::SIZE {
             crate::memory::page_allocator::free(
                 PhysFrame::from_start_address(
-                    crate::memory::virtual_memory_manager::virtual_to_physical(
+                    crate::memory::vmm::virtual_to_physical(
                         allocator.page_table,
                         VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * allocator.pages),
-                    ),
+                    )
+                    // UNWRAP: If the page table is null any allocation would fail and
+                    // the entry is used because we keep track of what we mapped.
+                    .unwrap(),
                 )
-                .expect("Error: failed to get block physical address"),
+                // UNWRAP: The address is aligned because `heap_start` is aligned.
+                .unwrap(),
             );
 
             (*block).set_size((*block).size() - Size4KiB::SIZE);
@@ -174,10 +178,7 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
             (*(*block).prev()).set_has_next(false);
             (*(*block).prev()).set_size((*(*block).prev()).size() + HEADER_SIZE as u64);
         }
-        crate::memory::virtual_memory_manager::unmap_address(
-            allocator.page_table,
-            VirtAddr::new(block.addr() as u64),
-        );
+        crate::memory::vmm::unmap_address(allocator.page_table, VirtAddr::new(block.addr() as u64));
     }
 }
 
@@ -307,8 +308,8 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
         let mut allocator = self.lock();
-        let adjustment = get_adjustment(_ptr as *mut HeapBlock, _layout.align());
-        let block = (_ptr as usize - HEADER_SIZE - adjustment) as *mut HeapBlock;
+        let adjustment = get_adjustment(_ptr as *mut HeapBlock, _layout.align() as u64);
+        let block = (_ptr as u64 - HEADER_SIZE - adjustment) as *mut HeapBlock;
 
         // use dealloc_node function
         dealloc_node(&mut allocator, block);
