@@ -128,6 +128,7 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
 
         if (*block).size() == 0 {
             (*(*block).prev()).set_has_next(false);
+            (*(*block).prev()).set_size((*(*block).prev()).size() + HEADER_SIZE as u64);
         }
         crate::memory::virtual_memory_manager::unmap_address(
             allocator.page_table,
