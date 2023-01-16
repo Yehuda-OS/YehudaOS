@@ -178,7 +178,10 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
             (*(*block).prev()).set_has_next(false);
             (*(*block).prev()).set_size((*(*block).prev()).size() + HEADER_SIZE as u64);
         }
-        crate::memory::vmm::unmap_address(allocator.page_table, VirtAddr::new(block.addr() as u64));
+        crate::memory::vmm::unmap_address(allocator.page_table, VirtAddr::new(block as u64))
+            // UNWRAP: If the page table is null any allocation would fail and
+            // the entry is used because we keep track of what we mapped.
+            .unwrap();
     }
 }
 
