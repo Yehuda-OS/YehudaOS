@@ -12,6 +12,8 @@ mod interrupts;
 mod io;
 mod memory;
 
+use crate::memory::allocator::{Allocator, Locked, ALLOCATOR, HEAP_START};
+
 /// Kernel Entry Point
 ///
 /// `_start` is defined in the linker script as the entry point for the ELF file.
@@ -26,7 +28,7 @@ pub extern "C" fn _start() -> ! {
         memory::create_hhdm(memory::PAGE_TABLE);
         memory::load_tables_to_cr3(memory::PAGE_TABLE);
         memory::reclaim_bootloader_memory();
-        interrupts::IDT.load();
+        ALLOCATOR = Locked::<Allocator>::new(Allocator::new(HEAP_START, memory::PAGE_TABLE));
     }
     println!("Hello world");
 

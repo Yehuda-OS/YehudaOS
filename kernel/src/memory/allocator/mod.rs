@@ -5,9 +5,11 @@ use core::{
 
 use heap_block::HeapBlock;
 use x86_64::{
-    structures::paging::{PageSize, PageTableFlags, Size4KiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
 };
+
+use crate::println;
 
 mod heap_block;
 
@@ -92,6 +94,47 @@ fn alloc_node(
     };
 
     Some(allocated)
+}
+
+/// function that deallocate a node
+/// # Arguments
+/// - `allocator` - The `Allocator` instance that is being used.
+/// - `block` - The block to deallocate.
+unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
+    (*block).set_free(true);
+    if (*block).has_next() && (*(*block).next()).free() {
+        merge_blocks(block);
+    }
+    if (*block).has_prev() && (*(*block).prev()).free() {
+        merge_blocks((*block).prev());
+        block = (*block).prev();
+    }
+
+    if !(*block).has_next() {
+        while (*block).size() > Size4KiB::SIZE {
+            crate::memory::page_allocator::free(
+                PhysFrame::from_start_address(
+                    crate::memory::virtual_memory_manager::virtual_to_physical(
+                        allocator.page_table,
+                        VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * allocator.pages),
+                    ),
+                )
+                .expect("Error: failed to get block physical address"),
+            );
+
+            (*block).set_size((*block).size() - Size4KiB::SIZE);
+            allocator.pages -= 1;
+        }
+
+        if (*block).size() == 0 {
+            (*(*block).prev()).set_has_next(false);
+            (*(*block).prev()).set_size((*(*block).prev()).size() + HEADER_SIZE as u64);
+        }
+        crate::memory::virtual_memory_manager::unmap_address(
+            allocator.page_table,
+            VirtAddr::new(block.addr() as u64),
+        );
+    }
 }
 
 /// Returns a usable heap block for a specific allocation request
@@ -210,6 +253,8 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
             block = resize_block(block, size, align);
             adjustment = get_adjustment(block, align);
 
+            (*block).set_free(false);
+
             (block as usize + HEADER_SIZE + adjustment) as *mut u8
         } else {
             null_mut()
@@ -217,7 +262,12 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        panic!("dealloc should be never called")
+        let mut allocator = self.lock();
+        let adjustment = get_adjustment(_ptr as *mut HeapBlock, _layout.align());
+        let block = (_ptr as usize - HEADER_SIZE - adjustment) as *mut HeapBlock;
+
+        // use dealloc_node function
+        dealloc_node(&mut allocator, block);
     }
 }
 
