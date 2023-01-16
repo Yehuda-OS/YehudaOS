@@ -7,7 +7,8 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use super::{PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS};
+const PAGE_TABLE_ENTRIES: isize = 512;
+const PAGE_TABLE_LEVELS: u8 = 4;
 
 /// Get an entry in a page table.
 ///
@@ -35,7 +36,7 @@ pub fn create_page_table() -> PhysAddr {
         .expect("No free memory for a page table")
         .start_address();
 
-    for i in 0..super::PAGE_TABLE_ENTRIES {
+    for i in 0..PAGE_TABLE_ENTRIES {
         // SAFETY: the page table was allocated and the offset is in the page table range.
         unsafe {
             (*get_page_table_entry(page_table, i)).set_unused();

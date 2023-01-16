@@ -2,7 +2,7 @@ use core::fmt;
 use limine::LimineTerminalRequest;
 use spin::Mutex;
 
-static TERMINAL_REQUEST: LimineTerminalRequest = LimineTerminalRequest::new(0);
+pub static TERMINAL_REQUEST: LimineTerminalRequest = LimineTerminalRequest::new(0);
 
 struct Writer {
     terminals: Option<&'static limine::LimineTerminalResponse>,
@@ -51,5 +51,5 @@ macro_rules! print {
 macro_rules! println {
     ()          => { $crate::print!("\n"); };
     // On nightly, `format_args_nl!` could also be used.
-    ($($t:tt)*) => { $crate::print!("{}\n", format_args!($($t)*)); };
+    ($($t:tt)*) => { $crate::print!("{}\n", format_args!($($t)*)) };
 }
