@@ -713,11 +713,7 @@ impl Fs {
     /// # Returns
     /// `Ok(())` if the file was removed successfully and `Err` if not
     pub fn remove_file(&mut self, path_str: String, directory: bool) -> Result<(), &'static str> {
-        let last_delimeter = if path_str.rfind('/').is_some() {
-            path_str.rfind('/').unwrap()
-        } else {
-            0
-        };
+        let last_delimeter = path_str.rfind('/').unwrap_or(0);
         let file_name = path_str[last_delimeter + 1..].to_string();
         let mut dir;
         if let Some(inode) = self.get_inode(&path_str[0..(last_delimeter + 1)], None) {
