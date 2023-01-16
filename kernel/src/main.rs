@@ -20,7 +20,8 @@ pub extern "C" fn _start() -> ! {
     memory::page_allocator::initialize();
     unsafe {
         // UNWRAP: There's no point in continuing without a valid page table.
-        memory::PAGE_TABLE = memory::vmm::create_page_table().unwrap();
+        memory::PAGE_TABLE = memory::vmm::create_page_table()
+            .expect("Not enough free memory for a kernel's page table");
         memory::map_kernel_address().unwrap();
         memory::create_hhdm(memory::PAGE_TABLE).unwrap();
         memory::map_bootloader_memory().unwrap();
