@@ -441,9 +441,24 @@ impl Fs {
         file: &DirEntry,
         folder: &mut Inode,
     ) -> Result<Inode, WriteError> {
-        let buffer: Vec<u8> = vec![0; core::mem::size_of_val(file)];
+        let file_size = core::mem::size_of::<DirEntry>();
+        let mut buffer: Vec<u8> = vec![0; file_size];
+        let mut offset = 0;
 
-        let res = unsafe { self.write(folder.id, buffer.as_slice(), folder.size - buffer.len()) };
+        while offset < folder.size {
+            unsafe { self.read(folder.id, buffer.as_mut_slice(), offset) };
+            if unsafe {
+                buffer.as_slice()
+                    == slice::from_raw_parts(file as *const _ as *mut u8, buffer.len())
+            } {
+                break;
+            }
+            offset += file_size;
+        }
+
+        unsafe { self.read(folder.id, buffer.as_mut_slice(), folder.size - file_size) };
+
+        let res = unsafe { self.write(folder.id, buffer.as_slice(), offset) };
         self.set_len(folder.id, folder.size - buffer.len());
         res
     }
