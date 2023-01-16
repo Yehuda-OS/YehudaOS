@@ -102,8 +102,7 @@ fn main() {
                 if cmd.len() == 2 {
                     println!(
                         "{}",
-                        fs::get_content(&cmd[1].to_string())
-                            .unwrap_or("".to_string())
+                        fs::get_content(&cmd[1].to_string()).unwrap_or("".to_string())
                     );
                 } else {
                     println!("{}{}", CONTENT_CMD, ": file path requested")

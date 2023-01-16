@@ -73,503 +73,493 @@ fn get_root_dir() -> Inode {
         )
     };
 
-<<<<<<< HEAD
-        ans
+    ans
+}
+
+/// Returns the `Inode` of a file, or `None` if no file was found.
+///
+/// # Arguments
+/// - `path` - The path to the file.
+/// - `cwd` - The current working directory, used for relative paths.
+fn get_inode(&self, mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
+    let mut next_delimiter = path.find('/');
+    let mut next_folder;
+    let mut inode = self.get_root_dir();
+    let mut index: usize = 0;
+
+    if path == "/" {
+        return Some(inode);
+    }
+    // Check if the path is relative
+    if path.chars().nth(0).unwrap_or(' ') != '/' {
+        if let Some(cwd) = cwd {
+            inode = cwd;
+        } else {
+            return None;
+        }
     }
 
-    /// Returns the `Inode` of a file, or `None` if no file was found.
-    ///
-    /// # Arguments
-    /// - `path` - The path to the file.
-    /// - `cwd` - The current working directory, used for relative paths.
-    fn get_inode(&self, mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
-        let mut next_delimiter = path.find('/');
-        let mut next_folder;
-        let mut inode = self.get_root_dir();
-        let mut index: usize = 0;
-
-        if path == "/" {
-            return Some(inode);
-        }
-        // Check if the path is relative
-        if path.chars().nth(0).unwrap_or(' ') != '/' {
-            if let Some(cwd) = cwd {
-                inode = cwd;
-            } else {
-                return None;
-            }
-        }
-
-        while next_delimiter != None {
-            let mut data: Vec<u8> = vec![0; inode.size];
-            unsafe { self.read(inode.id, data.as_mut_slice(), index) };
-            let dir_content = unsafe {
-                Box::from(slice::from_raw_parts(
-                    data.as_ptr() as *const DirEntry,
-                    data.len() / core::mem::size_of::<DirEntry>(),
-                ))
-            };
-            path = &path[(next_delimiter.unwrap() + 1)..];
-            next_delimiter = path.find('/');
-            next_folder = match next_delimiter {
-                Some(delimeter) => &path[0..delimeter],
-                None => &path[0..],
-            };
-            while index != dir_content.len() && dir_content[index].name != next_folder {
-                index += 1;
-            }
-            if index >= dir_content.len() {
-                return None;
-            }
-            match self.read_inode(dir_content[index].id) {
-                Some(file) => inode = file,
-                None => return None,
-            }
-
-            index = 0;
-        }
-
-        Some(inode)
-    }
-
-    /// find the Inode address by id
-    ///
-    /// # Arguments
-    /// - `id` - the Inode's id
-    ///
-    /// # Returns
-    /// the address if the Inode
-    fn get_inode_address(&self, id: usize) -> usize {
-        self.disk_parts.root + id * core::mem::size_of::<Inode>()
-    }
-
-    #[deprecated]
-    fn read_file(&self, inode: &Inode) -> Box<&[u8]> {
-        let last_pointer: usize = inode.size / BLOCK_SIZE;
-        let mut pointer = 0;
-        let mut to_read;
-        let mut bytes_read = 0;
-        let mut buffer = Box::new(vec![0; inode.size]);
-
-        while bytes_read != inode.size {
-            to_read = if pointer == last_pointer {
-                inode.size % BLOCK_SIZE
-            } else {
-                BLOCK_SIZE
-            };
-            unsafe {
-                self.blkdev.read(
-                    inode.addresses[pointer],
-                    to_read,
-                    (*buffer).as_mut_ptr().add(bytes_read),
-                );
-            };
-            bytes_read += to_read;
-            pointer += 1;
-        }
-
-        unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
-    }
-
-    #[deprecated]
-    fn read_dir(&self, inode: &Inode) -> Box<&[DirEntry]> {
-        let data = self.read_file(inode);
-
-        unsafe {
+    while next_delimiter != None {
+        let mut data: Vec<u8> = vec![0; inode.size];
+        unsafe { self.read(inode.id, data.as_mut_slice(), index) };
+        let dir_content = unsafe {
             Box::from(slice::from_raw_parts(
                 data.as_ptr() as *const DirEntry,
                 data.len() / core::mem::size_of::<DirEntry>(),
             ))
+        };
+        path = &path[(next_delimiter.unwrap() + 1)..];
+        next_delimiter = path.find('/');
+        next_folder = match next_delimiter {
+            Some(delimeter) => &path[0..delimeter],
+            None => &path[0..],
+        };
+        while index != dir_content.len() && dir_content[index].name != next_folder {
+            index += 1;
         }
+        if index >= dir_content.len() {
+            return None;
+        }
+        match self.read_inode(dir_content[index].id) {
+            Some(file) => inode = file,
+            None => return None,
+        }
+
+        index = 0;
     }
 
-    /// Returns `true` if a bit in a bitmap is set to 1.
-    ///
-    /// # Arguments
-    /// - `bitmap_start` - The start of the bitmap.
-    /// - `i` - The index in the bitmap.
-    fn is_allocated(&self, bitmap_start: usize, i: usize) -> bool {
-        let byte_address = bitmap_start + i / BITS_IN_BYTE;
-        let offset = i % BITS_IN_BYTE;
-        let mut byte: u8 = 0;
+    Some(inode)
+}
 
-        unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) }
+/// find the Inode address by id
+///
+/// # Arguments
+/// - `id` - the Inode's id
+///
+/// # Returns
+/// the address if the Inode
+fn get_inode_address(&self, id: usize) -> usize {
+    self.disk_parts.root + id * core::mem::size_of::<Inode>()
+}
 
-        byte & (1 << offset) != 0
-    }
+#[deprecated]
+fn read_file(&self, inode: &Inode) -> Box<&[u8]> {
+    let last_pointer: usize = inode.size / BLOCK_SIZE;
+    let mut pointer = 0;
+    let mut to_read;
+    let mut bytes_read = 0;
+    let mut buffer = Box::new(vec![0; inode.size]);
 
-    /// Returns the `Inode` object with a specific ID, or None if the inode is not
-    /// associated with any file.
-    ///
-    /// # Arguments
-    /// - `id` - The inode's ID.
-    fn read_inode(&self, id: usize) -> Option<Inode> {
-        let mut inode = Inode::new();
-
-        if self.is_allocated(self.disk_parts.inode_bit_map, id) {
-            unsafe {
-                self.blkdev.read(
-                    self.get_inode_address(id),
-                    core::mem::size_of::<Inode>(),
-                    &mut inode as *mut _ as *mut u8,
-                )
-            }
-
-            Some(inode)
+    while bytes_read != inode.size {
+        to_read = if pointer == last_pointer {
+            inode.size % BLOCK_SIZE
         } else {
-            None
-        }
-    }
-
-    /// a function that writes Inode to the memory
-    ///
-    /// # Arguments
-    /// - `inode` - the Inode that has to be written to the memory
-    fn write_inode(&mut self, inode: &Inode) {
-        unsafe {
-            self.blkdev.write(
-                self.get_inode_address(inode.id),
-                core::mem::size_of::<Inode>(),
-                inode as *const _ as *mut u8,
-            )
+            BLOCK_SIZE
         };
-    }
-
-    /// allocate Inode
-    ///
-    /// # Returns
-    /// the address of the inode if it was allocated or None if no free space was found
-    fn allocate_inode(&mut self) -> Option<usize> {
-        Some(self.allocate(self.disk_parts.inode_bit_map)?)
-    }
-
-    /// allocate a block or Inode
-    ///
-    /// # Arguments
-    /// - `bitmap_start` - the start of the bitmap
-    ///
-    /// # Returns
-    /// the address of the allocated block or Inode
-    fn allocate(&mut self, bitmap_start: usize) -> Option<usize> {
-        const BITS_IN_BUFFER: usize = 64;
-        const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
-        const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
-        let mut buffer: usize = 0;
-        let mut address: usize = bitmap_start;
-        // read the bitmap until an unoccupied memory is found
-        loop {
-            unsafe {
-                self.blkdev
-                    .read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8)
-            };
-            address += BYTES_IN_BUFFER;
-            if buffer != ALL_OCCUPIED {
-                break;
-            }
-
-            if address >= self.disk_parts.data {
-                return None;
-            }
-        }
-        address -= BYTES_IN_BUFFER;
-
-        // read the buffer until an unoccupied memory is found
-        for i in 0..BITS_IN_BUFFER {
-            if buffer & (1 << i) == 0 {
-                // if the (i)'s bit is 0
-                buffer ^= 1 << i; // flip the bit to mark as occupied
-                unsafe {
-                    self.blkdev.write(
-                        address,
-                        BYTES_IN_BUFFER,
-                        core::mem::transmute(&buffer as *const usize as *mut u8),
-                    );
-                }
-                // get the index in the bitmap
-                address -= bitmap_start;
-                address += i;
-
-                // once we found unoccupied space, we finished our task
-                break;
-            }
-        }
-
-        Some(address)
-    }
-
-    /// deallocate a block or inode by his index in the bitmap
-    ///
-    /// # Arguments
-    /// - `bitmap_start` - the start og the bitmap
-    /// - `n` - the index of the block
-    fn deallocate(&mut self, bitmap_start: usize, n: usize) {
-        let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;
-        let mut byte: u8 = 0;
-        let offset = n % BITS_IN_BYTE;
-
-        unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) };
-        byte ^= 1 << offset; // flip the bit to mark as unoccupied
-        unsafe { self.blkdev.write(byte_address, 1, &mut byte as *mut u8) };
-    }
-
-    #[deprecated]
-    fn reallocate_blocks(&mut self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
-        let required_blocks = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
-        let blocks_to_allocate;
-        let mut used_blocks = 0;
-        let mut new_addresses = *inode;
-
-        if required_blocks > DIRECT_POINTERS {
-            return Err("too many blocks are required");
-        }
-
-        while new_addresses.addresses[used_blocks as usize] != 0 {
-            used_blocks += 1;
-        }
-
-        blocks_to_allocate = (required_blocks as isize - used_blocks) as isize;
-
-        if blocks_to_allocate > 0 {
-            for _ in 0..blocks_to_allocate {
-                new_addresses.addresses[used_blocks as usize] = self.allocate_block().unwrap();
-                used_blocks += 1;
-            }
-        } else if blocks_to_allocate < 0 {
-            for _ in 0..(-blocks_to_allocate) {
-                used_blocks -= 1;
-                self.deallocate_block(new_addresses.addresses[used_blocks as usize]);
-                new_addresses.addresses[used_blocks as usize] = 0;
-            }
-        }
-
-        Ok(new_addresses)
-    }
-
-    /// allocate a block
-    ///
-    /// # Returns
-    /// the block's address
-    fn allocate_block(&mut self) -> Option<usize> {
-        let mut address = self.allocate(self.disk_parts.block_bit_map)?;
-
-        // get physical address of the occupied block
-        address *= BLOCK_SIZE;
-        address += self.disk_parts.data;
-
-        Some(address)
-    }
-
-    /// deallocate a block
-    ///
-    /// # Arguments
-    /// - `address` - the block's address
-    fn deallocate_block(&mut self, address: usize) {
-        let block_number: usize =
-            ((address - self.disk_parts.data / BLOCK_SIZE) as isize).abs() as usize;
-
-        self.deallocate(self.disk_parts.block_bit_map, block_number);
-    }
-
-    /// function that adds a file to a folder
-    ///
-    /// # Arguments
-    /// - `file` - the file that has to be added to the folder
-    /// - `folder` - the folder that `file` is going to be added to
-    ///
-    /// # Returns
-    /// Inode of the folder after the file was added or WriteError otherwise
-    fn add_file_to_folder(
-        &mut self,
-        file: &DirEntry,
-        folder: &mut Inode,
-    ) -> Result<Inode, WriteError> {
-        let buffer: &[u8] = unsafe {
-            slice::from_raw_parts(file as *const _ as *const u8, core::mem::size_of_val(file))
-        };
-
-        unsafe { self.write(folder.id, buffer, folder.size) }
-    }
-
-    /// function that removes a file from a folder
-    ///
-    /// # Arguments
-    /// - `file` - the file that has to be removed from the folder
-    /// - `folder` - the folder that `file` is going to be removed from
-    ///
-    /// # Returns
-    /// Inode of the folder after the file was removed or WriteError otherwise
-    fn remove_file_from_folder(
-        &mut self,
-        file: &DirEntry,
-        folder: &mut Inode,
-    ) -> Result<Inode, WriteError> {
-        let file_size = core::mem::size_of::<DirEntry>();
-        let mut buffer: Vec<u8> = vec![0; file_size];
-        let mut offset = 0;
-
-        while offset < folder.size {
-            unsafe { self.read(folder.id, buffer.as_mut_slice(), offset) };
-            if unsafe {
-                buffer.as_slice()
-                    == slice::from_raw_parts(file as *const _ as *mut u8, buffer.len())
-            } {
-                break;
-            }
-            offset += file_size;
-        }
-
-        unsafe { self.read(folder.id, buffer.as_mut_slice(), folder.size - file_size) };
-
-        let res = unsafe { self.write(folder.id, buffer.as_slice(), offset) };
-        self.set_len(folder.id, folder.size - buffer.len());
-        res
-    }
-
-    /// Calculate the disk parts for the file system.
-    /// # Arguments
-    /// - `device_size` - the disk device size.
-    /// # Returns
-    ///  a struct with pointers to every segment.
-    fn calc_parts(device_size: usize) -> DiskParts {
-        let mut parts: DiskParts = DiskParts {
-            block_bit_map: 0,
-            inode_bit_map: 0,
-            root: 0,
-            unused: 0,
-            data: 0,
-        };
-
-        let mut remaining_space: usize = device_size - core::mem::size_of::<Header>();
-        let mut amount_of_blocks: usize = remaining_space / BLOCK_SIZE;
-        let mut amount_of_inodes: usize = 0;
-
-        parts.block_bit_map = core::mem::size_of::<Header>();
-        parts.inode_bit_map = parts.block_bit_map;
-
-        while (parts.inode_bit_map - parts.block_bit_map) * BITS_IN_BYTE < amount_of_blocks {
-            if (parts.inode_bit_map - parts.block_bit_map) % BLOCK_SIZE == 0 {
-                amount_of_blocks -= 1;
-            }
-            parts.inode_bit_map += 1;
-        }
-
-        remaining_space = device_size - parts.inode_bit_map;
-        amount_of_inodes = remaining_space / BYTES_PER_INODE;
-        parts.root =
-            parts.inode_bit_map + ((amount_of_inodes as f64 / BITS_IN_BYTE as f64) as usize + 1);
-        parts.unused = parts.root + amount_of_inodes * core::mem::size_of::<Inode>();
-
-        parts.data = parts.unused + (device_size - parts.unused) % BLOCK_SIZE;
-
-        parts
-    }
-
-    /// Returns the `index`th pointer of the inode or `Err` if the `index` exceeds the maximum
-    /// file size divided by the block size.
-    ///
-    /// # Arguments
-    /// - `file` - The inode to get the pointer from.
-    /// - `index` - The index of the pointer.
-    fn get_ptr(&self, file: &Inode, index: usize) -> Result<usize, ()> {
-        let offset;
-        let mut ptr: usize = 0;
-
-        if index < DIRECT_POINTERS {
-            return Ok(file.addresses[index]);
-        }
-
-        offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
-        if offset > BLOCK_SIZE {
-            return Err(());
-        }
         unsafe {
             self.blkdev.read(
-                file.indirect_pointer + offset,
-                POINTER_SIZE,
-                &mut ptr as *mut _ as *mut u8,
+                inode.addresses[pointer],
+                to_read,
+                (*buffer).as_mut_ptr().add(bytes_read),
             );
-        }
-
-        Ok(ptr)
+        };
+        bytes_read += to_read;
+        pointer += 1;
     }
 
-    /// Set the value of the `index`th pointer.
-    ///
-    /// # Arguments
-    /// - `file` - The file to change.
-    /// - `index` - The index of the pointer.
-    /// - `value` - The value to change to.
-    ///
-    /// # Returns
-    /// `Err` if the pointer exceeds the maximum file size
-    /// divided by the block size and `Ok` otherwise.
-    fn set_ptr(&mut self, file: &mut Inode, index: usize, value: usize) -> Result<(), ()> {
-        let offset;
+    unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
+}
 
-        if index < DIRECT_POINTERS {
-            file.addresses[index] = value;
+#[deprecated]
+fn read_dir(&self, inode: &Inode) -> Box<&[DirEntry]> {
+    let data = self.read_file(inode);
 
-            return Ok(());
+    unsafe {
+        Box::from(slice::from_raw_parts(
+            data.as_ptr() as *const DirEntry,
+            data.len() / core::mem::size_of::<DirEntry>(),
+        ))
+    }
+}
+
+/// Returns `true` if a bit in a bitmap is set to 1.
+///
+/// # Arguments
+/// - `bitmap_start` - The start of the bitmap.
+/// - `i` - The index in the bitmap.
+fn is_allocated(&self, bitmap_start: usize, i: usize) -> bool {
+    let byte_address = bitmap_start + i / BITS_IN_BYTE;
+    let offset = i % BITS_IN_BYTE;
+    let mut byte: u8 = 0;
+
+    unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) }
+
+    byte & (1 << offset) != 0
+}
+
+/// Returns the `Inode` object with a specific ID, or None if the inode is not
+/// associated with any file.
+///
+/// # Arguments
+/// - `id` - The inode's ID.
+fn read_inode(&self, id: usize) -> Option<Inode> {
+    let mut inode = Inode::new();
+
+    if self.is_allocated(self.disk_parts.inode_bit_map, id) {
+        unsafe {
+            self.blkdev.read(
+                self.get_inode_address(id),
+                core::mem::size_of::<Inode>(),
+                &mut inode as *mut _ as *mut u8,
+            )
         }
 
-        offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
-        if offset > BLOCK_SIZE {
+        Some(inode)
+    } else {
+        None
+    }
+}
+
+/// a function that writes Inode to the memory
+///
+/// # Arguments
+/// - `inode` - the Inode that has to be written to the memory
+fn write_inode(&mut self, inode: &Inode) {
+    unsafe {
+        self.blkdev.write(
+            self.get_inode_address(inode.id),
+            core::mem::size_of::<Inode>(),
+            inode as *const _ as *mut u8,
+        )
+    };
+}
+
+/// allocate Inode
+///
+/// # Returns
+/// the address of the inode if it was allocated or None if no free space was found
+fn allocate_inode(&mut self) -> Option<usize> {
+    Some(self.allocate(self.disk_parts.inode_bit_map)?)
+}
+
+/// allocate a block or Inode
+///
+/// # Arguments
+/// - `bitmap_start` - the start of the bitmap
+///
+/// # Returns
+/// the address of the allocated block or Inode
+fn allocate(&mut self, bitmap_start: usize) -> Option<usize> {
+    const BITS_IN_BUFFER: usize = 64;
+    const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
+    const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
+    let mut buffer: usize = 0;
+    let mut address: usize = bitmap_start;
+    // read the bitmap until an unoccupied memory is found
+    loop {
+        unsafe {
+            self.blkdev
+                .read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8)
+        };
+        address += BYTES_IN_BUFFER;
+        if buffer != ALL_OCCUPIED {
+            break;
+        }
+
+        if address >= self.disk_parts.data {
+            return None;
+        }
+    }
+    address -= BYTES_IN_BUFFER;
+
+    // read the buffer until an unoccupied memory is found
+    for i in 0..BITS_IN_BUFFER {
+        if buffer & (1 << i) == 0 {
+            // if the (i)'s bit is 0
+            buffer ^= 1 << i; // flip the bit to mark as occupied
+            unsafe {
+                self.blkdev.write(
+                    address,
+                    BYTES_IN_BUFFER,
+                    core::mem::transmute(&buffer as *const usize as *mut u8),
+                );
+            }
+            // get the index in the bitmap
+            address -= bitmap_start;
+            address += i;
+
+            // once we found unoccupied space, we finished our task
+            break;
+        }
+    }
+
+    Some(address)
+}
+
+/// deallocate a block or inode by his index in the bitmap
+///
+/// # Arguments
+/// - `bitmap_start` - the start og the bitmap
+/// - `n` - the index of the block
+fn deallocate(&mut self, bitmap_start: usize, n: usize) {
+    let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;
+    let mut byte: u8 = 0;
+    let offset = n % BITS_IN_BYTE;
+
+    unsafe { self.blkdev.read(byte_address, 1, &mut byte as *mut u8) };
+    byte ^= 1 << offset; // flip the bit to mark as unoccupied
+    unsafe { self.blkdev.write(byte_address, 1, &mut byte as *mut u8) };
+}
+
+#[deprecated]
+fn reallocate_blocks(&mut self, inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
+    let required_blocks = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
+    let blocks_to_allocate;
+    let mut used_blocks = 0;
+    let mut new_addresses = *inode;
+
+    if required_blocks > DIRECT_POINTERS {
+        return Err("too many blocks are required");
+    }
+
+    while new_addresses.addresses[used_blocks as usize] != 0 {
+        used_blocks += 1;
+    }
+
+    blocks_to_allocate = (required_blocks as isize - used_blocks) as isize;
+
+    if blocks_to_allocate > 0 {
+        for _ in 0..blocks_to_allocate {
+            new_addresses.addresses[used_blocks as usize] = self.allocate_block().unwrap();
+            used_blocks += 1;
+        }
+    } else if blocks_to_allocate < 0 {
+        for _ in 0..(-blocks_to_allocate) {
+            used_blocks -= 1;
+            self.deallocate_block(new_addresses.addresses[used_blocks as usize]);
+            new_addresses.addresses[used_blocks as usize] = 0;
+        }
+    }
+
+    Ok(new_addresses)
+}
+
+/// allocate a block
+///
+/// # Returns
+/// the block's address
+fn allocate_block(&mut self) -> Option<usize> {
+    let mut address = self.allocate(self.disk_parts.block_bit_map)?;
+
+    // get physical address of the occupied block
+    address *= BLOCK_SIZE;
+    address += self.disk_parts.data;
+
+    Some(address)
+}
+
+/// deallocate a block
+///
+/// # Arguments
+/// - `address` - the block's address
+fn deallocate_block(&mut self, address: usize) {
+    let block_number: usize =
+        ((address - self.disk_parts.data / BLOCK_SIZE) as isize).abs() as usize;
+
+    self.deallocate(self.disk_parts.block_bit_map, block_number);
+}
+
+/// function that adds a file to a folder
+///
+/// # Arguments
+/// - `file` - the file that has to be added to the folder
+/// - `folder` - the folder that `file` is going to be added to
+///
+/// # Returns
+/// Inode of the folder after the file was added or WriteError otherwise
+fn add_file_to_folder(&mut self, file: &DirEntry, folder: &mut Inode) -> Result<Inode, WriteError> {
+    let buffer: &[u8] = unsafe {
+        slice::from_raw_parts(file as *const _ as *const u8, core::mem::size_of_val(file))
+    };
+
+    unsafe { self.write(folder.id, buffer, folder.size) }
+}
+
+/// function that removes a file from a folder
+///
+/// # Arguments
+/// - `file` - the file that has to be removed from the folder
+/// - `folder` - the folder that `file` is going to be removed from
+///
+/// # Returns
+/// Inode of the folder after the file was removed or WriteError otherwise
+fn remove_file_from_folder(
+    &mut self,
+    file: &DirEntry,
+    folder: &mut Inode,
+) -> Result<Inode, WriteError> {
+    let file_size = core::mem::size_of::<DirEntry>();
+    let mut buffer: Vec<u8> = vec![0; file_size];
+    let mut offset = 0;
+
+    while offset < folder.size {
+        unsafe { self.read(folder.id, buffer.as_mut_slice(), offset) };
+        if unsafe {
+            buffer.as_slice() == slice::from_raw_parts(file as *const _ as *mut u8, buffer.len())
+        } {
+            break;
+        }
+        offset += file_size;
+    }
+
+    unsafe { self.read(folder.id, buffer.as_mut_slice(), folder.size - file_size) };
+
+    let res = unsafe { self.write(folder.id, buffer.as_slice(), offset) };
+    self.set_len(folder.id, folder.size - buffer.len());
+    res
+}
+
+/// Calculate the disk parts for the file system.
+/// # Arguments
+/// - `device_size` - the disk device size.
+/// # Returns
+///  a struct with pointers to every segment.
+fn calc_parts(device_size: usize) -> DiskParts {
+    let mut parts: DiskParts = DiskParts {
+        block_bit_map: 0,
+        inode_bit_map: 0,
+        root: 0,
+        unused: 0,
+        data: 0,
+    };
+
+    let mut remaining_space: usize = device_size - core::mem::size_of::<Header>();
+    let mut amount_of_blocks: usize = remaining_space / BLOCK_SIZE;
+    let mut amount_of_inodes: usize = 0;
+
+    parts.block_bit_map = core::mem::size_of::<Header>();
+    parts.inode_bit_map = parts.block_bit_map;
+
+    while (parts.inode_bit_map - parts.block_bit_map) * BITS_IN_BYTE < amount_of_blocks {
+        if (parts.inode_bit_map - parts.block_bit_map) % BLOCK_SIZE == 0 {
+            amount_of_blocks -= 1;
+        }
+        parts.inode_bit_map += 1;
+    }
+
+    remaining_space = device_size - parts.inode_bit_map;
+    amount_of_inodes = remaining_space / BYTES_PER_INODE;
+    parts.root =
+        parts.inode_bit_map + ((amount_of_inodes as f64 / BITS_IN_BYTE as f64) as usize + 1);
+    parts.unused = parts.root + amount_of_inodes * core::mem::size_of::<Inode>();
+
+    parts.data = parts.unused + (device_size - parts.unused) % BLOCK_SIZE;
+
+    parts
+}
+
+/// Returns the `index`th pointer of the inode or `Err` if the `index` exceeds the maximum
+/// file size divided by the block size.
+///
+/// # Arguments
+/// - `file` - The inode to get the pointer from.
+/// - `index` - The index of the pointer.
+fn get_ptr(&self, file: &Inode, index: usize) -> Result<usize, ()> {
+    let offset;
+    let mut ptr: usize = 0;
+
+    if index < DIRECT_POINTERS {
+        return Ok(file.addresses[index]);
+    }
+
+    offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
+    if offset > BLOCK_SIZE {
+        return Err(());
+    }
+    unsafe {
+        self.blkdev.read(
+            file.indirect_pointer + offset,
+            POINTER_SIZE,
+            &mut ptr as *mut _ as *mut u8,
+        );
+    }
+
+    Ok(ptr)
+}
+
+/// Set the value of the `index`th pointer.
+///
+/// # Arguments
+/// - `file` - The file to change.
+/// - `index` - The index of the pointer.
+/// - `value` - The value to change to.
+///
+/// # Returns
+/// `Err` if the pointer exceeds the maximum file size
+/// divided by the block size and `Ok` otherwise.
+fn set_ptr(&mut self, file: &mut Inode, index: usize, value: usize) -> Result<(), ()> {
+    let offset;
+
+    if index < DIRECT_POINTERS {
+        file.addresses[index] = value;
+
+        return Ok(());
+    }
+
+    offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
+    if offset > BLOCK_SIZE {
+        return Err(());
+    }
+    if file.indirect_pointer == 0 {
+        if let Some(indirect_pointer) = self.allocate_block() {
+            file.indirect_pointer = indirect_pointer;
+        } else {
             return Err(());
         }
-        if file.indirect_pointer == 0 {
-            if let Some(indirect_pointer) = self.allocate_block() {
-                file.indirect_pointer = indirect_pointer;
-            } else {
-                return Err(());
-            }
-        }
-        unsafe {
-            self.blkdev.write(
-                file.indirect_pointer + offset,
-                POINTER_SIZE,
-                &value as *const _ as *const u8,
-            );
-        };
-
-        Ok(())
     }
+    unsafe {
+        self.blkdev.write(
+            file.indirect_pointer + offset,
+            POINTER_SIZE,
+            &value as *const _ as *const u8,
+        );
+    };
 
-    /// Add the "." and ".." special folders to a folder.
-    ///
-    /// # Arguments
-    /// - `containing_folder` - The folder that contains `folder`.
-    /// - `folder` - The folder to add to.
-    fn add_special_folders(&mut self, containing_folder: &Inode, folder: &mut Inode) {
-        let dot = DirEntry {
-            name: ".",
-            id: folder.id,
-        };
-        let dot_dot = DirEntry {
-            name: "..",
-            id: containing_folder.id,
-        };
+    Ok(())
+}
 
-        *folder = self.add_file_to_folder(&dot, folder).unwrap();
-        self.add_file_to_folder(&dot_dot, folder);
+/// Add the "." and ".." special folders to a folder.
+///
+/// # Arguments
+/// - `containing_folder` - The folder that contains `folder`.
+/// - `folder` - The folder to add to.
+fn add_special_folders(&mut self, containing_folder: &Inode, folder: &mut Inode) {
+    let dot = DirEntry {
+        name: ".",
+        id: folder.id,
+    };
+    let dot_dot = DirEntry {
+        name: "..",
+        id: containing_folder.id,
+    };
+
+    *folder = self.add_file_to_folder(&dot, folder).unwrap();
+    self.add_file_to_folder(&dot_dot, folder);
+}
+
+/// function that checks if an inode is directory
+///
+/// # Arguments
+///  - `id` - the id of the Inode
+///
+/// # Returns
+/// `true` if the inode is directory and `false` if not
+fn is_dir(&self, id: usize) -> bool {
+    if let Some(inode) = self.read_inode(id) {
+        inode.directory
+    } else {
+        false
     }
-
-    /// function that checks if an inode is directory
-    ///
-    /// # Arguments
-    ///  - `id` - the id of the Inode
-    ///
-    /// # Returns
-    /// `true` if the inode is directory and `false` if not
-    fn is_dir(&self, id: usize) -> bool {
-        if let Some(inode) = self.read_inode(id) {
-            inode.directory
-        } else {
-            false
-        }
-    }
-=======
-    ans
->>>>>>> e8ae173891ed803887d9374b96cf2ba55f9f2ef3
 }
 
 /// Returns the `Inode` of a file, or `None` if no file was found.
@@ -595,7 +585,6 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         }
     }
 
-<<<<<<< HEAD
     /// function that removes a file
     ///
     /// # Arguments
@@ -867,11 +856,6 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         let dir = self.get_inode(path_str, None).unwrap();
         let mut data: Vec<u8> = vec![0; dir.size];
         unsafe { self.read(dir.id, data.as_mut_slice(), 0) };
-=======
-    while next_delimiter != None {
-        let mut data: Vec<u8> = vec![0; inode.size()];
-        unsafe { read(inode.id, data.as_mut_slice(), index) };
->>>>>>> e8ae173891ed803887d9374b96cf2ba55f9f2ef3
         let dir_content = unsafe {
             Box::from(slice::from_raw_parts(
                 data.as_ptr() as *const DirEntry,
@@ -1161,25 +1145,24 @@ fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, FsEr
 /// Inode of the folder after the file was removed or FsError otherwise.
 fn remove_file_from_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, FsError> {
     let file_size = core::mem::size_of::<DirEntry>();
-        let mut buffer: Vec<u8> = vec![0; file_size];
-        let mut offset = 0;
+    let mut buffer: Vec<u8> = vec![0; file_size];
+    let mut offset = 0;
 
-        while offset < folder.size {
-            unsafe { self.read(folder.id, buffer.as_mut_slice(), offset) };
-            if unsafe {
-                buffer.as_slice()
-                    == slice::from_raw_parts(file as *const _ as *mut u8, buffer.len())
-            } {
-                break;
-            }
-            offset += file_size;
+    while offset < folder.size {
+        unsafe { self.read(folder.id, buffer.as_mut_slice(), offset) };
+        if unsafe {
+            buffer.as_slice() == slice::from_raw_parts(file as *const _ as *mut u8, buffer.len())
+        } {
+            break;
         }
+        offset += file_size;
+    }
 
-        unsafe { self.read(folder.id, buffer.as_mut_slice(), folder.size - file_size) };
+    unsafe { self.read(folder.id, buffer.as_mut_slice(), folder.size - file_size) };
 
-        let res = unsafe { self.write(folder.id, buffer.as_slice(), offset) };
-        self.set_len(folder.id, folder.size - buffer.len());
-        res
+    let res = unsafe { self.write(folder.id, buffer.as_slice(), offset) };
+    self.set_len(folder.id, folder.size - buffer.len());
+    res
 }
 
 /// Calculate the disk parts for the file system.
