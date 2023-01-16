@@ -2,9 +2,13 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 #![feature(strict_provenance)]
+#![feature(abi_x86_interrupt)]
+#![feature(const_mut_refs)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 
+mod interrupts;
 mod io;
 mod memory;
 
