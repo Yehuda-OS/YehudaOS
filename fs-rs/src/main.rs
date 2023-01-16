@@ -2,16 +2,12 @@
 
 use std::vec::Vec;
 
-const FS_NAME: &str = "fs";
-
 const LIST_CMD: &str = "ls";
 const CONTENT_CMD: &str = "cat";
 const CREATE_FILE_CMD: &str = "touch";
 const CREATE_DIR_CMD: &str = "mkdir";
 const EDIT_CMD: &str = "edit";
-const TREE_CMD: &str = "tree";
 const HELP_CMD: &str = "help";
-const EXIT_CMD: &str = "exit";
 const REMOVE_FILE_CMD: &str = "rm";
 const REMOVE_DIR_CMD: &str = "rmdir";
 
