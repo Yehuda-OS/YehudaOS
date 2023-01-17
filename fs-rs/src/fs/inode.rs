@@ -69,6 +69,10 @@ impl Inode {
         if offset > BLOCK_SIZE {
             return Err(FsError::MaximumSizeExceeded);
         }
+        if self.indirect_pointer == 0 {
+            return Ok(0);
+        }
+
         unsafe {
             blkdev::read(
                 self.indirect_pointer + offset,
