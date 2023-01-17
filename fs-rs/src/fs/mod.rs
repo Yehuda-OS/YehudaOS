@@ -572,6 +572,7 @@ pub fn format() {
     add_special_folders(&root.clone(), &mut root);
 }
 
+#[deprecated]
 pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
