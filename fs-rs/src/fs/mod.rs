@@ -550,11 +550,7 @@ pub fn format() {
 
 #[deprecated]
 pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str> {
-    let last_delimeter = if path_str.rfind('/').is_some() {
-        path_str.rfind('/').unwrap()
-    } else {
-        0
-    };
+    let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
     let mut file = Inode::new();
     let mut dir;
@@ -589,11 +585,7 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
 /// # Returns
 /// `Ok(())` if the file was removed successfully and `Err` if not
 pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str> {
-    let last_delimeter = if path_str.rfind('/').is_some() {
-        path_str.rfind('/').unwrap()
-    } else {
-        0
-    };
+    let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
     let mut dir;
     if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
