@@ -262,27 +262,24 @@ fn allocate_inode() -> Option<usize> {
 fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
     const BITS_IN_BUFFER: usize = 64;
     const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
-    const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
-    let mut buffer: usize = 0;
+    const ALL_OCCUPIED: usize = !0;
+    let mut buffer: usize = ALL_OCCUPIED;
     let mut address: usize = bitmap_start;
-    // read the bitmap until an unoccupied memory is found
-    loop {
+
+    // read the bitmap until unoccupied memory is found
+    while buffer == ALL_OCCUPIED {
         unsafe { blkdev::read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8) };
         address += BYTES_IN_BUFFER;
         if address >= bitmap_end {
             return None;
-        }
-
-        if buffer != ALL_OCCUPIED {
-            break;
         }
     }
     address -= BYTES_IN_BUFFER;
 
     // read the buffer until an unoccupied memory is found
     for i in 0..BITS_IN_BUFFER {
+        // if the (i)'s bit is 0
         if buffer & (1 << i) == 0 {
-            // if the (i)'s bit is 0
             buffer ^= 1 << i; // flip the bit to mark as occupied
             unsafe {
                 blkdev::write(
