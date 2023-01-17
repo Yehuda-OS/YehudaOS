@@ -259,12 +259,12 @@ fn allocate(bitmap_start: usize) -> Option<usize> {
     loop {
         unsafe { blkdev::read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8) };
         address += BYTES_IN_BUFFER;
-        if buffer != ALL_OCCUPIED {
-            break;
+        if address + BYTES_IN_BUFFER >= DISK_PARTS.data {
+            return None;
         }
 
-        if address >= DISK_PARTS.data {
-            return None;
+        if buffer != ALL_OCCUPIED {
+            break;
         }
     }
     address -= BYTES_IN_BUFFER;
@@ -609,7 +609,7 @@ pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str
     }
     file_details.name = Box::leak(file_name.into_boxed_str());
     file_details.id = get_file_id(&path_str, None).unwrap();
-    // the size of empty folder is 48
+    // An empty folder contains 2 entries
     if directory == true
         && read_inode(file_details.id).unwrap().size() > 2 * core::mem::size_of::<DirEntry>()
     {
