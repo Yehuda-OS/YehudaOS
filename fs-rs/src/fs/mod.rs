@@ -716,20 +716,13 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
 /// # Returns
 /// The function returns the `FileNotFound` or `MaximumSizeExceeded` error.
 pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
-    let mut resized;
     let last_ptr;
-    let resized_last_ptr;
+    let resized_last_ptr = size / BLOCK_SIZE;
     let mut current;
     let mut block;
-
-    if let Some(inode) = read_inode(file) {
-        resized = inode;
-    } else {
-        return Err(FsError::FileNotFound);
-    }
+    let mut resized = read_inode(file).ok_or(FsError::FileNotFound)?;
 
     last_ptr = resized.size() / BLOCK_SIZE;
-    resized_last_ptr = size / BLOCK_SIZE;
     current = last_ptr;
     // If the file has been resized to a smaller size, deallocate the unused blocks.
     while current > resized_last_ptr {
