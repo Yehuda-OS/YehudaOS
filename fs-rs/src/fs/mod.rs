@@ -271,7 +271,12 @@ fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
         unsafe { blkdev::read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8) };
         address += BYTES_IN_BUFFER;
         if address >= bitmap_end {
-            return None;
+            // Force the bits that are outside of the bitmap to 1.
+            buffer |= !(!0 << (address - bitmap_end) * BITS_IN_BYTE);
+
+            if buffer == ALL_OCCUPIED {
+                return None;
+            }
         }
     }
     address -= BYTES_IN_BUFFER;
