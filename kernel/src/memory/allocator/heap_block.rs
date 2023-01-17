@@ -4,16 +4,19 @@ use core::ptr::null_mut;
 pub struct HeapBlock {
     size: u64,
     prev: *mut HeapBlock,
+    magic: u8,
 }
 
 impl HeapBlock {
     const FREE_BIT: u8 = 63;
     const HAS_NEXT_BIT: u8 = 62;
+    const MAGIC_NUMBER: u8 = 233;
 
     pub const fn empty() -> Self {
         HeapBlock {
             size: 0,
             prev: null_mut(),
+            magic: HeapBlock::MAGIC_NUMBER,
         }
     }
 
@@ -25,7 +28,11 @@ impl HeapBlock {
             size |= 1 << HeapBlock::HAS_NEXT_BIT;
         }
 
-        HeapBlock { size, prev }
+        HeapBlock {
+            size,
+            prev,
+            magic: HeapBlock::MAGIC_NUMBER,
+        }
     }
 
     /// Get the size of the block.
