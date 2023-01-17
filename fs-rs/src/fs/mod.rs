@@ -370,7 +370,7 @@ fn allocate_block() -> Option<usize> {
 /// # Arguments
 /// - `address` - the block's address
 fn deallocate_block(address: usize) {
-    let block_number: usize = ((address - DISK_PARTS.data / BLOCK_SIZE) as isize).abs() as usize;
+    let block_number = (address - DISK_PARTS.data) / BLOCK_SIZE;
 
     deallocate(DISK_PARTS.block_bit_map, block_number);
 }
@@ -575,7 +575,7 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
     let mut file = Inode::new();
-    let mut dir;
+    let dir;
     if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
         dir = inode
     } else {
@@ -796,36 +796,29 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
 /// # Returns
 /// If the function fails, an error will be returned.
 pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsError> {
-    let mut updated;
     let mut start = offset % BLOCK_SIZE;
     let mut to_write = BLOCK_SIZE - start;
     let mut pointer = offset / BLOCK_SIZE;
     let mut written = 0;
     let mut remaining = buffer.len();
+    let mut updated = read_inode(file).ok_or(FsError::FileNotFound)?;
 
-    if let Some(inode) = read_inode(file) {
-        updated = inode;
-    } else {
-        return Err(FsError::FileNotFound);
-    }
     if offset + remaining > updated.size() {
-        match set_len(file, offset + remaining) {
-            // UNWRAP: We already checked if the file exists.
-            Ok(_) => updated = read_inode(file).unwrap(),
-            Err(e) => return Err(e),
-        }
+        // UNWRAP: We already checked if the file exists.
+        set_len(file, offset + remaining).map(|_| updated = read_inode(file).unwrap())?;
     }
 
     if to_write > remaining {
         to_write = remaining
     }
     while remaining != 0 {
+        // UNWRAP: The pointer is in the file's range because
+        // we change the file's size accordingly.
         if updated.get_ptr(pointer).unwrap() == 0 {
-            if let Some(block) = allocate_block() {
-                updated.set_ptr(pointer, block).unwrap();
-            } else {
-                return Err(FsError::NotEnoughDiskSpace);
-            }
+            updated.set_ptr(
+                pointer,
+                allocate_block().ok_or(FsError::NotEnoughDiskSpace)?,
+            ).unwrap();
         }
         blkdev::write(
             updated.get_ptr(pointer).unwrap() + start,
