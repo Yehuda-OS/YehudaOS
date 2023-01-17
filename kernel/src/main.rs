@@ -9,7 +9,7 @@
 extern crate alloc;
 
 mod gdt;
-mod interrupts;
+mod idt;
 mod io;
 mod memory;
 mod scheduler;
