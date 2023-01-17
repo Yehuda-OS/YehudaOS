@@ -54,7 +54,7 @@ pub struct DirListEntry {
 
 #[derive(Clone, PartialEq, Eq)]
 struct DirEntry {
-    name: &'static str,
+    name: [u8; FILE_NAME_LEN],
     id: usize,
 }
 
@@ -114,7 +114,17 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
             Some(delimeter) => &path[0..delimeter],
             None => &path[0..],
         };
-        while index != dir_content.len() && dir_content[index].name != next_folder {
+        while index != dir_content.len()
+            && core::str::from_utf8(
+                &dir_content[index].name[..dir_content[index]
+                    .name
+                    .iter()
+                    .position(|x| *x == 0)
+                    .unwrap_or(FILE_NAME_LEN)],
+            )
+            .unwrap()
+                != next_folder
+        {
             index += 1;
         }
         if index >= dir_content.len() {
@@ -456,11 +466,11 @@ const fn calc_parts(device_size: usize) -> DiskParts {
 /// - `folder` - The folder to add to.
 fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
     let dot = DirEntry {
-        name: ".",
+        name: { ['.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
         id: folder.id,
     };
     let dot_dot = DirEntry {
-        name: "..",
+        name: ['.' as u8, '.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         id: containing_folder.id,
     };
 
@@ -559,7 +569,10 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
     } else {
         return Err("Error: invalid path");
     }
-    let mut file_details = DirEntry { name: "", id: 0 };
+    let mut file_details = DirEntry {
+        name: [0; FILE_NAME_LEN],
+        id: 0,
+    };
 
     file.id = allocate_inode().unwrap();
     file.directory = directory;
@@ -568,7 +581,19 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
         add_special_folders(&dir, &mut file)
     }
 
-    file_details.name = Box::leak(file_name.into_boxed_str());
+    file_details.name = {
+        let mut name: [u8; FILE_NAME_LEN] = [0; FILE_NAME_LEN];
+        let temp = file_name.as_bytes();
+        if temp.len() >= FILE_NAME_LEN {
+            name = temp[..FILE_NAME_LEN].try_into().unwrap();
+        } else {
+            for i in 0..temp.len() {
+                name[i] = temp[i];
+            }
+        }
+
+        name
+    };
     file_details.id = file.id;
     match add_file_to_folder(&file_details, &mut dir) {
         Ok(_) => Ok(()),
@@ -594,12 +619,27 @@ pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str
         return Err("Error: invalid path");
     }
 
-    let mut file_details = DirEntry { name: "", id: 0 };
+    let mut file_details = DirEntry {
+        name: [0; FILE_NAME_LEN],
+        id: 0,
+    };
     // check if file exists
     if get_file_id(&path_str, None).is_none() {
         return Err("Error: file does not exist");
     }
-    file_details.name = Box::leak(file_name.into_boxed_str());
+    file_details.name = {
+        let mut name: [u8; FILE_NAME_LEN] = [0; FILE_NAME_LEN];
+        let temp = file_name.as_bytes();
+        if temp.len() >= FILE_NAME_LEN {
+            name = temp[..FILE_NAME_LEN].try_into().unwrap();
+        } else {
+            for i in 0..temp.len() {
+                name[i] = temp[i];
+            }
+        }
+
+        name
+    };
     file_details.id = get_file_id(&path_str, None).unwrap();
     // An empty folder contains 2 entries
     if directory == true
@@ -847,7 +887,11 @@ pub fn list_dir(path_str: &String) -> DirList {
     let file = Inode::new();
 
     for i in 0..dir_content.len() {
-        entry.name = dir_content[i].name;
+        entry.name = Box::leak(
+            String::from_utf8(dir_content[i].name.to_vec())
+                .unwrap()
+                .into_boxed_str(),
+        );
         unsafe {
             blkdev::read(
                 get_inode_address(dir_content[i].id),
