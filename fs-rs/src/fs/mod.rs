@@ -249,7 +249,7 @@ fn write_inode(inode: &Inode) {
 /// # Returns
 /// the address of the inode if it was allocated or None if no free space was found
 fn allocate_inode() -> Option<usize> {
-    Some(allocate(DISK_PARTS.inode_bit_map, DISK_PARTS.root)?)
+    allocate(DISK_PARTS.inode_bit_map, DISK_PARTS.root)
 }
 
 /// allocate a block or Inode
@@ -570,7 +570,6 @@ pub fn format() {
     add_special_folders(&root.clone(), &mut root);
 }
 
-#[deprecated]
 pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
