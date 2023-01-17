@@ -42,7 +42,7 @@ impl Inode {
             return Err(super::FsError::MaximumSizeExceeded);
         }
 
-        if value / BLOCK_SIZE <= DIRECT_POINTERS {
+        if value / BLOCK_SIZE <= DIRECT_POINTERS && self.indirect_pointer != 0 {
             super::deallocate_block(self.indirect_pointer);
             self.indirect_pointer = 0;
         }
