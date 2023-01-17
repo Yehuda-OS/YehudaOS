@@ -1,0 +1,15 @@
+[package]
+name = "fs-rs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fs_rs"
+path = "src/main.rs"
+
+[lib]
+name = "fs_rs"
+path = "src/lib.rs"
+
+
+[dependencies]
