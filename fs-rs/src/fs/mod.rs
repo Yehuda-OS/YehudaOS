@@ -249,7 +249,7 @@ fn write_inode(inode: &Inode) {
 /// # Returns
 /// the address of the inode if it was allocated or None if no free space was found
 fn allocate_inode() -> Option<usize> {
-    Some(allocate(DISK_PARTS.inode_bit_map)?)
+    Some(allocate(DISK_PARTS.inode_bit_map, DISK_PARTS.root)?)
 }
 
 /// allocate a block or Inode
@@ -259,7 +259,7 @@ fn allocate_inode() -> Option<usize> {
 ///
 /// # Returns
 /// the address of the allocated block or Inode
-fn allocate(bitmap_start: usize) -> Option<usize> {
+fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
     const BITS_IN_BUFFER: usize = 64;
     const BYTES_IN_BUFFER: usize = BITS_IN_BUFFER / BITS_IN_BYTE;
     const ALL_OCCUPIED: usize = 0xFFFFFFFFFFFFFFFF;
@@ -269,7 +269,7 @@ fn allocate(bitmap_start: usize) -> Option<usize> {
     loop {
         unsafe { blkdev::read(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8) };
         address += BYTES_IN_BUFFER;
-        if address + BYTES_IN_BUFFER >= DISK_PARTS.data {
+        if address >= bitmap_end {
             return None;
         }
 
@@ -356,7 +356,7 @@ fn reallocate_blocks(inode: &Inode, new_size: usize) -> Result<Inode, &'static s
 /// # Returns
 /// the block's address
 fn allocate_block() -> Option<usize> {
-    let mut address = allocate(DISK_PARTS.block_bit_map)?;
+    let mut address = allocate(DISK_PARTS.block_bit_map, DISK_PARTS.inode_bit_map)?;
 
     // get physical address of the occupied block
     address *= BLOCK_SIZE;
@@ -815,10 +815,12 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsE
         // UNWRAP: The pointer is in the file's range because
         // we change the file's size accordingly.
         if updated.get_ptr(pointer).unwrap() == 0 {
-            updated.set_ptr(
-                pointer,
-                allocate_block().ok_or(FsError::NotEnoughDiskSpace)?,
-            ).unwrap();
+            updated
+                .set_ptr(
+                    pointer,
+                    allocate_block().ok_or(FsError::NotEnoughDiskSpace)?,
+                )
+                .unwrap();
         }
         blkdev::write(
             updated.get_ptr(pointer).unwrap() + start,
