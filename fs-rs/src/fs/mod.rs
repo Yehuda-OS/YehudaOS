@@ -372,43 +372,53 @@ fn deallocate_block(address: usize) {
 /// - `folder` - the folder that `file` is going to be added to
 ///
 /// # Returns
-/// Inode of the folder after the file was added or WriteError otherwise
-fn add_file_to_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, FsError> {
+/// Inode of the folder after the file was added or `FsError` otherwise
+fn add_file_to_folder(file: &DirEntry, folder: usize) -> Result<(), FsError> {
+    let folder_size = read_inode(folder).ok_or(FsError::FileNotFound)?.size();
     let buffer: &[u8] = unsafe {
         slice::from_raw_parts(file as *const _ as *const u8, core::mem::size_of_val(file))
     };
 
-    unsafe { write(folder.id, buffer, folder.size()) }
+    unsafe { write(folder, buffer, folder_size) }
 }
 
 /// function that removes a file from a folder
 ///
 /// # Arguments
-/// - `file` - the file that has to be removed from the folder
-/// - `folder` - the folder that `file` is going to be removed from
+/// - `file` - The id of the file that has to be removed from the folder.
+/// - `folder` - The id of the folder that `file` is going to be removed from.
 ///
 /// # Returns
-/// Inode of the folder after the file was removed or FsError otherwise.
-fn remove_file_from_folder(file: &DirEntry, folder: &mut Inode) -> Result<Inode, FsError> {
+/// `FileNotFound` error if the folder does not exist or the file is
+/// not inside the folder, `Ok` otherwise.
+fn remove_file_from_folder(file: usize, folder: usize) -> Result<(), FsError> {
     let file_size = core::mem::size_of::<DirEntry>();
     let mut buffer: Vec<u8> = vec![0; file_size];
     let mut offset = 0;
+    let folder_size = read_inode(folder).ok_or(FsError::FileNotFound)?.size();
 
-    while offset < folder.size() {
-        unsafe { read(folder.id, buffer.as_mut_slice(), offset) };
-        if unsafe { &*(buffer.as_ptr() as *const DirEntry) == file } {
+    loop {
+        // UNWRAP: We already checked if the folder exists.
+        if unsafe { read(folder, buffer.as_mut_slice(), offset).unwrap() } == 0 {
+            return Err(FsError::FileNotFound);
+        }
+        if unsafe { (*(buffer.as_ptr() as *const DirEntry)).id == file } {
             break;
         }
         offset += file_size;
     }
 
-    unsafe { read(folder.id, buffer.as_mut_slice(), folder.size() - file_size) };
+    unsafe {
+        read(folder, buffer.as_mut_slice(), folder_size - file_size);
+        // UNWRAP: We already checked if the folder exists and we write inside the folder where
+        // there was already data.
+        write(folder, buffer.as_slice(), offset).unwrap();
+    };
+    // UNWRAP: We already checked if the folder exists and we shrink the folder, thus we can't
+    // exceed the maximum file size.
+    set_len(folder, folder_size - buffer.len()).unwrap();
 
-    let res = unsafe { write(folder.id, buffer.as_slice(), offset) };
-    if let Err(_) = set_len(folder.id, folder.size() - buffer.len()) {
-        return Err(FsError::NotEnoughDiskSpace);
-    }
-    res
+    Ok(())
 }
 
 /// Calculate the disk parts for the file system.
@@ -464,8 +474,10 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
         id: containing_folder.id,
     };
 
-    *folder = add_file_to_folder(&dot, folder).unwrap();
-    *folder = add_file_to_folder(&dot_dot, folder).unwrap();
+    add_file_to_folder(&dot, folder.id).unwrap();
+    *folder = read_inode(folder.id).unwrap();
+    add_file_to_folder(&dot_dot, folder.id).unwrap();
+    *folder = read_inode(folder.id).unwrap();
 }
 
 /// function that checks if an inode is directory
@@ -570,7 +582,7 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
 
     file_details.name = Box::leak(file_name.into_boxed_str());
     file_details.id = file.id;
-    match add_file_to_folder(&file_details, &mut dir) {
+    match add_file_to_folder(&file_details, dir.id) {
         Ok(_) => Ok(()),
         Err(_) => Err("Error: failed to add the file to the folder"),
     }
@@ -587,7 +599,7 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
 pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
-    let mut dir;
+    let dir;
     if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
         dir = inode
     } else {
@@ -611,11 +623,10 @@ pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str
     } else if directory == true && is_dir(file_details.id) == false {
         return Err("Error: rmdir is used for directories, not for files");
     }
+    remove_file_from_folder(file_details.id, dir.id)
+        .map_err(|_| "Error: failed to remove the file from the folder")?;
 
-    match remove_file_from_folder(&file_details, &mut dir) {
-        Ok(_) => Ok(()),
-        Err(_) => Err("Error: failed to remove the file from the folder"),
-    }
+    Ok(())
 }
 
 /// Get a file's `Inode` id.
@@ -748,8 +759,8 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
 /// created in the file. Reading from the hole will return null bytes.
 ///
 /// # Returns
-/// if the function succeeded, If it fails, an error will be returned.
-pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, FsError> {
+/// If the function fails, an error will be returned.
+pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsError> {
     let mut updated;
     let mut start = offset % BLOCK_SIZE;
     let mut to_write = BLOCK_SIZE - start;
@@ -798,7 +809,7 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<Inode, 
     }
     write_inode(&updated);
 
-    Ok(updated)
+    Ok(())
 }
 
 /// function that returns the content of a file
