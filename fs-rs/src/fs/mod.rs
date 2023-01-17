@@ -726,10 +726,12 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
     current = last_ptr;
     // If the file has been resized to a smaller size, deallocate the unused blocks.
     while current > resized_last_ptr {
-        block = resized.get_ptr(current).unwrap();
+        block = resized.get_ptr(current)?;
 
         if block != 0 {
             deallocate_block(block);
+            // UNWRAP: The pointer is guarenteed to be inside the file and there is enough
+            // space for the pointer because it is already occupied by `block`.
             resized.set_ptr(current, 0).unwrap();
         }
         current -= 1;
