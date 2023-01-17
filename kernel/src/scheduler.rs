@@ -87,6 +87,38 @@ pub unsafe fn load_tss() {
     asm!("ltr ax", in("ax")super::gdt::TSS);
 }
 
+/// Save all the general purpose registers of a process.
+///
+/// # Arguments
+/// - `p` - The process' data structure to save the registers to.
+pub fn save_context(p: &mut Process, rbp: u64) {
+    unsafe {
+        asm!("
+        push rbx
+        ",
+            out("rax")p.registers.rax,
+            out("rcx")p.registers.rcx,
+            out("rdx")p.registers.rdx,
+            out("rsi")p.registers.rsi,
+            out("rdi")p.registers.rdi,
+            out("r8")p.registers.r8,
+            out("r9")p.registers.r9,
+            out("r10")p.registers.r10,
+            out("r11")p.registers.r11,
+            out("r12")p.registers.r12,
+            out("r13")p.registers.r13,
+            out("r14")p.registers.r14,
+            out("r15")p.registers.r15,
+        );
+        asm!("
+        pop {rbx}
+        ", 
+            rbx=out(reg)p.registers.rbx
+        );
+    }
+    p.registers.rbp = rbp;
+}
+
 /// Start running a user process in ring 3.
 ///
 /// # Arguments
