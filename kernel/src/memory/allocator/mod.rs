@@ -9,8 +9,6 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::println;
-
 mod heap_block;
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
@@ -311,8 +309,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
         let mut allocator = self.lock();
-        let adjustment = get_adjustment(_ptr as *mut HeapBlock, _layout.align() as u64);
-        let block = (_ptr as u64 - HEADER_SIZE - adjustment) as *mut HeapBlock;
+        let block = HeapBlock::get_ptr_block(_ptr);
 
         // use dealloc_node function
         dealloc_node(&mut allocator, block);

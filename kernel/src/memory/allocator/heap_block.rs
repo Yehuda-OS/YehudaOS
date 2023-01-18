@@ -1,6 +1,14 @@
 use core::ptr::null_mut;
 
+use super::HEADER_SIZE;
+
+/// struct that save heap block
+///
+/// packed, otherwise the `get_ptr_block` function will not work
+///
+/// #[repr(C)] is so it will work with libc `malloc` and `free` functions
 #[derive(Copy, Clone)]
+#[repr(C, packed)]
 pub struct HeapBlock {
     size: u64,
     prev: *mut HeapBlock,
@@ -100,5 +108,15 @@ impl HeapBlock {
 
     pub fn prev(&self) -> *mut HeapBlock {
         self.prev
+    }
+
+    pub fn get_ptr_block(mut ptr: *mut u8) -> *mut HeapBlock {
+        loop {
+            if unsafe { *ptr == HeapBlock::MAGIC_NUMBER } {
+                return (ptr.addr() as u64 - HEADER_SIZE + 1) as *mut HeapBlock;
+            }
+
+            ptr = (ptr.addr() - 1) as *mut u8;
+        }
     }
 }
