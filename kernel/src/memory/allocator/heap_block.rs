@@ -110,6 +110,13 @@ impl HeapBlock {
         self.prev
     }
 
+    /// function that gets pointer and return the block it belongs to
+    ///
+    /// # Arguments
+    /// - `ptr` - the pointer to find the block it belongs to
+    ///
+    /// # Returns
+    /// the block that `ptr` belongs to
     pub fn get_ptr_block(mut ptr: *mut u8) -> *mut HeapBlock {
         loop {
             if unsafe { *ptr == HeapBlock::MAGIC_NUMBER } {
