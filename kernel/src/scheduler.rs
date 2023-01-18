@@ -46,6 +46,7 @@ pub struct TaskStateSegment {
     io_permission_bitmap: u16,
 }
 
+#[derive(Default, Debug)]
 pub struct Registers {
     rax: u64,
     rbx: u64,
@@ -90,33 +91,40 @@ pub unsafe fn load_tss() {
 /// Save all the general purpose registers of a process.
 ///
 /// # Arguments
-/// - `p` - The process' data structure to save the registers to.
-pub fn save_context(p: &mut Process, rbp: u64) {
+/// - `rbp` - The saved `rbp` register.
+/// 
+/// # Returns
+/// A data structure with the saved values of the registers.
+pub fn save_context(rbp: u64) -> Registers{
+    let mut registers = Registers::default();
+
     unsafe {
         asm!("
         push rbx
         ",
-            out("rax")p.registers.rax,
-            out("rcx")p.registers.rcx,
-            out("rdx")p.registers.rdx,
-            out("rsi")p.registers.rsi,
-            out("rdi")p.registers.rdi,
-            out("r8")p.registers.r8,
-            out("r9")p.registers.r9,
-            out("r10")p.registers.r10,
-            out("r11")p.registers.r11,
-            out("r12")p.registers.r12,
-            out("r13")p.registers.r13,
-            out("r14")p.registers.r14,
-            out("r15")p.registers.r15,
+            out("rax")registers.rax,
+            out("rcx")registers.rcx,
+            out("rdx")registers.rdx,
+            out("rsi")registers.rsi,
+            out("rdi")registers.rdi,
+            out("r8")registers.r8,
+            out("r9")registers.r9,
+            out("r10")registers.r10,
+            out("r11")registers.r11,
+            out("r12")registers.r12,
+            out("r13")registers.r13,
+            out("r14")registers.r14,
+            out("r15")registers.r15,
         );
         asm!("
         pop {rbx}
         ", 
-            rbx=out(reg)p.registers.rbx
+            rbx=out(reg)registers.rbx
         );
     }
-    p.registers.rbp = rbp;
+    registers.rbp = rbp;
+
+    registers
 }
 
 /// Start running a user process in ring 3.
