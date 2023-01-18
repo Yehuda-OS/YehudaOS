@@ -90,39 +90,77 @@ pub unsafe fn load_tss() {
 
 /// Save all the general purpose registers of a process.
 ///
-/// # Arguments
-/// - `rbp` - The saved `rbp` register.
-/// 
 /// # Returns
 /// A data structure with the saved values of the registers.
-pub fn save_context(rbp: u64) -> Registers{
-    let mut registers = Registers::default();
+///
+/// # Safety
+/// This function is unsafe because it assumes the saved value of the `rbp` register is on
+/// the top of the stack and the `rbp` register contains the pointer to it
+/// (Happens with every function that uses a stack frame).
+/// This is unsafe because the function reads the caller's stack.
+#[inline(always)]
+pub unsafe fn save_context() -> Registers {
+    let mut registers: Registers;
 
-    unsafe {
-        asm!("
+    asm!(
+        "
+        push r15
+        push r14
+        push r13
+        push r12
+        push r11
+        push r10
+        push r9
+        push r8
+        mov r8, [rbp]
+        push r8
+        push rdi
+        push rsi
+        push rdx
+        push rcx
         push rbx
+        push rax
+        "
+    );
+    registers = Registers::default();
+    asm!(
+        "
+        pop {0}
+        pop {1}
+        pop {2}
+        pop {3}
+        pop {4}
+        pop {5}
+        pop {6}
+        pop {7}
+        pop {8}
+        pop {9}
+        pop {10}
+        pop {11}
+        pop {12}
+        pop {13}
         ",
-            out("rax")registers.rax,
-            out("rcx")registers.rcx,
-            out("rdx")registers.rdx,
-            out("rsi")registers.rsi,
-            out("rdi")registers.rdi,
-            out("r8")registers.r8,
-            out("r9")registers.r9,
-            out("r10")registers.r10,
-            out("r11")registers.r11,
-            out("r12")registers.r12,
-            out("r13")registers.r13,
-            out("r14")registers.r14,
-            out("r15")registers.r15,
-        );
-        asm!("
-        pop {rbx}
-        ", 
-            rbx=out(reg)registers.rbx
-        );
-    }
-    registers.rbp = rbp;
+        out(reg)registers.rax,
+        out(reg)registers.rbx,
+        out(reg)registers.rcx,
+        out(reg)registers.rdx,
+        out(reg)registers.rsi,
+        out(reg)registers.rdi,
+        out(reg)registers.rbp,
+        out(reg)registers.r8,
+        out(reg)registers.r9,
+        out(reg)registers.r10,
+        out(reg)registers.r11,
+        out(reg)registers.r12,
+        out(reg)registers.r13,
+        out(reg)registers.r14,
+    );
+    asm!(
+        "
+        pop {0}
+        ",
+        out(reg)registers.r15,
+    );
 
     registers
 }
