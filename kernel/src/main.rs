@@ -38,6 +38,7 @@ pub extern "C" fn _start() -> ! {
         gdt::create();
         gdt::activate();
         scheduler::load_tss();
+        idt::IDT.load();
     }
     println!("Hello world");
 
