@@ -15,7 +15,6 @@ mod memory;
 mod scheduler;
 mod terminal;
 
-use crate::memory::allocator::{Allocator, Locked, ALLOCATOR, HEAP_START};
 
 /// Kernel Entry Point
 ///
