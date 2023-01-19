@@ -9,13 +9,12 @@
 extern crate alloc;
 
 mod gdt;
-mod interrupts;
+mod idt;
 mod io;
 mod memory;
 mod scheduler;
 mod terminal;
 
-use crate::memory::allocator::{Allocator, Locked, ALLOCATOR, HEAP_START};
 
 /// Kernel Entry Point
 ///
@@ -39,6 +38,7 @@ pub extern "C" fn _start() -> ! {
         gdt::create();
         gdt::activate();
         scheduler::load_tss();
+        idt::IDT.load();
     }
     println!("Hello world");
 

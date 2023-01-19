@@ -23,22 +23,11 @@ lazy_static! {
     pub static ref IDT: Idt = {
         let mut idt = Idt::new();
 
-        idt.set_handler(
-            DIV_0,
-            crate::interrupt_handler!(div_0, divide_by_zero_handler) as u64,
-        );
-        idt.set_handler(
-            BREAKPOINT,
-            crate::interrupt_handler!(breakpoint, breakpoint_handler) as u64,
-        );
-        idt.set_handler(
-            DOUBLE_FAULT,
-            crate::interrupt_handler!(d_fault, double_fault_handler) as u64,
-        );
-        idt.set_handler(
-            PAGE_FAULT,
-            crate::interrupt_handler!(p_fault, page_fault_handler) as u64,
-        );
+        idt.set_handler(DIV_0, divide_by_zero_handler as u64);
+        idt.set_handler(BREAKPOINT, breakpoint_handler as u64);
+        idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
+        idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
+
         idt
     };
 }
@@ -150,29 +139,35 @@ impl Idt {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+    let registers = super::scheduler::save_context();
+
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
         &*stack_frame
     });
     loop {}
 }
 
-#[no_mangle]
-extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+unsafe fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+    let registers = super::scheduler::save_context();
+
     print!("EXCEPTION: BREAKPOINT");
+    loop {}
 }
 
-#[no_mangle]
-extern "C" fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+    let registers = super::scheduler::save_context();
+
     print!("EXCEPTION: double fault occured");
     loop {}
 }
 
-extern "C" fn page_fault_handler(
+unsafe fn page_fault_handler(
     stack_frame: &ExceptionStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
+    let registers = super::scheduler::save_context();
+
     println!("============");
     println!("|Page Fault|");
     println!("============");
