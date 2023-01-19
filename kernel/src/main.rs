@@ -12,6 +12,7 @@ mod gdt;
 mod idt;
 mod io;
 mod memory;
+mod pit;
 mod scheduler;
 mod terminal;
 
