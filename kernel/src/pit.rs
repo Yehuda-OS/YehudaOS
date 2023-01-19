@@ -16,3 +16,6 @@ pub unsafe fn start(tps: u32) {
     io::outb(0x40, high);
 }
 
+pub unsafe fn handler() {
+    crate::println!("HI");
+}
