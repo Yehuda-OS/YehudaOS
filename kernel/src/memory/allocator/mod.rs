@@ -158,7 +158,9 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
                 PhysFrame::from_start_address(
                     crate::memory::vmm::virtual_to_physical(
                         allocator.page_table,
-                        VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * allocator.pages),
+                        VirtAddr::new(
+                            allocator.heap_start + Size4KiB::SIZE * (allocator.pages - 1),
+                        ),
                     )
                     // UNWRAP: If the page table is null any allocation would fail and
                     // the entry is used because we keep track of what we mapped.
