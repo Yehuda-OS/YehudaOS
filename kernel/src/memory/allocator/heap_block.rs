@@ -118,6 +118,8 @@ impl HeapBlock {
     /// # Returns
     /// the block that `ptr` belongs to
     pub fn get_ptr_block(mut ptr: *mut u8) -> *mut HeapBlock {
+        ptr = (ptr.addr() - 1) as *mut u8;
+
         loop {
             if unsafe { *ptr == HeapBlock::MAGIC_NUMBER } {
                 return (ptr.addr() as u64 - HEADER_SIZE + 1) as *mut HeapBlock;
