@@ -1,4 +1,13 @@
 
+use super::io;
+
+const TICKS_PER_SECOND: u32 = 1193182;
+const PIT_COMMAND_PORT: u16 = 0x43;
+const PIT_COMMAND: u8 = 0x36;
+const PIC1_PORT: u16 = 0x20; //master PIC command port
+const PIC2_PORT: u16 = 0xA0; //slave PIC command port
+
+
 /// Start the system timer.
 /// 
 /// # Arguments
