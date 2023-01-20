@@ -7,7 +7,7 @@ use super::HEADER_SIZE;
 /// packed, otherwise the `get_ptr_block` function will not work
 ///
 /// #[repr(C)] is so it will work with libc `malloc` and `free` functions
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 pub struct HeapBlock {
     size: u64,

@@ -148,8 +148,8 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
         merge_blocks(block);
     }
     if (*block).has_prev() && (*(*block).prev()).free() {
-        merge_blocks((*block).prev());
         block = (*block).prev();
+        merge_blocks(block);
     }
 
     if !(*block).has_next() {
@@ -232,7 +232,7 @@ unsafe fn find_usable_block(
 unsafe fn merge_blocks(block: *mut HeapBlock) {
     let next = *(*block).next();
 
-    (*block).set_size((*block).size() + next.size());
+    (*block).set_size((*block).size() + next.size() + HEADER_SIZE);
     (*block).set_has_next(next.has_next());
 }
 
@@ -287,6 +287,19 @@ unsafe fn resize_block(mut block: *mut HeapBlock, size: u64, align: u64) -> *mut
     }
 
     block
+}
+
+/// Used for debugging.
+#[allow(unused)]
+unsafe fn print_list(first: *mut HeapBlock) {
+    use crate::println;
+    let mut curr = first;
+
+    println!("\n\n|LIST|");
+    while curr != null_mut() {
+        println!("{:p} : {:?}", curr, *curr);
+        curr = (*curr).next();
+    }
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
