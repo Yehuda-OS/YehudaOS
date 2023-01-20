@@ -9,8 +9,6 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::println;
-
 mod heap_block;
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
@@ -150,17 +148,19 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
         merge_blocks(block);
     }
     if (*block).has_prev() && (*(*block).prev()).free() {
-        merge_blocks((*block).prev());
         block = (*block).prev();
+        merge_blocks(block);
     }
 
     if !(*block).has_next() {
         while (*block).size() > Size4KiB::SIZE {
-            crate::memory::page_allocator::free(
+            super::page_allocator::free(
                 PhysFrame::from_start_address(
-                    crate::memory::vmm::virtual_to_physical(
+                    super::vmm::virtual_to_physical(
                         allocator.page_table,
-                        VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * allocator.pages),
+                        VirtAddr::new(
+                            allocator.heap_start + Size4KiB::SIZE * (allocator.pages - 1),
+                        ),
                     )
                     // UNWRAP: If the page table is null any allocation would fail and
                     // the entry is used because we keep track of what we mapped.
@@ -169,6 +169,13 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
                 // UNWRAP: The address is aligned because `heap_start` is aligned.
                 .unwrap(),
             );
+            super::vmm::unmap_address(
+                allocator.page_table,
+                VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * (allocator.pages - 1)),
+            )
+            // UNWRAP: If the page table is null any allocation would fail and
+            // the entry is used because we keep track of what we mapped.
+            .unwrap();
 
             (*block).set_size((*block).size() - Size4KiB::SIZE);
             allocator.pages -= 1;
@@ -178,10 +185,6 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
             (*(*block).prev()).set_has_next(false);
             (*(*block).prev()).set_size((*(*block).prev()).size() + HEADER_SIZE as u64);
         }
-        crate::memory::vmm::unmap_address(allocator.page_table, VirtAddr::new(block as u64))
-            // UNWRAP: If the page table is null any allocation would fail and
-            // the entry is used because we keep track of what we mapped.
-            .unwrap();
     }
 }
 
@@ -229,7 +232,7 @@ unsafe fn find_usable_block(
 unsafe fn merge_blocks(block: *mut HeapBlock) {
     let next = *(*block).next();
 
-    (*block).set_size((*block).size() + next.size());
+    (*block).set_size((*block).size() + next.size() + HEADER_SIZE);
     (*block).set_has_next(next.has_next());
 }
 
@@ -286,6 +289,19 @@ unsafe fn resize_block(mut block: *mut HeapBlock, size: u64, align: u64) -> *mut
     block
 }
 
+/// Used for debugging.
+#[allow(unused)]
+unsafe fn print_list(first: *mut HeapBlock) {
+    use crate::println;
+    let mut curr = first;
+
+    println!("\n\n|LIST|");
+    while curr != null_mut() {
+        println!("{:p} : {:?}", curr, *curr);
+        curr = (*curr).next();
+    }
+}
+
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         let mut allocator = self.lock();
@@ -311,8 +327,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
         let mut allocator = self.lock();
-        let adjustment = get_adjustment(_ptr as *mut HeapBlock, _layout.align() as u64);
-        let block = (_ptr as u64 - HEADER_SIZE - adjustment) as *mut HeapBlock;
+        let block = HeapBlock::get_ptr_block(_ptr);
 
         // use dealloc_node function
         dealloc_node(&mut allocator, block);

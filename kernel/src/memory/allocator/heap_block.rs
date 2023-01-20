@@ -1,19 +1,30 @@
 use core::ptr::null_mut;
 
-#[derive(Copy, Clone)]
+use super::HEADER_SIZE;
+
+/// struct that save heap block
+///
+/// packed, otherwise the `get_ptr_block` function will not work
+///
+/// #[repr(C)] is so it will work with libc `malloc` and `free` functions
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 pub struct HeapBlock {
     size: u64,
     prev: *mut HeapBlock,
+    magic: u8,
 }
 
 impl HeapBlock {
     const FREE_BIT: u8 = 63;
     const HAS_NEXT_BIT: u8 = 62;
+    const MAGIC_NUMBER: u8 = 233;
 
     pub const fn empty() -> Self {
         HeapBlock {
             size: 0,
             prev: null_mut(),
+            magic: HeapBlock::MAGIC_NUMBER,
         }
     }
 
@@ -25,7 +36,11 @@ impl HeapBlock {
             size |= 1 << HeapBlock::HAS_NEXT_BIT;
         }
 
-        HeapBlock { size, prev }
+        HeapBlock {
+            size,
+            prev,
+            magic: HeapBlock::MAGIC_NUMBER,
+        }
     }
 
     /// Get the size of the block.
@@ -93,5 +108,24 @@ impl HeapBlock {
 
     pub fn prev(&self) -> *mut HeapBlock {
         self.prev
+    }
+
+    /// function that gets pointer and return the block it belongs to
+    ///
+    /// # Arguments
+    /// - `ptr` - the pointer to find the block it belongs to
+    ///
+    /// # Returns
+    /// the block that `ptr` belongs to
+    pub fn get_ptr_block(mut ptr: *mut u8) -> *mut HeapBlock {
+        ptr = (ptr.addr() - 1) as *mut u8;
+
+        loop {
+            if unsafe { *ptr == HeapBlock::MAGIC_NUMBER } {
+                return (ptr.addr() as u64 - HEADER_SIZE + 1) as *mut HeapBlock;
+            }
+
+            ptr = (ptr.addr() - 1) as *mut u8;
+        }
     }
 }
