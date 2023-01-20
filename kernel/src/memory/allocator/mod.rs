@@ -154,9 +154,9 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
 
     if !(*block).has_next() {
         while (*block).size() > Size4KiB::SIZE {
-            crate::memory::page_allocator::free(
+            super::page_allocator::free(
                 PhysFrame::from_start_address(
-                    crate::memory::vmm::virtual_to_physical(
+                    super::vmm::virtual_to_physical(
                         allocator.page_table,
                         VirtAddr::new(
                             allocator.heap_start + Size4KiB::SIZE * (allocator.pages - 1),
@@ -169,6 +169,13 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
                 // UNWRAP: The address is aligned because `heap_start` is aligned.
                 .unwrap(),
             );
+            super::vmm::unmap_address(
+                allocator.page_table,
+                VirtAddr::new(allocator.heap_start + Size4KiB::SIZE * (allocator.pages - 1)),
+            )
+            // UNWRAP: If the page table is null any allocation would fail and
+            // the entry is used because we keep track of what we mapped.
+            .unwrap();
 
             (*block).set_size((*block).size() - Size4KiB::SIZE);
             allocator.pages -= 1;
@@ -178,10 +185,6 @@ unsafe fn dealloc_node(allocator: &mut Allocator, mut block: *mut HeapBlock) {
             (*(*block).prev()).set_has_next(false);
             (*(*block).prev()).set_size((*(*block).prev()).size() + HEADER_SIZE as u64);
         }
-        crate::memory::vmm::unmap_address(allocator.page_table, VirtAddr::new(block as u64))
-            // UNWRAP: If the page table is null any allocation would fail and
-            // the entry is used because we keep track of what we mapped.
-            .unwrap();
     }
 }
 
