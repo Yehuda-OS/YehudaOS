@@ -26,6 +26,7 @@ lazy_static! {
         idt.set_handler(BREAKPOINT, breakpoint_handler as u64);
         idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
         idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
+        idt.set_handler(0x20, super::pit::handler as u64);
 
         idt
     };
