@@ -40,6 +40,9 @@ pub extern "C" fn _start() -> ! {
         gdt::activate();
         scheduler::load_tss();
         idt::IDT.load();
+        idt::PICS.lock().initialize();
+        core::arch::asm!("sti");
+        pit::start(19);
     }
     println!("Hello world");
 

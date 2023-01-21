@@ -23,6 +23,10 @@ pub unsafe fn start(tps: u32) {
     io::outb(0x40, high);
 }
 
-pub unsafe fn handler() {
-    crate::println!("HI");
+pub extern "x86-interrupt" fn handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
+    crate::print!(".");
+
+    unsafe {
+        super::idt::PICS.lock().notify_end_of_interrupt(0x20);
+    }
 }
