@@ -2,7 +2,6 @@ mod macros;
 
 use crate::{print, println};
 use bit_field::BitField;
-use core::arch::asm;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
@@ -15,9 +14,12 @@ const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
 const DOUBLE_FAULT: u8 = 8;
 const PAGE_FAULT: u8 = 0xE;
+const PIC_OFFSET1: u8 = 0x20;
+const PIC_OFFSET2: u8 = PIC_OFFSET1 + 8;
+const PIT_HANDLER: u8 = 0x20;
 
-#[allow(dead_code)]
-pub static PICS: spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe { ChainedPics::new(32, 40) });
+pub static PICS: spin::Mutex<ChainedPics> =
+    spin::Mutex::new(unsafe { ChainedPics::new(PIC_OFFSET1, PIC_OFFSET2) });
 
 lazy_static! {
     pub static ref IDT: Idt = {
@@ -27,6 +29,7 @@ lazy_static! {
         idt.set_handler(BREAKPOINT, breakpoint_handler as u64);
         idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
         idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
+        idt.set_handler(PIT_HANDLER, super::pit::handler as u64);
 
         idt
     };
@@ -134,6 +137,10 @@ impl Idt {
                 base: VirtAddr::new_unsafe(self as *const _ as u64),
                 limit: (size_of::<Self>() - 1) as u16,
             };
+            let mut pics = PICS.lock();
+
+            pics.initialize();
+            pics.write_masks(0, 0);
             x86_64::instructions::tables::lidt(&ptr)
         };
     }

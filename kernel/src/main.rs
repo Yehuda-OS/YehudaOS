@@ -12,6 +12,7 @@ mod gdt;
 mod idt;
 mod io;
 mod memory;
+mod pit;
 mod scheduler;
 mod terminal;
 
@@ -39,6 +40,7 @@ pub extern "C" fn _start() -> ! {
         gdt::activate();
         scheduler::load_tss();
         idt::IDT.load();
+        pit::start(19);
     }
     println!("Hello world");
 
