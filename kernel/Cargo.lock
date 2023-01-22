@@ -25,6 +25,7 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "bit_field",
+ "bitflags",
  "lazy_static",
  "limine",
  "pic8259",

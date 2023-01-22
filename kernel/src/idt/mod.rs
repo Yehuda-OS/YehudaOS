@@ -2,7 +2,6 @@ mod macros;
 
 use crate::{print, println};
 use bit_field::BitField;
-use core::arch::asm;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
@@ -15,30 +14,23 @@ const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
 const DOUBLE_FAULT: u8 = 8;
 const PAGE_FAULT: u8 = 0xE;
+const PIC_OFFSET1: u8 = 0x20;
+const PIC_OFFSET2: u8 = PIC_OFFSET1 + 8;
+const PIT_HANDLER: u8 = 0x20;
 
-#[allow(dead_code)]
-pub static PICS: spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe { ChainedPics::new(32, 40) });
+pub static PICS: spin::Mutex<ChainedPics> =
+    spin::Mutex::new(unsafe { ChainedPics::new(PIC_OFFSET1, PIC_OFFSET2) });
 
 lazy_static! {
     pub static ref IDT: Idt = {
         let mut idt = Idt::new();
 
-        idt.set_handler(
-            DIV_0,
-            crate::interrupt_handler!(div_0, divide_by_zero_handler) as u64,
-        );
-        idt.set_handler(
-            BREAKPOINT,
-            crate::interrupt_handler!(breakpoint, breakpoint_handler) as u64,
-        );
-        idt.set_handler(
-            DOUBLE_FAULT,
-            crate::interrupt_handler!(d_fault, double_fault_handler) as u64,
-        );
-        idt.set_handler(
-            PAGE_FAULT,
-            crate::interrupt_handler!(p_fault, page_fault_handler) as u64,
-        );
+        idt.set_handler(DIV_0, divide_by_zero_handler as u64);
+        idt.set_handler(BREAKPOINT, breakpoint_handler as u64);
+        idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
+        idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
+        idt.set_handler(PIT_HANDLER, super::pit::handler as u64);
+
         idt
     };
 }
@@ -145,34 +137,44 @@ impl Idt {
                 base: VirtAddr::new_unsafe(self as *const _ as u64),
                 limit: (size_of::<Self>() - 1) as u16,
             };
+            let mut pics = PICS.lock();
+
+            pics.initialize();
+            pics.write_masks(0, 0);
             x86_64::instructions::tables::lidt(&ptr)
         };
     }
 }
 
-#[no_mangle]
-pub extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+    let registers = super::scheduler::save_context();
+
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
         &*stack_frame
     });
     loop {}
 }
 
-#[no_mangle]
-extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+unsafe fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+    let registers = super::scheduler::save_context();
+
     print!("EXCEPTION: BREAKPOINT");
+    loop {}
 }
 
-#[no_mangle]
-extern "C" fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+    let registers = super::scheduler::save_context();
+
     print!("EXCEPTION: double fault occured");
     loop {}
 }
 
-extern "C" fn page_fault_handler(
+unsafe fn page_fault_handler(
     stack_frame: &ExceptionStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
+    let registers = super::scheduler::save_context();
+
     println!("============");
     println!("|Page Fault|");
     println!("============");

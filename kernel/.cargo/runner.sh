@@ -22,7 +22,8 @@ cd -
 
 # Copy the needed files into an ISO image.
 mkdir -p target/iso_root
-cp $KERNEL conf/limine.cfg target/limine/limine{.sys,-cd.bin,-cd-efi.bin} target/iso_root
+cp $KERNEL conf/limine.cfg target/limine/limine.sys target/limine/limine-cd.bin \
+target/limine/limine-cd-efi.bin target/iso_root
 
 xorriso -as mkisofs                                             \
     -b limine-cd.bin                                            \

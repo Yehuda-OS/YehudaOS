@@ -1,55 +1,67 @@
-use core::fmt;
-use limine::LimineTerminalRequest;
-use spin::Mutex;
+use core::arch::asm;
 
-pub static TERMINAL_REQUEST: LimineTerminalRequest = LimineTerminalRequest::new(0);
+#[inline]
+pub unsafe fn inb(port: u16) -> u8 {
+    let res: u8;
 
-struct Writer {
-    terminals: Option<&'static limine::LimineTerminalResponse>,
+    asm!(
+    "in al, dx",
+    out("al") (res),
+    in("dx") (port),
+    );
+
+    res
 }
 
-unsafe impl Send for Writer {}
+#[inline]
+pub unsafe fn inw(port: u16) -> u16 {
+    let res: u16;
 
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        // Get the Terminal response and cache it.
-        let response = match self.terminals {
-            None => {
-                let response = TERMINAL_REQUEST.get_response().get().ok_or(fmt::Error)?;
-                self.terminals = Some(response);
-                response
-            }
-            Some(resp) => resp,
-        };
+    asm!(
+    "in ax, dx",
+    out("ax") (res),
+    in("dx") (port),
+    );
 
-        let write = response.write().ok_or(fmt::Error)?;
-
-        // Output the string onto each terminal.
-        for terminal in response.terminals() {
-            write(terminal, s);
-        }
-
-        Ok(())
-    }
+    res
 }
 
-static WRITER: Mutex<Writer> = Mutex::new(Writer { terminals: None });
+#[inline]
+pub unsafe fn inl(port: u16) -> u32 {
+    let res: u32;
 
-pub fn _print(args: fmt::Arguments) {
-    // NOTE: Locking needs to happen around `print_fmt`, not `print_str`, as the former
-    // will call the latter potentially multiple times per invocation.
-    let mut writer = WRITER.lock();
-    fmt::Write::write_fmt(&mut *writer, args).ok();
+    asm!(
+    "in eax, dx",
+    out("eax") (res),
+    in("dx") (port),
+    );
+
+    res
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($t:tt)*) => { $crate::io::_print(format_args!($($t)*)) };
+#[inline]
+pub unsafe fn outb(port: u16, value: u8) {
+    asm!(
+       "out dx, al",
+       in("dx") port,
+       in("al") value,
+    );
 }
 
-#[macro_export]
-macro_rules! println {
-    ()          => { $crate::print!("\n"); };
-    // On nightly, `format_args_nl!` could also be used.
-    ($($t:tt)*) => { $crate::print!("{}\n", format_args!($($t)*)) };
+#[inline]
+pub unsafe fn outw(port: u16, value: u16) {
+    asm!(
+       "out dx, ax",
+       in("dx") port,
+       in("ax") value,
+    );
+}
+
+#[inline]
+pub unsafe fn outl(port: u16, value: u32) {
+    asm!(
+       "out dx, eax",
+       in("dx") port,
+       in("eax") value,
+    );
 }
