@@ -15,7 +15,7 @@ const PIT_CHANNEL0: u16 = 0x40;
 pub unsafe fn start(tps: u32) {
     let divisor = (TICKS_PER_SECOND / tps) as u16;
     let low = (divisor & 0xff) as u8;
-    let high = ((divisor >> 8) & 0xff) as u8;
+    let high = (divisor >> 8) as u8;
 
     io::outb(PIT_COMMAND_PORT, PIT_COMMAND);
     io::outb(PIT_CHANNEL0, low);
