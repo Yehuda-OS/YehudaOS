@@ -14,8 +14,11 @@ const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
 const DOUBLE_FAULT: u8 = 8;
 const PAGE_FAULT: u8 = 0xE;
+const PIC_OFFSET1: u8 = 0x20;
+const PIC_OFFSET2: u8 = PIC_OFFSET1 + 8;
 
-pub static PICS: spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe { ChainedPics::new(32, 40) });
+pub static PICS: spin::Mutex<ChainedPics> =
+    spin::Mutex::new(unsafe { ChainedPics::new(PIC_OFFSET1, PIC_OFFSET2) });
 
 lazy_static! {
     pub static ref IDT: Idt = {
@@ -133,6 +136,10 @@ impl Idt {
                 base: VirtAddr::new_unsafe(self as *const _ as u64),
                 limit: (size_of::<Self>() - 1) as u16,
             };
+            let mut pics = PICS.lock();
+
+            pics.initialize();
+            pics.write_masks(0, 0);
             x86_64::instructions::tables::lidt(&ptr)
         };
     }
