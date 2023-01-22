@@ -40,8 +40,6 @@ pub extern "C" fn _start() -> ! {
         gdt::activate();
         scheduler::load_tss();
         idt::IDT.load();
-        idt::PICS.lock().initialize();
-        idt::PICS.lock().write_masks(0, 0);
         pit::start(19);
     }
     println!("Hello world");
