@@ -15,7 +15,6 @@ const BREAKPOINT: u8 = 3;
 const DOUBLE_FAULT: u8 = 8;
 const PAGE_FAULT: u8 = 0xE;
 
-#[allow(dead_code)]
 pub static PICS: spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe { ChainedPics::new(32, 40) });
 
 lazy_static! {
