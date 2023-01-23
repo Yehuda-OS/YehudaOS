@@ -20,14 +20,6 @@ impl HeapBlock {
     const HAS_NEXT_BIT: u8 = 62;
     const MAGIC_NUMBER: u8 = 233;
 
-    pub const fn empty() -> Self {
-        HeapBlock {
-            size: 0,
-            prev: null_mut(),
-            magic: HeapBlock::MAGIC_NUMBER,
-        }
-    }
-
     pub const fn new(free: bool, has_next: bool, mut size: u64, prev: *mut HeapBlock) -> Self {
         if free {
             size |= 1 << HeapBlock::FREE_BIT;
