@@ -65,3 +65,20 @@ pub unsafe fn outl(port: u16, value: u32) {
        in("eax") value,
     );
 }
+
+/// Write to a Model Specific Register.
+///
+/// # Arguments
+/// - `msr` - The model specific register to write to.
+/// - `data` - The data to write.
+#[inline]
+pub fn wrmsr(msr: u32, data: u64) {
+    let low = data & (!0 as u32) as u64;
+    let high = data >> 32;
+
+    unsafe {
+        asm!("
+        wrmsr
+        ", in("ecx")msr, in("edx")high, in("eax")low);
+    }
+}
