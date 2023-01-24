@@ -66,11 +66,11 @@ pub struct Registers {
 }
 
 pub struct Process {
-    registers: Registers,
-    page_table: PhysAddr,
-    stack_pointer: u64,
-    instruction_pointer: u64,
-    flags: u64,
+    pub registers: Registers,
+    pub page_table: PhysAddr,
+    pub stack_pointer: u64,
+    pub instruction_pointer: u64,
+    pub flags: u64,
 }
 
 /// Returns the address of the Task State Segment.
