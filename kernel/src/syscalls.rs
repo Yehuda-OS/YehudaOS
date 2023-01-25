@@ -15,6 +15,43 @@ pub unsafe fn initialize() {
     io::wrmsr(EFER, 1);
 }
 
+/// Handle the syscall (Perform the action that the process has requested).
+///
+/// # Arguments
+/// - `syscall_number` - The identifier of the syscall, the value stored in `rax`.
+/// - `arg0` - Stored in `rdi`.
+/// - `arg1` - Stored in `rsi`.
+/// - `arg2` - Stored in `rdx`.
+/// - `arg3` - Stored in `r10`.
+/// - `arg4` - Stored in `r8`.
+/// - `arg5` - Stored in `r9`.
+pub fn handle_syscall(
+    syscall_number: u64,
+    arg0: u64,
+    arg1: u64,
+    arg2: u64,
+    arg3: u64,
+    arg4: u64,
+    arg5: u64,
+) {
+}
+
+pub unsafe fn int_0x80_handler() {
+    let registers = super::scheduler::save_context();
+
+    handle_syscall(
+        registers.rax,
+        registers.rdi,
+        registers.rsi,
+        registers.rdx,
+        registers.r10,
+        registers.r8,
+        registers.r9,
+    );
+
+    loop {}
+}
+
 pub unsafe fn handler() -> ! {
     let registers = scheduler::save_context();
     // TODO Change later to get the currently running process.
@@ -38,6 +75,15 @@ pub unsafe fn handler() -> ! {
         out(reg)proc.stack_pointer,
     );
     crate::println!("A syscall occured");
+    handle_syscall(
+        proc.registers.rax,
+        proc.registers.rdi,
+        proc.registers.rsi,
+        proc.registers.rdx,
+        proc.registers.r10,
+        proc.registers.r8,
+        proc.registers.r9,
+    );
 
     scheduler::load_context(&proc);
 }

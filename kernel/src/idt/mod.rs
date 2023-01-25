@@ -30,6 +30,7 @@ lazy_static! {
         idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
         idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
         idt.set_handler(PIT_HANDLER, super::pit::handler as u64);
+        idt.set_handler(0x80, super::syscalls::int_0x80_handler as u64);
 
         idt
     };
