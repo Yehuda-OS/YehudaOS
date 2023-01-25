@@ -46,7 +46,7 @@ impl Keyboard {
 
 const TO_ASCII_LOW: &'static [u8; 17] = b"\x1B1234567890-=\0x02";
 
-const TO_ASCII_MID1: &'static [u8; 14] = b"\tqwertyuiop[]\r";
+const TO_ASCII_MID1: &'static [u8; 14] = b"\tqwertyuiop[]\n";
 
 const TO_ASCII_MID2: &'static [u8; 11] = b"asdfghjkl;'";
 

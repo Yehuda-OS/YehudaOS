@@ -97,7 +97,7 @@ pub fn get_key_index(scancode: u8) -> usize {
         b'p' => 25,
         b'[' => 26,
         b']' => 27,
-        b'\x0D' => 28,
+        b'\n' => 28,
         b'a' => 30,
         b's' => 31,
         b'd' => 32,
