@@ -4,8 +4,6 @@ use bitflags::bitflags;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use core::default::Default;
-
 /// PS/2 keyboard scancode wrapper
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Scancode(u8);
@@ -65,19 +63,7 @@ bitflags! {
     }
 }
 
-impl Default for Modifiers {
-    #[inline]
-    fn default() -> Self {
-        Modifiers::new()
-    }
-}
-
 impl Modifiers {
-    /// function that creates new empty modifier
-    pub const fn new() -> Self {
-        Modifiers { bits: 0b0000_0000 }
-    }
-
     /// function that checks is the shift is pressed
     /// inline because is single line and O(1) complexity
     ///
@@ -143,7 +129,7 @@ impl Modifiers {
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard> = Mutex::new(Keyboard {
         data_port: 0x60,
-        state: Modifiers::new(),
+        state: Modifiers::empty(),
     });
 }
 pub fn read_char() -> Option<char> {
@@ -157,7 +143,6 @@ pub fn read_char() -> Option<char> {
 }
 
 pub extern "x86-interrupt" fn handler(stack_frame: &super::ExceptionStackFrame) {
-    // println!("keyboard happened");
     if let Some(input) = read_char() {
         crate::print!("{}", input);
     }
