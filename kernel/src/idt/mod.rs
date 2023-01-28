@@ -17,6 +17,7 @@ const PAGE_FAULT: u8 = 0xE;
 const PIC_OFFSET1: u8 = 0x20;
 const PIC_OFFSET2: u8 = PIC_OFFSET1 + 8;
 const PIT_HANDLER: u8 = 0x20;
+const SYSCALL_HANDLER: u8 = 0x80;
 
 pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_OFFSET1, PIC_OFFSET2) });
@@ -30,7 +31,7 @@ lazy_static! {
         idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
         idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
         idt.set_handler(PIT_HANDLER, super::pit::handler as u64);
-        idt.set_handler(0x80, super::syscalls::int_0x80_handler as u64);
+        idt.set_handler(SYSCALL_HANDLER, super::syscalls::int_0x80_handler as u64);
 
         idt
     };
