@@ -14,8 +14,8 @@ mod io;
 mod memory;
 mod pit;
 mod scheduler;
+mod syscalls;
 mod terminal;
-
 
 /// Kernel Entry Point
 ///
@@ -40,6 +40,7 @@ pub extern "C" fn _start() -> ! {
         gdt::activate();
         scheduler::load_tss();
         idt::IDT.load();
+        syscalls::initialize();
         pit::start(19);
     }
     println!("Hello world");
