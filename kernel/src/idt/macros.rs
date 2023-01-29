@@ -1,6 +1,7 @@
 #[macro_export]
 macro_rules! interrupt_handler {
-    ($name:ident, $handler:ident) => {{
+    ($handler:ident => $name:ident) => {{
+        #[naked]
         #[no_mangle]
         pub extern "C" fn $name() -> ! {
             unsafe {
@@ -17,7 +18,7 @@ macro_rules! interrupt_handler {
                     push r11
                     mov rdi, rsp
                     add rdi, 9*8
-                    call {handler}
+                    call {}
                     pop r11
                     pop r10
                     pop r9
@@ -28,7 +29,7 @@ macro_rules! interrupt_handler {
                     pop rcx
                     pop rax
                     iretq",
-                    handler = in(reg) $handler,
+                    sym $handler,
                     options(noreturn),
                 );
             }

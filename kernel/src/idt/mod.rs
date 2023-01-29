@@ -1,8 +1,10 @@
 mod keyboard;
 mod macros;
 
-use crate::{print, println};
+use crate::syscalls::int_0x80_handler as syscall_handler;
+use crate::{interrupt_handler, print, println};
 use bit_field::BitField;
+use core::arch::asm;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
@@ -28,13 +30,28 @@ lazy_static! {
     pub static ref IDT: Idt = {
         let mut idt = Idt::new();
 
-        idt.set_handler(DIV_0, divide_by_zero_handler as u64);
-        idt.set_handler(BREAKPOINT, breakpoint_handler as u64);
-        idt.set_handler(DOUBLE_FAULT, double_fault_handler as u64);
-        idt.set_handler(PAGE_FAULT, page_fault_handler as u64);
+        idt.set_handler(
+            DIV_0,
+            interrupt_handler!(divide_by_zero_handler => div_0) as u64,
+        );
+        idt.set_handler(
+            BREAKPOINT,
+            interrupt_handler!(breakpoint_handler => breakpoint) as u64,
+        );
+        idt.set_handler(
+            DOUBLE_FAULT,
+            interrupt_handler!(double_fault_handler => d_fault) as u64,
+        );
+        idt.set_handler(
+            PAGE_FAULT,
+            interrupt_handler!(page_fault_handler => p_fault) as u64,
+        );
         idt.set_handler(PIT_HANDLER, super::pit::handler as u64);
         idt.set_handler(KEYBOARD_HANDLER, keyboard::handler as u64);
-        idt.set_handler(SYSCALL_HANDLER, super::syscalls::int_0x80_handler as u64);
+        idt.set_handler(
+            SYSCALL_HANDLER,
+            interrupt_handler!(syscall_handler => syscall) as u64,
+        );
 
         idt
     };
@@ -152,8 +169,6 @@ impl Idt {
 }
 
 unsafe fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
-    let registers = super::scheduler::save_context();
-
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
         &*stack_frame
     });
@@ -161,15 +176,11 @@ unsafe fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
 }
 
 unsafe fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
-    let registers = super::scheduler::save_context();
-
     print!("EXCEPTION: BREAKPOINT");
     loop {}
 }
 
 unsafe fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
-    let registers = super::scheduler::save_context();
-
     print!("EXCEPTION: double fault occured");
     loop {}
 }
@@ -178,8 +189,6 @@ unsafe fn page_fault_handler(
     stack_frame: &ExceptionStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
-    let registers = super::scheduler::save_context();
-
     println!("============");
     println!("|Page Fault|");
     println!("============");
