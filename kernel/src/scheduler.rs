@@ -65,6 +65,15 @@ pub struct Registers {
     pub r15: u64,
 }
 
+#[repr(u8)]
+pub enum ProcessStates {
+    New,
+    Ready,
+    Running,
+    Waiting,
+    Terminate,
+}
+
 pub struct Process {
     pub registers: Registers,
     pub page_table: PhysAddr,
