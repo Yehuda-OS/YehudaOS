@@ -1,10 +1,14 @@
 use super::Process;
 use fs_rs::fs;
 
-type ElfAddr = u64; // Unsigned program address
-type ElfOff = u64; // Unsigned file offset
-type ElfSection = u16; // Unsigned section index
-type ElfVersym = u16; // Unsigned version symbol information
+/// Unsigned program address
+type ElfAddr = u64;
+/// Unsigned file offset
+type ElfOff = u64;
+/// Unsigned section index
+type ElfSection = u16;
+/// Unsigned version symbol information
+type ElfVersym = u16;
 type ElfByte = u8;
 type ElfHalf = u16;
 type ElfSword = i32;
