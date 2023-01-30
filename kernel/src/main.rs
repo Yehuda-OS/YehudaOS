@@ -16,7 +16,6 @@ mod pit;
 mod scheduler;
 mod terminal;
 
-
 /// Kernel Entry Point
 ///
 /// `_start` is defined in the linker script as the entry point for the ELF file.
@@ -38,6 +37,7 @@ pub extern "C" fn _start() -> ! {
             .set_page_table(memory::PAGE_TABLE);
         gdt::create();
         gdt::activate();
+        fs_rs::fs::init();
         scheduler::load_tss();
         idt::IDT.load();
         pit::start(19);
