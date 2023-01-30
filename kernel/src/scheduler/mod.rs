@@ -75,6 +75,23 @@ pub struct Process {
     flags: u64,
 }
 
+impl Process {
+    /// Returns a new `Process` struct and creates a page table for it, or `None` if there
+    /// is no free space for a page table.
+    ///
+    /// # Safety
+    /// A valid kernel's page table is required.
+    pub unsafe fn new() -> Option<Self> {
+        Some(Process {
+            registers: Registers::default(),
+            page_table: create_page_table()?,
+            stack_pointer: 0,
+            instruction_pointer: 0,
+            flags: 0,
+        })
+    }
+}
+
 /// Returns the address of the Task State Segment.
 pub fn get_tss_address() -> u64 {
     unsafe { &TSS_ENTRY as *const _ as u64 }
