@@ -261,3 +261,7 @@ unsafe fn create_page_table() -> Option<PhysAddr> {
 
     Some(table)
 }
+
+fn terminate_process(p: &Process) {
+    // TODO
+}
