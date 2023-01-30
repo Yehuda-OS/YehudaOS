@@ -1,26 +1,20 @@
 use super::Process;
+use crate::memory;
 use fs_rs::fs;
+use x86_64::{
+    structures::paging::{PageSize, PageTableFlags, Size4KiB},
+    VirtAddr,
+};
 
 /// Unsigned program address
 type ElfAddr = u64;
 /// Unsigned file offset
 type ElfOff = u64;
-/// Unsigned section index
-type ElfSection = u16;
-/// Unsigned version symbol information
-type ElfVersym = u16;
-type ElfByte = u8;
-type ElfHalf = u16;
-type ElfSword = i32;
-type ElfWord = u32;
-type ElfSxword = i64;
-type ElfXword = u64;
 
 const EI_NIDENT: usize = 16;
-const EI_MAG0: u8 = 0x7f;
-const EI_MAG1: u8 = 'E' as u8;
-const EI_MAG2: u8 = 'L' as u8;
-const EI_MAG3: u8 = 'F' as u8;
+
+#[derive(Debug)]
+pub struct OutOfMemory {}
 
 #[repr(C)]
 #[derive(Default)]
@@ -79,7 +73,7 @@ fn get_header(file_id: u64) -> ElfEhdr {
     header
 }
 
-/// Returns an array of the program header pointer.
+/// Returns an array of the program header entry.
 ///
 /// # Arguments
 /// - `file_id` - The ID of the ELF file.
@@ -101,15 +95,76 @@ fn get_program_table(file_id: u64, header: &ElfEhdr) -> alloc::vec::Vec<ElfPhdr>
     }
 }
 
-pub unsafe fn load_process(file_id: u64) -> Option<Process> {
-    let header = get_header(file_id);
-    let p = Process {
-        registers: super::Registers::default(),
-        page_table: super::create_page_table()?,
-        stack_pointer: 0,
-        instruction_pointer: header.e_entry,
-        flags: 0,
-    };
+/// Map a segment to a process' address space.
+///
+///  # Arguments
+/// - `p` - The process' struct.
+/// - `segment` - The segment to map.
+fn map_segment(p: &Process, segment: &ElfPhdr) -> Result<(), OutOfMemory> {
+    let flags =
+        PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE;
+    let mut mapped = 0;
+    let mut page;
 
-    Some(p)
+    while mapped < segment.p_memsz {
+        page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
+        // The page table should not be null because it is returned from the `create_page_table`
+        // function.
+        // If the file is valid, the virtual address should not be already used.
+        // We map a 4KiB page and we don't use the `HUGE_PAGE` flag.
+        memory::vmm::map_address(p.page_table, VirtAddr::new(segment.p_vaddr), page, flags)
+            .map_err(|_| OutOfMemory {})?;
+        mapped += Size4KiB::SIZE;
+    }
+
+    Ok(())
+}
+
+/// Write a segment to the process' memory.
+///
+/// # Arguments
+/// - `file_id` - The ELF file of the process.
+/// - `p` - The process' struct.
+/// - `segment` - The segment to write.
+///
+/// # Panics
+/// Panic if the segment has not yet been mapped into the process' address space.
+///
+/// # Safety
+/// This function is unsafe because it assumes the segment has been loaded to memory correctly.
+unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
+    // UNWRAP: The page table is not null and we panic if the segment has not been mapped to memory.
+    let address = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(segment.p_vaddr))
+        .unwrap()
+        .as_u64();
+    let buffer = core::slice::from_raw_parts_mut(
+        (address + memory::HHDM_OFFSET) as *mut u8,
+        segment.p_memsz as usize,
+    );
+
+    fs::read(file_id as usize, buffer, segment.p_offset as usize);
+}
+
+/// Load a process' virtual address space.
+///
+/// # Arguments
+/// - `file_id` - The ELF file to load.
+///
+/// # Returns
+/// The function returns a newly created `Process` struct or an `OutOfMemory` error.
+pub unsafe fn load_process(file_id: u64) -> Result<Process, OutOfMemory> {
+    let header = get_header(file_id);
+    let mut p = Process::new().ok_or(OutOfMemory {})?;
+
+    p.instruction_pointer = header.e_entry;
+    for entry in &get_program_table(file_id, &header) {
+        map_segment(&p, entry).map_err(|e| {
+            super::terminate_process(&p);
+
+            e
+        })?;
+        write_segment(file_id, &p, entry);
+    }
+
+    Ok(p)
 }
