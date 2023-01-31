@@ -1,5 +1,6 @@
 use super::Process;
 use crate::memory;
+use core::fmt;
 use fs_rs::fs;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, Size4KiB},
@@ -11,10 +12,18 @@ type ElfAddr = u64;
 /// Unsigned file offset
 type ElfOff = u64;
 
+const PROCESS_STACK_POINTER: u64 = 0xffff_7000_0000_0000;
+
 const EI_NIDENT: usize = 16;
 
 #[derive(Debug)]
 pub struct OutOfMemory {}
+
+impl fmt::Display for OutOfMemory {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "not enough memory to create a process")
+    }
+}
 
 #[repr(C)]
 #[derive(Default)]
@@ -152,11 +161,15 @@ unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
 ///
 /// # Returns
 /// The function returns a newly created `Process` struct or an `OutOfMemory` error.
+///
+/// # Safety
+/// This function is unsafe because it assumes that `file_id` points to a valid
+/// ELF file.
 pub unsafe fn load_process(file_id: u64) -> Result<Process, OutOfMemory> {
     let header = get_header(file_id);
-    let mut p = Process::new().ok_or(OutOfMemory {})?;
+    let stack_page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
+    let p = Process::new(header.e_entry, PROCESS_STACK_POINTER).ok_or(OutOfMemory {})?;
 
-    p.instruction_pointer = header.e_entry;
     for entry in &get_program_table(file_id, &header) {
         map_segment(&p, entry).map_err(|e| {
             super::terminate_process(&p);
@@ -165,6 +178,17 @@ pub unsafe fn load_process(file_id: u64) -> Result<Process, OutOfMemory> {
         })?;
         write_segment(file_id, &p, entry);
     }
+    // The page table is not null because we check it in `create_page_table`.
+    // There are no problems with the huge page flag.
+    // The file should not contains segments that will overlap with the process' stack.
+    // Therefore, if there's an error we return `OutOfMemory`.
+    memory::vmm::map_address(
+        p.page_table,
+        VirtAddr::new(PROCESS_STACK_POINTER - Size4KiB::SIZE),
+        stack_page,
+        PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
+    )
+    .map_err(|_| OutOfMemory {})?;
 
     Ok(p)
 }

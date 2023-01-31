@@ -79,14 +79,18 @@ impl Process {
     /// Returns a new `Process` struct and creates a page table for it, or `None` if there
     /// is no free space for a page table.
     ///
+    /// # Arguments
+    /// - `rip` - The process' instruction pointer.
+    /// - `rsp` - The process' stack pointer.
+    ///
     /// # Safety
     /// A valid kernel's page table is required.
-    pub unsafe fn new() -> Option<Self> {
+    pub unsafe fn new(rip: u64, rsp: u64) -> Option<Self> {
         Some(Process {
             registers: Registers::default(),
             page_table: create_page_table()?,
-            stack_pointer: 0,
-            instruction_pointer: 0,
+            stack_pointer: rsp,
+            instruction_pointer: rip,
             flags: 0,
         })
     }
