@@ -5,6 +5,7 @@ use crate::syscalls::int_0x80_handler as syscall_handler;
 use crate::{interrupt_handler, print, println};
 use bit_field::BitField;
 use core::arch::asm;
+pub use keyboard::stdin::read_line;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
