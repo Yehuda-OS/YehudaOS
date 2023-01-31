@@ -711,16 +711,13 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
         return Some(0);
     }
 
-    remaining = if buffer.len() > inode.size() - offset {
-        inode.size() - offset
-    } else {
-        buffer.len()
-    };
+    remaining = core::cmp::min(buffer.len(), inode.size() - offset);
     if to_read > remaining {
         to_read = remaining;
     }
     while remaining != 0 {
         // If there is no pointer read null bytes
+        // UNWRAP: We check that we don't exceed the file's size
         if inode.get_ptr(pointer).unwrap() == 0 {
             for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
                 *i = 0;
@@ -736,11 +733,7 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
         bytes_read += to_read;
         remaining -= to_read;
         pointer += 1;
-        to_read = if remaining < BLOCK_SIZE {
-            remaining
-        } else {
-            BLOCK_SIZE
-        };
+        to_read = core::cmp::min(remaining, BLOCK_SIZE);
     }
 
     Some(bytes_read)
