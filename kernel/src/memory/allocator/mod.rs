@@ -3,6 +3,8 @@ use core::{
     ptr::null_mut,
 };
 
+use crate::mutex::Mutex;
+use crate::mutex::MutexGuard;
 use heap_block::HeapBlock;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
@@ -336,17 +338,17 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
 
 /// A wrapper around spin::Mutex to permit trait implementations.
 pub struct Locked<A> {
-    inner: spin::Mutex<A>,
+    inner: Mutex<A>,
 }
 
 impl<A> Locked<A> {
     pub const fn new(inner: A) -> Self {
         Locked {
-            inner: spin::Mutex::new(inner),
+            inner: Mutex::new(inner),
         }
     }
 
-    pub fn lock(&self) -> spin::MutexGuard<A> {
+    pub fn lock(&self) -> MutexGuard<A> {
         self.inner.lock()
     }
 }
