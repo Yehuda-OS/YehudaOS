@@ -21,6 +21,10 @@ impl<T> Mutex<T> {
         }
     }
 
+    /// Wait until the lock is free and then lock it.
+    /// 
+    /// # Returns
+    /// Returns a mutex guard that unlocks the lock automatically when it goes out of scope.
     pub fn lock(&self) -> MutexGuard<T> {
         unsafe {
             core::arch::asm!(
@@ -40,6 +44,7 @@ impl<T> Mutex<T> {
         }
     }
 
+    /// Try to lock and return a mutex guard if the lock was successfuly locked.
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
         let mut locked = true;
 
