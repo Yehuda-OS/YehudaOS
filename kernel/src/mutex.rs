@@ -3,6 +3,7 @@ pub struct Mutex<T> {
     locked: bool,
 }
 
+#[derive(Debug)]
 pub struct MutexGuard<'a, T> {
     value: &'a mut T,
     locked: &'a mut bool,
@@ -36,6 +37,35 @@ impl<T> Mutex<T> {
         MutexGuard {
             value: unsafe { &mut *get(&self.value) },
             locked: unsafe { &mut *get(&self.locked) },
+        }
+    }
+
+    pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+        let mut locked = true;
+
+        unsafe {
+            core::arch::asm!(
+                "
+            mov rdx, 0
+            bts [{0}], rdx
+            jc 2f
+            jmp 3f
+            ",
+                in(reg)get(&self.locked),
+            );
+            core::arch::asm!("2:");
+            // If the carry flag is on the lock was already locked.
+            locked = false;
+            core::arch::asm!("3:");
+        }
+
+        if locked {
+            Some(MutexGuard {
+                value: unsafe { &mut *get(&self.value) },
+                locked: unsafe { &mut *get(&self.locked) },
+            })
+        } else {
+            None
         }
     }
 }
