@@ -19,7 +19,7 @@ pub type DirList = Vec<DirListEntry>;
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
 const FILE_NAME_LEN: usize = 11;
-const BLOCK_SIZE: usize = 16;
+const BLOCK_SIZE: usize = 4096;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 const DISK_PARTS: DiskParts = calc_parts(blkdev::DEVICE_SIZE);
@@ -92,22 +92,21 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     }
     // Check if the path is relative
     if path.chars().nth(0).unwrap_or(' ') != '/' {
-        if let Some(cwd) = cwd {
-            inode = cwd;
-        } else {
-            return None;
-        }
+        inode = cwd?;
     }
 
     while next_delimiter != None {
         let mut data: Vec<u8> = vec![0; inode.size()];
+        let dir_content;
         unsafe { read(inode.id, data.as_mut_slice(), index) };
-        let dir_content = unsafe {
-            Box::from(slice::from_raw_parts(
+
+        dir_content = unsafe {
+            core::slice::from_raw_parts(
                 data.as_ptr() as *const DirEntry,
                 data.len() / core::mem::size_of::<DirEntry>(),
-            ))
+            )
         };
+
         path = &path[(next_delimiter.unwrap() + 1)..];
         next_delimiter = path.find('/');
         next_folder = match next_delimiter {
@@ -752,8 +751,8 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
 /// If the file has been set to a smaller length, the extra data will be lost.
 ///
 /// # Arguments
-/// `file` - The `Inode` of the file.
-/// `size` - The required size.
+/// - `file` - The `Inode` of the file.
+/// - `size` - The required size.
 ///
 /// # Returns
 /// The function returns the `FileNotFound` or `MaximumSizeExceeded` error.
