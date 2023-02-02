@@ -12,7 +12,6 @@ use x86_64::{
 mod heap_block;
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
-pub const MAX_PAGES: u64 = 25; // 100 KiB
 
 const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
@@ -78,10 +77,6 @@ fn alloc_node(
     } else {
         (size + adjustment) / Size4KiB::SIZE + 1
     };
-
-    if allocator.pages + required_pages > MAX_PAGES {
-        return None;
-    }
     let mut success = true;
 
     for _ in 0..required_pages {
