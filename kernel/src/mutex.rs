@@ -22,7 +22,7 @@ impl<T> Mutex<T> {
     }
 
     /// Wait until the lock is free and then lock it.
-    /// 
+    ///
     /// # Returns
     /// Returns a mutex guard that unlocks the lock automatically when it goes out of scope.
     pub fn lock(&self) -> MutexGuard<T> {
