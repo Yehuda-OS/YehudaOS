@@ -13,11 +13,13 @@ pub fn init() {
 }
 
 /// Set `size` bytes starting in offset `addr` to `value`.
-/// 
+///
 /// # Safety
 /// This operation is unsafe because it uses raw pointers.
 pub unsafe fn set(addr: usize, size: usize, value: u8) {
-    core::ptr::write(DATA.as_mut_ptr(), value);
+    for i in 0..size {
+        core::ptr::write(DATA.as_mut_ptr().add(addr + i), value);
+    }
 }
 
 /// Read from the block device.
