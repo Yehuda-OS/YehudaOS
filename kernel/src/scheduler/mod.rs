@@ -257,10 +257,11 @@ pub unsafe fn load_context(p: &Process) -> ! {
 unsafe fn create_page_table() -> Option<PhysAddr> {
     let table = memory::vmm::create_page_table()?;
     let high_kernel_table = memory::PAGE_TABLE + Size4KiB::SIZE / 2;
+    let high_user_table = table + Size4KiB::SIZE / 2;
 
     core::ptr::copy_nonoverlapping(
         (high_kernel_table.as_u64() + memory::HHDM_OFFSET) as *const u8,
-        (table.as_u64() + memory::HHDM_OFFSET) as *mut u8,
+        (high_user_table.as_u64() + memory::HHDM_OFFSET) as *mut u8,
         Size4KiB::SIZE as usize / 2,
     );
 
