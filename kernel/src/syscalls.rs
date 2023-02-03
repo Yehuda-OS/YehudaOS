@@ -1,9 +1,17 @@
 use super::io;
 use super::scheduler;
+use crate::iostream::STDIN;
+use core::slice;
+use fs_rs::fs::is_dir;
+use fs_rs::fs::read as fread;
 
 const EFER: u32 = 0xc0000080;
 const STAR: u32 = 0xc0000081;
 const LSTAR: u32 = 0xc0000082;
+const STDIN_DESCRIPTOR: i32 = 0;
+const STDOUT_DESCRIPTOR: i32 = 1;
+const STDERR_DESCRIPTOR: i32 = 2;
+const TO_SUB_FROM_FD_TO_GET_FILE_ID: i32 = 3;
 
 pub unsafe fn initialize() {
     let rip = handler as u64;
@@ -86,4 +94,38 @@ pub unsafe fn handler() -> ! {
     );
 
     scheduler::load_context(&proc);
+}
+
+/// implementation for `read` syscall
+///
+/// # Arguments
+/// - `fd` - the file descriptor
+unsafe fn read(fd: i32, buf: *mut u8, count: usize) -> isize {
+    if fd < 0 {
+        return -1;
+    }
+
+    let mut buf = alloc::string::String::new();
+    if buf.as_ptr().is_null() {
+        return -1;
+    }
+    if fd < 3 && fd >= 0 {
+        match fd {
+            STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as isize,
+            STDOUT_DESCRIPTOR => return 0, // STDOUT still not implemented
+            STDERR_DESCRIPTOR => return 0, // STDERR still not implemented
+            _ => {}
+        }
+    }
+
+    let buffer = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr(), count) };
+    match fread((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize, buffer, 0) {
+        Some(b) => {
+            if is_dir((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize) {
+                return -1;
+            }
+            b as isize
+        }
+        None => -1,
+    }
 }

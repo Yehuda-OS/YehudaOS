@@ -12,6 +12,7 @@ extern crate alloc;
 mod gdt;
 mod idt;
 mod io;
+mod iostream;
 mod memory;
 mod pit;
 mod scheduler;
@@ -43,6 +44,9 @@ pub extern "C" fn _start() -> ! {
         idt::IDT.load();
         syscalls::initialize();
         pit::start(19);
+        let mut buf = alloc::string::String::new();
+        iostream::STDIN.read_line(&mut buf);
+        println!("{}", buf);
     }
     println!("Hello world");
 

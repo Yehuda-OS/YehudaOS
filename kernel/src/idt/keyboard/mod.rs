@@ -1,5 +1,5 @@
 mod keycode;
-pub mod stdin;
+use crate::iostream::key_handle;
 
 use bitflags::bitflags;
 use lazy_static::lazy_static;
@@ -147,7 +147,7 @@ pub fn read_char() -> Option<char> {
 
 pub extern "x86-interrupt" fn handler(stack_frame: &super::ExceptionStackFrame) {
     if let Some(input) = read_char() {
-        stdin::key_handle(input);
+        key_handle(input);
         crate::print!("{}", input);
     }
     // send the PICs the end interrupt signal
