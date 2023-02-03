@@ -292,7 +292,7 @@ unsafe fn print_list(first: *mut HeapBlock) {
 
     println!("\n\n|LIST|");
     while curr != null_mut() {
-        println!("{:p} : {:?}", curr, *curr);
+        println!("{:p} : {:?}, size: {:#x}", curr, *curr, (*curr).size());
         curr = (*curr).next();
     }
 }
