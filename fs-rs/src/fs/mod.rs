@@ -363,7 +363,11 @@ fn allocate_block() -> Option<usize> {
     address *= BLOCK_SIZE;
     address += DISK_PARTS.data;
 
-    Some(address)
+    if address + BLOCK_SIZE > blkdev::DEVICE_SIZE {
+        None
+    } else {
+        Some(address)
+    }
 }
 
 /// deallocate a block
