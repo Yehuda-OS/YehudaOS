@@ -96,17 +96,16 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     }
 
     while next_delimiter != None {
-        let mut data: Vec<u8> = vec![0; inode.size()];
-        let dir_content;
-        unsafe { read(inode.id, data.as_mut_slice(), index) };
+        let mut dir_content =
+            vec![DirEntry::default(); inode.size() / core::mem::size_of::<DirEntry>()];
 
-        dir_content = unsafe {
-            core::slice::from_raw_parts(
-                data.as_ptr() as *const DirEntry,
-                data.len() / core::mem::size_of::<DirEntry>(),
+        unsafe {
+            read(
+                inode.id,
+                core::slice::from_raw_parts_mut(dir_content.as_mut_ptr() as *mut u8, inode.size()),
+                index,
             )
         };
-
         path = &path[(next_delimiter.unwrap() + 1)..];
         next_delimiter = path.find('/');
         next_folder = match next_delimiter {
