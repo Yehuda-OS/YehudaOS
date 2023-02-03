@@ -256,10 +256,11 @@ pub unsafe fn load_context(p: &Process) -> ! {
 /// A valid kernel's page table is required.
 unsafe fn create_page_table() -> Option<PhysAddr> {
     let table = memory::vmm::create_page_table()?;
+    let high_kernel_table = memory::PAGE_TABLE + Size4KiB::SIZE / 2;
 
     core::ptr::copy_nonoverlapping(
-        (memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
-        table.as_u64() as *mut u8,
+        (high_kernel_table.as_u64() + memory::HHDM_OFFSET) as *const u8,
+        (table.as_u64() + memory::HHDM_OFFSET) as *mut u8,
         Size4KiB::SIZE as usize / 2,
     );
 
