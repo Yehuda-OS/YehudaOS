@@ -2,7 +2,7 @@ extern crate alloc;
 use alloc::vec;
 use vec::Vec;
 
-pub const DEVICE_SIZE: usize = 1024 * 1024;
+pub const DEVICE_SIZE: usize = 10 * 1024 * 1024;
 
 static mut DATA: Vec<u8> = Vec::new();
 
