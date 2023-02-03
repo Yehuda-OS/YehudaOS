@@ -122,8 +122,13 @@ fn map_segment(p: &Process, segment: &ElfPhdr) -> Result<(), OutOfMemory> {
         // function.
         // If the file is valid, the virtual address should not be already used.
         // We map a 4KiB page and we don't use the `HUGE_PAGE` flag.
-        memory::vmm::map_address(p.page_table, VirtAddr::new(segment.p_vaddr), page, flags)
-            .map_err(|_| OutOfMemory {})?;
+        memory::vmm::map_address(
+            p.page_table,
+            VirtAddr::new(segment.p_vaddr + mapped),
+            page,
+            flags,
+        )
+        .map_err(|_| OutOfMemory {})?;
         mapped += Size4KiB::SIZE;
     }
 
