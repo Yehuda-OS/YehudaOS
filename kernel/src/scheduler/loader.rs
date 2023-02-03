@@ -148,16 +148,29 @@ fn map_segment(p: &Process, segment: &ElfPhdr) -> Result<(), OutOfMemory> {
 /// # Safety
 /// This function is unsafe because it assumes the segment has been loaded to memory correctly.
 unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
-    // UNWRAP: The page table is not null and we panic if the segment has not been mapped to memory.
-    let address = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(segment.p_vaddr))
-        .unwrap()
-        .as_u64();
-    let buffer = core::slice::from_raw_parts_mut(
-        (address + memory::HHDM_OFFSET) as *mut u8,
-        segment.p_memsz as usize,
-    );
+    let mut address;
+    let mut buffer;
+    let mut to_write = segment.p_memsz;
 
-    fs::read(file_id as usize, buffer, segment.p_offset as usize);
+    loop {
+        // UNWRAP: The page table is not null and we
+        // panic if the segment has not been mapped to memory.
+        address = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(segment.p_vaddr))
+            .unwrap()
+            .as_u64();
+        buffer = core::slice::from_raw_parts_mut(
+            (address + memory::HHDM_OFFSET) as *mut u8,
+            core::cmp::min(to_write, Size4KiB::SIZE) as usize,
+        );
+
+        fs::read(file_id as usize, buffer, segment.p_offset as usize);
+
+        if to_write <= Size4KiB::SIZE {
+            return;
+        }
+
+        to_write -= Size4KiB::SIZE;
+    }
 }
 
 /// Load a process' virtual address space.
