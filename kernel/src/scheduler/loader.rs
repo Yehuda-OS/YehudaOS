@@ -12,9 +12,10 @@ type ElfAddr = u64;
 /// Unsigned file offset
 type ElfOff = u64;
 
-const PROCESS_STACK_POINTER: u64 = 0xffff_7000_0000_0000;
+const PROCESS_STACK_POINTER: u64 = 0x7000_0000_0000;
 
 const EI_NIDENT: usize = 16;
+const PT_LOAD: u32 = 1;
 
 #[derive(Debug)]
 pub struct OutOfMemory {}
@@ -171,12 +172,14 @@ pub unsafe fn load_process(file_id: u64) -> Result<Process, OutOfMemory> {
     let p = Process::new(header.e_entry, PROCESS_STACK_POINTER).ok_or(OutOfMemory {})?;
 
     for entry in &get_program_table(file_id, &header) {
-        map_segment(&p, entry).map_err(|e| {
-            super::terminate_process(&p);
+        if entry.p_type == PT_LOAD {
+            map_segment(&p, entry).map_err(|e| {
+                super::terminate_process(&p);
 
-            e
-        })?;
-        write_segment(file_id, &p, entry);
+                e
+            })?;
+            write_segment(file_id, &p, entry);
+        }
     }
     // The page table is not null because we check it in `create_page_table`.
     // There are no problems with the huge page flag.
