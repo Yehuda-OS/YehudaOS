@@ -19,7 +19,7 @@ pub type DirList = Vec<DirListEntry>;
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
 const FILE_NAME_LEN: usize = 11;
-const BLOCK_SIZE: usize = 4096;
+const BLOCK_SIZE: usize = 8192;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 const DISK_PARTS: DiskParts = calc_parts(blkdev::DEVICE_SIZE);
@@ -52,7 +52,7 @@ pub struct DirListEntry {
     pub file_size: usize,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Default)]
 struct DirEntry {
     name: [u8; FILE_NAME_LEN],
     id: usize,
