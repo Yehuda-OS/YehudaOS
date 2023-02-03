@@ -286,14 +286,11 @@ fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
         if buffer & (1 << i) == 0 {
             buffer ^= 1 << i; // flip the bit to mark as occupied
             unsafe {
-                blkdev::write(
-                    address,
-                    BYTES_IN_BUFFER,
-                    core::mem::transmute(&buffer as *const usize as *mut u8),
-                );
+                blkdev::write(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8);
             }
             // get the index in the bitmap
             address -= bitmap_start;
+            address *= BITS_IN_BYTE;
             address += i;
 
             // once we found unoccupied space, we finished our task
