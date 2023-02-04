@@ -70,7 +70,7 @@ pub unsafe fn handler() -> ! {
     // `rbp` holds the value of the stack pointer after pushing the original `rbp`.
     core::arch::asm!("
     mov {0}, rbp
-    sub {0}, 8
+    add {0}, 8
     ",
         out(reg)proc.stack_pointer,
     );
