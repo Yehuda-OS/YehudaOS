@@ -1,6 +1,6 @@
 // keyboard set, key[0] is without shift, key[1] if when shifted
 // more than one indexes with '\0' as value because are reserved
-pub(super) static KEYMAP: [[char; 2]; 58] = [
+pub(super) static KEYMAP: [[char; 2]; 59] = [
     ['\0', '\0'],
     ['\x1B', '\x1B'],
     ['1', '!'],
@@ -59,6 +59,7 @@ pub(super) static KEYMAP: [[char; 2]; 58] = [
     ['\0', '\0'],
     ['\0', '\0'],
     [' ', ' '],
+    ['\x08', '\x08'],
 ];
 
 /// function that returns the key index in US array
@@ -122,6 +123,7 @@ pub fn get_key_index(scancode: u8) -> usize {
         b'.' => 52,
         b'/' => 53,
         b' ' => 57,
+        b'\x08' => 58,
         _ => 0,
     }
 }

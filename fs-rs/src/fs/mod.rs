@@ -498,7 +498,7 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
 ///
 /// # Returns
 /// `true` if the inode is directory and `false` if not
-fn is_dir(id: usize) -> bool {
+pub fn is_dir(id: usize) -> bool {
     if let Some(inode) = read_inode(id) {
         inode.directory
     } else {

@@ -1,4 +1,5 @@
 mod keycode;
+use crate::iostream::key_handle;
 
 use bitflags::bitflags;
 use lazy_static::lazy_static;
@@ -42,7 +43,7 @@ impl Keyboard {
     }
 }
 
-const TO_ASCII_LOW: &'static [u8; 17] = b"\x1B1234567890-=\0x02";
+const TO_ASCII_LOW: &'static [u8; 14] = b"\x1B1234567890-=\x08";
 
 const TO_ASCII_MID1: &'static [u8; 14] = b"\tqwertyuiop[]\n";
 
@@ -115,7 +116,9 @@ impl Modifiers {
         use keycode::{get_key_index, KEYMAP};
 
         if let Some(c) = KEYMAP.get(get_key_index(ascii) as usize) {
-            if self.is_shifted() || (self.is_uppercase() && (c[0] as char).is_alphabetic()) {
+            if (self.is_uppercase() && (c[0] as char).is_alphabetic())
+                || (self.is_shifted() && !(c[0] as char).is_alphabetic())
+            {
                 c[1] as u8
             } else {
                 c[0] as u8
@@ -144,6 +147,7 @@ pub fn read_char() -> Option<char> {
 
 pub extern "x86-interrupt" fn handler(stack_frame: &super::ExceptionStackFrame) {
     if let Some(input) = read_char() {
+        key_handle(input);
         crate::print!("{}", input);
     }
     // send the PICs the end interrupt signal

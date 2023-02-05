@@ -6,10 +6,6 @@ extern crate alloc;
 
 pub mod fs;
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
