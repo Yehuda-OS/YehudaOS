@@ -110,6 +110,8 @@ impl Inode {
         offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
         if self.indirect_pointer == 0 {
             self.indirect_pointer = super::allocate_block().ok_or(FsError::NotEnoughDiskSpace)?;
+            // SAFETY: We checked that the allocation succeeded.
+            unsafe { blkdev::set(self.indirect_pointer, BLOCK_SIZE, 0) }
         }
         unsafe {
             blkdev::write(

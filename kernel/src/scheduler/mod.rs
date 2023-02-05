@@ -5,6 +5,8 @@ use x86_64::{
     PhysAddr,
 };
 
+pub mod loader;
+
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
 
@@ -80,6 +82,27 @@ pub struct Process {
     pub stack_pointer: u64,
     pub instruction_pointer: u64,
     pub flags: u64,
+}
+
+impl Process {
+    /// Returns a new `Process` struct and creates a page table for it, or `None` if there
+    /// is no free space for a page table.
+    ///
+    /// # Arguments
+    /// - `rip` - The process' instruction pointer.
+    /// - `rsp` - The process' stack pointer.
+    ///
+    /// # Safety
+    /// A valid kernel's page table is required.
+    pub unsafe fn new(rip: u64, rsp: u64) -> Option<Self> {
+        Some(Process {
+            registers: Registers::default(),
+            page_table: create_page_table()?,
+            stack_pointer: rsp,
+            instruction_pointer: rip,
+            flags: 0,
+        })
+    }
 }
 
 /// Returns the address of the Task State Segment.
@@ -242,12 +265,18 @@ pub unsafe fn load_context(p: &Process) -> ! {
 /// A valid kernel's page table is required.
 unsafe fn create_page_table() -> Option<PhysAddr> {
     let table = memory::vmm::create_page_table()?;
+    let high_kernel_table = memory::PAGE_TABLE + Size4KiB::SIZE / 2;
+    let high_user_table = table + Size4KiB::SIZE / 2;
 
     core::ptr::copy_nonoverlapping(
-        (memory::PAGE_TABLE + Size4KiB::SIZE / 2).as_u64() as *const u8,
-        table.as_u64() as *mut u8,
+        (high_kernel_table.as_u64() + memory::HHDM_OFFSET) as *const u8,
+        (high_user_table.as_u64() + memory::HHDM_OFFSET) as *mut u8,
         Size4KiB::SIZE as usize / 2,
     );
 
     Some(table)
+}
+
+fn terminate_process(p: &Process) {
+    // TODO
 }

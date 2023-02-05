@@ -8,6 +8,8 @@
 
 extern crate alloc;
 
+use fs_rs::fs;
+
 mod gdt;
 mod idt;
 mod io;
@@ -39,6 +41,7 @@ pub extern "C" fn _start() -> ! {
             .set_page_table(memory::PAGE_TABLE);
         gdt::create();
         gdt::activate();
+        fs::init();
         scheduler::load_tss();
         idt::IDT.load();
         syscalls::initialize();

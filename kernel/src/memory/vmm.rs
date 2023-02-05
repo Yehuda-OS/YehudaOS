@@ -165,10 +165,6 @@ pub fn map_address<T: PageSize>(
             }
         }
         Size2MiB::SIZE => {
-            assert!(
-                flags.contains(PageTableFlags::HUGE_PAGE),
-                "Missing huge page flag"
-            );
             if flags.contains(PageTableFlags::HUGE_PAGE) {
                 Ok(3) // When the page size is 2MiB we stop iterating at p2 table
             } else {
