@@ -1,4 +1,7 @@
+use crate::mutex::Mutex;
+
 use super::memory;
+use alloc::collections::VecDeque;
 use core::arch::asm;
 use x86_64::{
     structures::paging::{PageSize, Size4KiB},
@@ -9,6 +12,10 @@ pub mod loader;
 
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
+
+pub struct ProcQueue {
+    inner: Mutex<VecDeque<Process>>,
+}
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
