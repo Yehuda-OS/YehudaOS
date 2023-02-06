@@ -21,7 +21,7 @@ pub fn add_to_the_queue(p: &'static Process) {
     let mut proc_queue = PROC_QUEUE.lock();
 
     let proc: (&'static Process, u8) = if p.kernel_task {
-        (p, 15) // if kernel task get higher priority
+        (p, 15) // if the procrss is kernel task it gets higher priority
     } else {
         (p, 0)
     };
