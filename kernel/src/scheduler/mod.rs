@@ -1,21 +1,21 @@
-use crate::mutex::Mutex;
-
 use super::memory;
+use crate::mutex::Mutex;
 use alloc::collections::VecDeque;
 use core::arch::asm;
+use lazy_static::lazy_static;
 use x86_64::{
     structures::paging::{PageSize, Size4KiB},
     PhysAddr,
 };
 
+lazy_static! {
+    pub static ref PROC_QUEUE: Mutex<VecDeque<Process>> = __static_ref_initialize();
+}
+
 pub mod loader;
 
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
-
-pub struct ProcQueue {
-    inner: Mutex<VecDeque<Process>>,
-}
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
