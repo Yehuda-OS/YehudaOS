@@ -1,6 +1,6 @@
 use super::memory;
 use crate::mutex::Mutex;
-use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 use core::arch::asm;
 use lazy_static::lazy_static;
 use x86_64::{
@@ -9,18 +9,29 @@ use x86_64::{
 };
 
 lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<VecDeque<(Process, u8)>> = __static_ref_initialize();
+    pub static ref PROC_QUEUE: Mutex<Vec<(&'static Process, u8)>> = Mutex::new(Vec::new());
 }
 
 /// function that push process into the process queue
 ///
 /// # Arguments
 /// - `p` - the process
-///
-/// # Returns
-/// the index of the process in the queue if pushed successfully, None otherwise
-pub fn add_to_the_queue(p: &Process) -> Option<usize> {
-    None
+pub fn add_to_the_queue(p: &'static Process) {
+    use core::cmp::Ordering;
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    let proc: (&'static Process, u8) = if p.kernel_task {
+        (p, 15) // if kernel task get higher priority
+    } else {
+        (p, 0)
+    };
+
+    proc_queue.push(proc);
+    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    for i in 0..proc_queue.len() {
+        proc_queue[i].1 += 1;
+    }
+    unsafe { load_context(proc_queue.pop().unwrap().0) };
 }
 
 pub mod loader;
