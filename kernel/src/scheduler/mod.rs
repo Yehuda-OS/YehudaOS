@@ -9,7 +9,18 @@ use x86_64::{
 };
 
 lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<VecDeque<Process>> = __static_ref_initialize();
+    pub static ref PROC_QUEUE: Mutex<VecDeque<(Process, u8)>> = __static_ref_initialize();
+}
+
+/// function that push process into the process queue
+///
+/// # Arguments
+/// - `p` - the process
+///
+/// # Returns
+/// the index of the process in the queue if pushed successfully, None otherwise
+pub fn add_to_the_queue(p: &Process) -> Option<usize> {
+    None
 }
 
 pub mod loader;
