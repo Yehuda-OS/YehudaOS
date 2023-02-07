@@ -9,18 +9,18 @@ use x86_64::{
 };
 
 lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<Vec<(&'static Process, u8)>> = Mutex::new(Vec::new());
+    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
 }
 
 /// function that push process into the process queue
 ///
 /// # Arguments
 /// - `p` - the process
-pub fn add_to_the_queue(p: &'static Process) {
+pub fn add_to_the_queue(p: Process) {
     use core::cmp::Ordering;
     let mut proc_queue = PROC_QUEUE.lock();
 
-    let proc: (&'static Process, u8) = if p.kernel_task {
+    let proc: (Process, u8) = if p.kernel_task {
         (p, 15) // if the procrss is kernel task it gets higher priority
     } else {
         (p, 0)
@@ -31,7 +31,6 @@ pub fn add_to_the_queue(p: &'static Process) {
     for i in 0..proc_queue.len() {
         proc_queue[i].1 += 1;
     }
-    unsafe { load_context(proc_queue.pop().unwrap().0) };
 }
 
 pub mod loader;
