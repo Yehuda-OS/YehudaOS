@@ -3,6 +3,9 @@ pub struct Mutex<T> {
     locked: bool,
 }
 
+unsafe impl<T: Sized + Send> core::marker::Sync for Mutex<T> {}
+unsafe impl<T: Sized + Send> core::marker::Send for Mutex<T> {}
+
 #[derive(Debug)]
 pub struct MutexGuard<'a, T> {
     value: &'a mut T,
