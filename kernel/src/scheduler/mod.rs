@@ -246,7 +246,7 @@ pub unsafe fn load_context(p: &Process) -> ! {
 /// A valid kernel's page table is required.
 unsafe fn create_page_table() -> Option<PhysAddr> {
     let table = memory::vmm::create_page_table()?;
-    let high_kernel_table = memory::PAGE_TABLE + Size4KiB::SIZE / 2;
+    let high_kernel_table = memory::get_page_table() + Size4KiB::SIZE / 2;
     let high_user_table = table + Size4KiB::SIZE / 2;
 
     core::ptr::copy_nonoverlapping(
