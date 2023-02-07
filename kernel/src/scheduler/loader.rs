@@ -173,43 +173,58 @@ unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
     }
 }
 
-/// Load a process' virtual address space.
-///
-/// # Arguments
-/// - `file_id` - The ELF file to load.
-///
-/// # Returns
-/// The function returns a newly created `Process` struct or an `OutOfMemory` error.
-///
-/// # Safety
-/// This function is unsafe because it assumes that `file_id` points to a valid
-/// ELF file.
-pub unsafe fn load_process(file_id: u64) -> Result<Process, OutOfMemory> {
-    let header = get_header(file_id);
-    let stack_page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
-    let p = Process::new(header.e_entry, PROCESS_STACK_POINTER, false).ok_or(OutOfMemory {})?;
+impl super::Process {
+    /// Load a process' virtual address space.
+    ///
+    /// # Arguments
+    /// - `file_id` - The ELF file to load.
+    ///
+    /// # Returns
+    /// The function returns a newly created `Process` struct or an `OutOfMemory` error.
+    ///
+    /// # Safety
+    /// This function is unsafe because it assumes that `file_id` points to a valid
+    /// ELF file.
+    pub unsafe fn user_process(file_id: u64) -> Result<Self, OutOfMemory> {
+        let header = get_header(file_id);
+        let stack_page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
+        let p = Process {
+            registers: super::Registers::default(),
+            page_table: super::create_page_table().ok_or(OutOfMemory {})?,
+            stack_pointer: PROCESS_STACK_POINTER,
+            instruction_pointer: header.e_entry,
+            flags: 0,
+            kernel_task: false,
+        };
 
-    for entry in &get_program_table(file_id, &header) {
-        if entry.p_type == PT_LOAD {
-            map_segment(&p, entry).map_err(|e| {
-                super::terminate_process(&p);
+        for entry in &get_program_table(file_id, &header) {
+            if entry.p_type == PT_LOAD {
+                map_segment(&p, entry).map_err(|e| {
+                    super::terminate_process(&p);
 
-                e
-            })?;
-            write_segment(file_id, &p, entry);
+                    e
+                })?;
+                write_segment(file_id, &p, entry);
+            }
         }
-    }
-    // The page table is not null because we check it in `create_page_table`.
-    // There are no problems with the huge page flag.
-    // The file should not contains segments that will overlap with the process' stack.
-    // Therefore, if there's an error we return `OutOfMemory`.
-    memory::vmm::map_address(
-        p.page_table,
-        VirtAddr::new(PROCESS_STACK_POINTER - Size4KiB::SIZE),
-        stack_page,
-        PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
-    )
-    .map_err(|_| OutOfMemory {})?;
+        // The page table is not null because we check it in `create_page_table`.
+        // There are no problems with the huge page flag.
+        // The file should not contains segments that will overlap with the process' stack.
+        // Therefore, if there's an error we return `OutOfMemory`.
+        memory::vmm::map_address(
+            p.page_table,
+            VirtAddr::new(PROCESS_STACK_POINTER - Size4KiB::SIZE),
+            stack_page,
+            PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
+        )
+        .map_err(|_| OutOfMemory {})?;
 
-    Ok(p)
+        Ok(p)
+    }
+}
+
+impl Drop for super::Process {
+    fn drop(&mut self) {
+        todo!()
+    }
 }
