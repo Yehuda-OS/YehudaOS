@@ -6,6 +6,7 @@ use x86_64::{
 };
 
 mod loader;
+mod kernel_tasks;
 
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
