@@ -82,6 +82,7 @@ pub struct Process {
     pub stack_pointer: u64,
     pub instruction_pointer: u64,
     pub flags: u64,
+    pub kernel_task: bool,
 }
 
 impl Process {
@@ -91,16 +92,18 @@ impl Process {
     /// # Arguments
     /// - `rip` - The process' instruction pointer.
     /// - `rsp` - The process' stack pointer.
+    /// - `kernel_task` - Whether the process is a kernel task.
     ///
     /// # Safety
     /// A valid kernel's page table is required.
-    pub unsafe fn new(rip: u64, rsp: u64) -> Option<Self> {
+    pub unsafe fn new(rip: u64, rsp: u64, kernel_task: bool) -> Option<Self> {
         Some(Process {
             registers: Registers::default(),
             page_table: create_page_table()?,
             stack_pointer: rsp,
             instruction_pointer: rip,
             flags: 0,
+            kernel_task,
         })
     }
 }

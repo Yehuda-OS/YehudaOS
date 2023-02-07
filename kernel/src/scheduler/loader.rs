@@ -187,7 +187,7 @@ unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
 pub unsafe fn load_process(file_id: u64) -> Result<Process, OutOfMemory> {
     let header = get_header(file_id);
     let stack_page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
-    let p = Process::new(header.e_entry, PROCESS_STACK_POINTER).ok_or(OutOfMemory {})?;
+    let p = Process::new(header.e_entry, PROCESS_STACK_POINTER, false).ok_or(OutOfMemory {})?;
 
     for entry in &get_program_table(file_id, &header) {
         if entry.p_type == PT_LOAD {
