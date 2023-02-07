@@ -5,7 +5,7 @@ use x86_64::{
     PhysAddr,
 };
 
-pub mod loader;
+mod loader;
 
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
@@ -83,29 +83,6 @@ pub struct Process {
     pub instruction_pointer: u64,
     pub flags: u64,
     pub kernel_task: bool,
-}
-
-impl Process {
-    /// Returns a new `Process` struct and creates a page table for it, or `None` if there
-    /// is no free space for a page table.
-    ///
-    /// # Arguments
-    /// - `rip` - The process' instruction pointer.
-    /// - `rsp` - The process' stack pointer.
-    /// - `kernel_task` - Whether the process is a kernel task.
-    ///
-    /// # Safety
-    /// A valid kernel's page table is required.
-    pub unsafe fn new(rip: u64, rsp: u64, kernel_task: bool) -> Option<Self> {
-        Some(Process {
-            registers: Registers::default(),
-            page_table: create_page_table()?,
-            stack_pointer: rsp,
-            instruction_pointer: rip,
-            flags: 0,
-            kernel_task,
-        })
-    }
 }
 
 /// Returns the address of the Task State Segment.
