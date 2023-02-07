@@ -17,7 +17,6 @@ lazy_static! {
 /// # Arguments
 /// - `p` - the process
 pub fn add_to_the_queue(p: Process) {
-    use core::cmp::Ordering;
     let mut proc_queue = PROC_QUEUE.lock();
 
     let proc: (Process, u8) = if p.kernel_task {
@@ -30,6 +29,14 @@ pub fn add_to_the_queue(p: Process) {
     proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
     for i in 0..proc_queue.len() {
         proc_queue[i].1 += 1;
+    }
+}
+
+pub fn load_from_queue() {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    while let Some(p) = proc_queue.pop() {
+        unsafe { load_context(&p.0) };
     }
 }
 
