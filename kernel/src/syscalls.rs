@@ -70,8 +70,7 @@ pub unsafe fn handler() -> ! {
         stack_pointer: 0,
         instruction_pointer: 0,
         flags: 0,
-        // syscall is a kernel task
-        kernel_task: true,
+        kernel_task: false,
     };
 
     // The `syscall` instruction saves the instruction pointer in `rcx` and the cpu flags in `r11`.

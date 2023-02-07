@@ -127,6 +127,7 @@ impl Process {
     /// # Arguments
     /// - `rip` - The process' instruction pointer.
     /// - `rsp` - The process' stack pointer.
+    /// - `kernel_task` - Whether the process is a kernel task.
     ///
     /// # Safety
     /// A valid kernel's page table is required.
