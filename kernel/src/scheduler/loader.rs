@@ -1,4 +1,4 @@
-use super::Process;
+use super::{Process, SchedulerError};
 use crate::memory;
 use core::fmt;
 use fs_rs::fs;
@@ -16,15 +16,6 @@ const PROCESS_STACK_POINTER: u64 = 0x7000_0000_0000;
 
 const EI_NIDENT: usize = 16;
 const PT_LOAD: u32 = 1;
-
-#[derive(Debug)]
-pub struct OutOfMemory {}
-
-impl fmt::Display for OutOfMemory {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "not enough memory to create a process")
-    }
-}
 
 #[repr(C)]
 #[derive(Default)]
@@ -110,14 +101,14 @@ fn get_program_table(file_id: u64, header: &ElfEhdr) -> alloc::vec::Vec<ElfPhdr>
 ///  # Arguments
 /// - `p` - The process' struct.
 /// - `segment` - The segment to map.
-fn map_segment(p: &Process, segment: &ElfPhdr) -> Result<(), OutOfMemory> {
+fn map_segment(p: &Process, segment: &ElfPhdr) -> Result<(), SchedulerError> {
     let flags =
         PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE;
     let mut mapped = 0;
     let mut page;
 
     while mapped < segment.p_memsz {
-        page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
+        page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         // The page table should not be null because it is returned from the `create_page_table`
         // function.
         // If the file is valid, the virtual address should not be already used.
@@ -128,7 +119,7 @@ fn map_segment(p: &Process, segment: &ElfPhdr) -> Result<(), OutOfMemory> {
             page,
             flags,
         )
-        .map_err(|_| OutOfMemory {})?;
+        .map_err(|_| SchedulerError::OutOfMemory)?;
         mapped += Size4KiB::SIZE;
     }
 
@@ -185,12 +176,12 @@ impl super::Process {
     /// # Safety
     /// This function is unsafe because it assumes that `file_id` points to a valid
     /// ELF file.
-    pub unsafe fn user_process(file_id: u64) -> Result<Self, OutOfMemory> {
+    pub unsafe fn user_process(file_id: u64) -> Result<Self, SchedulerError> {
         let header = get_header(file_id);
-        let stack_page = memory::page_allocator::allocate().ok_or(OutOfMemory {})?;
+        let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let p = Process {
             registers: super::Registers::default(),
-            page_table: super::create_page_table().ok_or(OutOfMemory {})?,
+            page_table: super::create_page_table().ok_or(SchedulerError::OutOfMemory)?,
             stack_pointer: PROCESS_STACK_POINTER,
             instruction_pointer: header.e_entry,
             flags: 0,
@@ -217,7 +208,7 @@ impl super::Process {
             stack_page,
             PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
         )
-        .map_err(|_| OutOfMemory {})?;
+        .map_err(|_| SchedulerError::OutOfMemory)?;
 
         Ok(p)
     }

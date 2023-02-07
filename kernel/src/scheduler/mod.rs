@@ -1,12 +1,13 @@
 use super::memory;
 use core::arch::asm;
+use core::fmt;
 use x86_64::{
     structures::paging::{PageSize, Size4KiB},
     PhysAddr,
 };
 
-mod loader;
 mod kernel_tasks;
+mod loader;
 
 const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
@@ -28,6 +29,19 @@ static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved3: 0,
     io_permission_bitmap: 0,
 };
+
+#[derive(Debug)]
+pub enum SchedulerError {
+    OutOfMemory,
+}
+
+impl fmt::Display for SchedulerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            SchedulerError::OutOfMemory => write!(f, "not enough memory to create a process"),
+        }
+    }
+}
 
 #[repr(packed)]
 #[allow(unused)]
