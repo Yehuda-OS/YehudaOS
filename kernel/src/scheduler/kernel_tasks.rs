@@ -40,6 +40,18 @@ fn allocate_stack() -> Option<u64> {
     None
 }
 
+/// Calls the exit syscall.
+/// This function will be automatically pushed to every kernel's task return address.
+unsafe fn terminate_task() {
+    core::arch::asm!(
+        "
+        mov rdi, rax
+        mov rax, 0x3c
+        syscall
+    "
+    );
+}
+
 /// Free a kernel's task stack after it is finished.
 /// Frees all the memory that was mapped to this stack and marks it as free in the bitmap.
 ///
@@ -76,16 +88,16 @@ impl super::Process {
     /// # Returns
     /// A `Process` struct for the task on success or an `OutOfMemory` error on fail.
     pub fn kernel_task<T>(
-        function: extern "C" fn(*mut T),
+        function: extern "C" fn(*mut T) -> i32,
         param: *mut T,
     ) -> Result<Self, SchedulerError> {
         const PARAM_SIZE: u64 = 8;
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
-        let p = super::Process {
+        let mut p = super::Process {
             registers: super::Registers::default(),
             page_table: memory::get_page_table(),
             // UNWRAP: Assume the maximum amount of threads is not exceeded.
-            stack_pointer: allocate_stack().unwrap() - PARAM_SIZE,
+            stack_pointer: allocate_stack().unwrap(),
             instruction_pointer: function as u64,
             flags: 0,
             kernel_task: true,
@@ -93,15 +105,19 @@ impl super::Process {
 
         memory::vmm::map_address(
             p.page_table,
-            VirtAddr::new(p.stack_pointer - Size4KiB::SIZE + PARAM_SIZE),
+            VirtAddr::new(p.stack_pointer - Size4KiB::SIZE),
             stack_page,
             PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
         )
         .map_err(|_| SchedulerError::OutOfMemory)?;
+        p.registers.rdi = param as u64;
+        // Push the return address to the task's stack.
         unsafe {
             *((stack_page.start_address().as_u64() + Size4KiB::SIZE - PARAM_SIZE
-                + memory::HHDM_OFFSET) as *mut u64) = param as u64
+                + memory::HHDM_OFFSET) as *mut u64) = terminate_task as u64
         }
+        // The return address is 8 bytes.
+        p.stack_pointer -= 8;
 
         Ok(p)
     }
