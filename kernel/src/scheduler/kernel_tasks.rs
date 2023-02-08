@@ -1,5 +1,5 @@
 use x86_64::{
-    structures::paging::{PageSize, PhysFrame, Size4KiB},
+    structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     VirtAddr,
 };
 
@@ -42,7 +42,7 @@ fn allocate_stack() -> Option<u64> {
 
 /// Free a kernel's task stack after it is finished.
 /// Frees all the memory that was mapped to this stack and marks it as free in the bitmap.
-/// 
+///
 /// # Arguments
 /// - `stack_pointer` - The stack pointer of the kernel's stack.
 /// The function assumes the stack pointer is in the range of the stack the task has received.
@@ -67,15 +67,41 @@ pub fn deallocate_stack(stack_pointer: u64) {
 }
 
 impl super::Process {
-    pub fn kernel_task(function: u64) -> Result<Self, SchedulerError> {
+    /// Create a new kernel task.
+    ///
+    /// # Arguments
+    /// - `function` - The function that will be ran.
+    /// - `param` - The parameter that will be sent to the function.
+    ///
+    /// # Returns
+    /// A `Process` struct for the task on success or an `OutOfMemory` error on fail.
+    pub fn kernel_task<T>(
+        function: extern "C" fn(*mut T),
+        param: *mut T,
+    ) -> Result<Self, SchedulerError> {
+        const PARAM_SIZE: u64 = 8;
+        let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let p = super::Process {
             registers: super::Registers::default(),
-            page_table: crate::memory::get_page_table(),
-            stack_pointer: allocate_stack().ok_or(SchedulerError::OutOfMemory)?,
-            instruction_pointer: function,
+            page_table: memory::get_page_table(),
+            // UNWRAP: Assume the maximum amount of threads is not exceeded.
+            stack_pointer: allocate_stack().unwrap() - PARAM_SIZE,
+            instruction_pointer: function as u64,
             flags: 0,
             kernel_task: true,
         };
+
+        memory::vmm::map_address(
+            p.page_table,
+            VirtAddr::new(p.stack_pointer - Size4KiB::SIZE + PARAM_SIZE),
+            stack_page,
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+        )
+        .map_err(|_| SchedulerError::OutOfMemory)?;
+        unsafe {
+            *((stack_page.start_address().as_u64() + Size4KiB::SIZE - PARAM_SIZE
+                + memory::HHDM_OFFSET) as *mut u64) = param as u64
+        }
 
         Ok(p)
     }
