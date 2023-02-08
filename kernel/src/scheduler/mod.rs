@@ -9,8 +9,10 @@ use x86_64::{
 mod kernel_tasks;
 mod loader;
 
-const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
-const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
+const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
+const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
+const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
+const USER_DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -201,6 +203,12 @@ pub unsafe fn save_context() -> Registers {
 /// This function is unsafe because it jumps to a code at a specific
 /// address and deletes the entire call stack.
 pub unsafe fn load_context(p: &Process) -> ! {
+    let (code_segment, data_segment) = if p.kernel_task {
+        (KERNEL_CODE_SEGMENT, KERNEL_DATA_SEGMENT)
+    } else {
+        (USER_CODE_SEGMENT, USER_DATA_SEGMENT)
+    };
+
     memory::load_tables_to_cr3(p.page_table);
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
@@ -216,7 +224,7 @@ pub unsafe fn load_context(p: &Process) -> ! {
     push {1:r}
     push {rip}
     ",
-        in(reg)DATA_SEGMENT, in(reg)CODE_SEGMENT,
+        in(reg)data_segment, in(reg)code_segment,
         rsp=in(reg)p.stack_pointer, rip=in(reg)p.instruction_pointer
     );
     // Push the future `rbx` and `rbp` to later pop them.
