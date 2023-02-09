@@ -8,89 +8,14 @@ use x86_64::{
     structures::paging::{PageSize, Size4KiB},
     PhysAddr,
 };
-
-lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
-}
-
-pub static mut CURR_PROC: Option<Process> = None;
-
-/// function that push process into the process queue
-///
-/// # Arguments
-/// - `p` - the process
-pub fn add_to_the_queue(p: Process) {
-    let mut proc_queue = PROC_QUEUE.lock();
-
-    let proc: (Process, u8) = if p.kernel_task {
-        (p, 15) // if the procrss is kernel task it gets higher priority
-    } else {
-        (p, 0)
-    };
-
-    proc_queue.push(proc);
-    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-    for i in 0..proc_queue.len() {
-        proc_queue[i].1 += 1;
-    }
-}
-
-pub fn load_from_queue() {
-    let mut proc_queue = PROC_QUEUE.lock();
-
-    if let Some(p) = proc_queue.pop() {
-        unsafe {
-            if CURR_PROC.is_some() {
-                add_to_the_queue(CURR_PROC.unwrap());
-            }
-            CURR_PROC = Some(p.0);
-            load_context(&CURR_PROC.unwrap())
-        };
-    }
-}
-
-lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
-}
-
-pub static mut CURR_PROC: Option<Process> = None;
-
-/// function that push process into the process queue
-///
-/// # Arguments
-/// - `p` - the process
-pub fn add_to_the_queue(p: Process) {
-    let mut proc_queue = PROC_QUEUE.lock();
-
-    let proc: (Process, u8) = if p.kernel_task {
-        (p, 15) // if the procrss is kernel task it gets higher priority
-    } else {
-        (p, 0)
-    };
-
-    proc_queue.push(proc);
-    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-    for i in 0..proc_queue.len() {
-        proc_queue[i].1 += 1;
-    }
-}
-
-pub fn load_from_queue() {
-    let mut proc_queue = PROC_QUEUE.lock();
-
-    if let Some(p) = proc_queue.pop() {
-        unsafe {
-            if CURR_PROC.is_some() {
-                add_to_the_queue(CURR_PROC.unwrap());
-            }
-            CURR_PROC = Some(p.0);
-            load_context(&CURR_PROC.unwrap())
-        };
-    }
-}
-
 mod kernel_tasks;
 mod loader;
+
+lazy_static! {
+    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
+}
+
+pub static mut CURR_PROC: Option<Process> = None;
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
@@ -176,7 +101,7 @@ pub enum ProcessStates {
     Terminate,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Process {
     pub registers: Registers,
     pub page_table: PhysAddr,
@@ -184,6 +109,41 @@ pub struct Process {
     pub instruction_pointer: u64,
     pub flags: u64,
     pub kernel_task: bool,
+}
+
+/// function that push process into the process queue
+///
+/// # Arguments
+/// - `p` - the process
+pub fn add_to_the_queue(p: Process) {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    let proc: (Process, u8) = if p.kernel_task {
+        (p, 15) // if the procrss is kernel task it gets higher priority
+    } else {
+        (p, 0)
+    };
+
+    proc_queue.push(proc);
+    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    for i in 0..proc_queue.len() {
+        proc_queue[i].1 += 1;
+    }
+}
+
+/// Load a process from the queue.
+pub fn load_from_queue() {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    if let Some(p) = proc_queue.pop() {
+        unsafe {
+            if CURR_PROC.is_some() {
+                add_to_the_queue(core::ptr::read(CURR_PROC.as_ref().unwrap()));
+            }
+            CURR_PROC = Some(p.0);
+            load_context(CURR_PROC.as_ref().unwrap())
+        };
+    }
 }
 
 /// Returns the address of the Task State Segment.
