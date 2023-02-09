@@ -91,7 +91,7 @@ impl super::Process {
         function: extern "C" fn(*mut T) -> i32,
         param: *mut T,
     ) -> Result<Self, SchedulerError> {
-        const PARAM_SIZE: u64 = 8;
+        const POINTER_SIZE: u64 = 8;
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let mut p = super::Process {
             registers: super::Registers::default(),
@@ -113,11 +113,10 @@ impl super::Process {
         p.registers.rdi = param as u64;
         // Push the return address to the task's stack.
         unsafe {
-            *((stack_page.start_address().as_u64() + Size4KiB::SIZE - PARAM_SIZE
+            *((stack_page.start_address().as_u64() + Size4KiB::SIZE - POINTER_SIZE
                 + memory::HHDM_OFFSET) as *mut u64) = terminate_task as u64
         }
-        // The return address is 8 bytes.
-        p.stack_pointer -= 8;
+        p.stack_pointer -= POINTER_SIZE;
 
         Ok(p)
     }
