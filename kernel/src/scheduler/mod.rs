@@ -35,7 +35,7 @@ pub fn add_to_the_queue(p: Process) {
 pub fn load_from_queue() {
     let mut proc_queue = PROC_QUEUE.lock();
 
-    while let Some(p) = proc_queue.pop() {
+    if let Some(p) = proc_queue.pop() {
         unsafe { load_context(&p.0) };
     }
 }
