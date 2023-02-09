@@ -1,10 +1,93 @@
 use super::memory;
+use crate::mutex::Mutex;
+use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
+use lazy_static::lazy_static;
 use x86_64::{
     structures::paging::{PageSize, Size4KiB},
     PhysAddr,
 };
+
+lazy_static! {
+    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
+}
+
+pub static mut CURR_PROC: Option<Process> = None;
+
+/// function that push process into the process queue
+///
+/// # Arguments
+/// - `p` - the process
+pub fn add_to_the_queue(p: Process) {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    let proc: (Process, u8) = if p.kernel_task {
+        (p, 15) // if the procrss is kernel task it gets higher priority
+    } else {
+        (p, 0)
+    };
+
+    proc_queue.push(proc);
+    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    for i in 0..proc_queue.len() {
+        proc_queue[i].1 += 1;
+    }
+}
+
+pub fn load_from_queue() {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    if let Some(p) = proc_queue.pop() {
+        unsafe {
+            if CURR_PROC.is_some() {
+                add_to_the_queue(CURR_PROC.unwrap());
+            }
+            CURR_PROC = Some(p.0);
+            load_context(&CURR_PROC.unwrap())
+        };
+    }
+}
+
+lazy_static! {
+    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
+}
+
+pub static mut CURR_PROC: Option<Process> = None;
+
+/// function that push process into the process queue
+///
+/// # Arguments
+/// - `p` - the process
+pub fn add_to_the_queue(p: Process) {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    let proc: (Process, u8) = if p.kernel_task {
+        (p, 15) // if the procrss is kernel task it gets higher priority
+    } else {
+        (p, 0)
+    };
+
+    proc_queue.push(proc);
+    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    for i in 0..proc_queue.len() {
+        proc_queue[i].1 += 1;
+    }
+}
+
+pub fn load_from_queue() {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    if let Some(p) = proc_queue.pop() {
+        unsafe {
+            if CURR_PROC.is_some() {
+                add_to_the_queue(CURR_PROC.unwrap());
+            }
+            CURR_PROC = Some(p.0);
+            load_context(&CURR_PROC.unwrap())
+        };
+    }
+}
 
 mod kernel_tasks;
 mod loader;
@@ -65,7 +148,7 @@ pub struct TaskStateSegment {
     io_permission_bitmap: u16,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Registers {
     pub rax: u64,
     pub rbx: u64,
@@ -93,6 +176,7 @@ pub enum ProcessStates {
     Terminate,
 }
 
+#[derive(Clone, Copy)]
 pub struct Process {
     pub registers: Registers,
     pub page_table: PhysAddr,
