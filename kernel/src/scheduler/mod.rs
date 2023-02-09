@@ -12,6 +12,8 @@ lazy_static! {
     pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
 }
 
+pub static mut CURR_PROC: Option<Process> = None;
+
 /// function that push process into the process queue
 ///
 /// # Arguments
@@ -36,7 +38,13 @@ pub fn load_from_queue() {
     let mut proc_queue = PROC_QUEUE.lock();
 
     if let Some(p) = proc_queue.pop() {
-        unsafe { load_context(&p.0) };
+        unsafe {
+            if CURR_PROC.is_some() {
+                add_to_the_queue(CURR_PROC.unwrap());
+            }
+            CURR_PROC = Some(p.0);
+            load_context(&CURR_PROC.unwrap())
+        };
     }
 }
 
@@ -83,7 +91,7 @@ pub struct TaskStateSegment {
     io_permission_bitmap: u16,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Registers {
     pub rax: u64,
     pub rbx: u64,
@@ -111,6 +119,7 @@ pub enum ProcessStates {
     Terminate,
 }
 
+#[derive(Clone, Copy)]
 pub struct Process {
     pub registers: Registers,
     pub page_table: PhysAddr,
