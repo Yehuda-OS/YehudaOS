@@ -213,9 +213,3 @@ impl super::Process {
         Ok(p)
     }
 }
-
-impl Drop for super::Process {
-    fn drop(&mut self) {
-        todo!()
-    }
-}

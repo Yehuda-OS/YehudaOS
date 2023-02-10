@@ -111,6 +111,25 @@ pub struct Process {
     pub kernel_task: bool,
 }
 
+impl Drop for Process {
+    fn drop(&mut self) {
+        if self.kernel_task {
+            kernel_tasks::deallocate_stack(self.stack_pointer);
+        } else {
+            memory::vmm::page_table_walker(self.page_table, &|virt, physical| {
+                if virt.as_u64() < memory::HHDM_OFFSET {
+                    memory::vmm::unmap_address(self.page_table, virt).unwrap();
+                    unsafe {
+                        memory::page_allocator::free(PhysFrame::from_start_address_unchecked(
+                            physical,
+                        ))
+                    }
+                }
+            });
+        }
+    }
+}
+
 /// Returns a mutable reference to the currently running process.
 /// Should not be used in a multi-threaded situation.
 pub fn get_running_process() -> MutexGuard<'static, Option<Process>> {
