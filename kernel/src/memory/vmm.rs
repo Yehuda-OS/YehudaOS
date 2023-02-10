@@ -92,6 +92,61 @@ pub fn create_page_table() -> Option<PhysAddr> {
     return Some(page_table);
 }
 
+/// Walk over all the used page table entries.
+/// Does not support huge pages.
+/// 
+/// # Arguments
+/// - `pml4` - The page table to walk over.
+/// - `handler` - A callback function that will be called on each used entry.
+/// It's parameters are the virtual address of the entry and the physical address
+/// that it is mapped to.
+pub fn page_table_walker(pml4: PhysAddr, handler: &dyn Fn(VirtAddr, PhysAddr)) {
+    let mut p3;
+    let mut p2;
+    let mut p1;
+    let mut entry;
+    let mut virtual_address;
+    let mut indexes;
+
+    for p4_index in 0..PAGE_TABLE_ENTRIES {
+        entry = unsafe { &mut *get_page_table_entry(pml4, p4_index) };
+        if entry.is_unused() {
+            continue;
+        }
+        p3 = entry.addr();
+        for p3_index in 0..PAGE_TABLE_ENTRIES {
+            entry = unsafe { &mut *get_page_table_entry(p3, p3_index) };
+            if entry.is_unused() || entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+                continue;
+            }
+            p2 = entry.addr();
+            for p2_index in 0..PAGE_TABLE_ENTRIES {
+                entry = unsafe { &mut *get_page_table_entry(p2, p2_index) };
+                if entry.is_unused() || entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+                    continue;
+                }
+                p1 = entry.addr();
+                for p1_index in 0..PAGE_TABLE_ENTRIES {
+                    entry = unsafe { &mut *get_page_table_entry(p1, p1_index) };
+                    if entry.is_unused() || entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+                        continue;
+                    }
+                    indexes = [p4_index, p3_index, p2_index, p1_index];
+                    virtual_address = 0;
+                    for index in indexes {
+                        // Every index is 9 bits
+                        virtual_address |= index;
+                        virtual_address <<= 9;
+                    }
+                    // The offset in the page is 12 bits.
+                    virtual_address <<= 12 - 9;
+                    handler(VirtAddr::new(virtual_address), entry.addr());
+                }
+            }
+        }
+    }
+}
+
 /// Returns the physical addresses a virtual address is mapped to or an error if `pml4`
 /// is null or the virtual address is unused.
 ///
