@@ -73,6 +73,9 @@ pub unsafe fn handler() -> ! {
         kernel_task: false,
     };
 
+    // Disable interrupts while handling a syscall.
+    core::arch::asm!("cli");
+
     // The `syscall` instruction saves the instruction pointer in `rcx` and the cpu flags in `r11`.
     proc.instruction_pointer = proc.registers.rcx;
     proc.flags = proc.registers.r11;
@@ -94,7 +97,7 @@ pub unsafe fn handler() -> ! {
         proc.registers.r9,
     );
 
-    scheduler::load_context(&proc);
+    loop {}
 }
 
 /// implementation for `read` syscall
