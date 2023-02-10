@@ -9,7 +9,7 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-const PAGE_TABLE_ENTRIES: isize = 512;
+const PAGE_TABLE_ENTRIES: u64 = 512;
 const PAGE_TABLE_LEVELS: u8 = 4;
 
 #[derive(Debug)]
@@ -68,8 +68,8 @@ impl fmt::Display for UnmapError {
 /// # Safety
 /// This function is unsafe because `page_table` must be a valid page table and `offset` must be
 /// equals or greater than 0 and must be less than 512.
-unsafe fn get_page_table_entry(page_table: PhysAddr, offset: isize) -> *mut PageTableEntry {
-    let entry_physical = (page_table.as_u64() as *const u64).offset(offset) as u64;
+unsafe fn get_page_table_entry(page_table: PhysAddr, offset: u64) -> *mut PageTableEntry {
+    let entry_physical = (page_table.as_u64() as *const u64).add(offset as usize) as u64;
     let entry_virtual = entry_physical + super::HHDM_OFFSET;
 
     entry_virtual as *mut PageTableEntry
@@ -113,7 +113,7 @@ pub fn virtual_to_physical(
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
-        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        let offset = ((virtual_address.as_u64() << used_bits) >> 55);
         // SAFETY: the offset is valid because it is 9 bits.
         let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
         let entry_flags = entry.flags();
@@ -189,7 +189,7 @@ pub fn map_address<T: PageSize>(
         // The offset is 9 bits. To get the offset we shift to the left all the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
-        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        let offset = (virtual_address.as_u64() << used_bits) >> 55;
 
         if page_table == 0 {
             // SAFETY: Entry is not null because pml4 has been asserted to be not null
@@ -239,7 +239,7 @@ fn virt_addr_to_page_table(level: u8, virtual_address: VirtAddr) -> PhysAddr {
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
-        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        let offset = (virtual_address.as_u64() << used_bits) >> 55;
         // SAFETY: the offset is valid because it is 9 bits.
         let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
 
@@ -292,7 +292,7 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) -> Result<(), Un
     }
 
     for _ in 0..PAGE_TABLE_LEVELS {
-        let offset = ((virtual_address.as_u64() << used_bits) >> 55) as isize;
+        let offset = (virtual_address.as_u64() << used_bits) >> 55;
         // SAFETY: the offset is valid because it is 9 bits.
         entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), offset) };
 
