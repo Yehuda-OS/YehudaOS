@@ -4,7 +4,8 @@ __attribute__((force_align_arg_pointer)) void _start()
     asm("call main");
 
     /* exit system call */
-    asm("mov %rax, %rdi;"
+    asm("mov $0, %rdi;"
+        "mov %eax, %edi;"
         "mov $0x3c, %rax;"
         "syscall");
     // tell the compiler to make sure side effects are done before the asm statement

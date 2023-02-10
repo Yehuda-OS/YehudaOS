@@ -45,7 +45,8 @@ fn allocate_stack() -> Option<u64> {
 unsafe fn terminate_task() {
     core::arch::asm!(
         "
-        mov rdi, rax
+        mov rdi, 0
+        mov edi, eax
         mov rax, 0x3c
         syscall
     "
