@@ -5,7 +5,7 @@ use core::arch::asm;
 use core::fmt;
 use lazy_static::lazy_static;
 use x86_64::{
-    structures::paging::{PageSize, Size4KiB},
+    structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
 };
 mod kernel_tasks;
@@ -15,7 +15,7 @@ lazy_static! {
     pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
 }
 
-static CURR_PROC: Mutex<Option<Process>> = Mutex::new(None);
+static mut CURR_PROC: Option<Process> = None;
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
@@ -130,10 +130,17 @@ impl Drop for Process {
     }
 }
 
+/// Get the `rsp0` field from the TSS.
+pub fn get_kernel_stack() -> u64 {
+    unsafe { TSS_ENTRY.rsp0 }
+}
+
 /// Returns a mutable reference to the currently running process.
+///
+/// # Safety
 /// Should not be used in a multi-threaded situation.
-pub fn get_running_process() -> MutexGuard<'static, Option<Process>> {
-    CURR_PROC.lock()
+pub unsafe fn get_running_process() -> &'static mut Option<Process> {
+    &mut CURR_PROC
 }
 
 /// function that push process into the process queue
@@ -160,18 +167,15 @@ pub fn add_to_the_queue(p: Process) {
 ///
 /// # Panics
 /// Panics if the process queue is empty.
-pub fn load_from_queue() -> ! {
+pub unsafe fn load_from_queue() -> ! {
     let mut proc_queue = PROC_QUEUE.lock();
     let p = proc_queue.pop().unwrap();
-    let mut current_process = CURR_PROC.lock();
 
-    if let Some(process) = &*current_process {
-        unsafe { add_to_the_queue(core::ptr::read(process)) }
+    if let Some(process) = &CURR_PROC {
+        add_to_the_queue(core::ptr::read(process))
     }
-    unsafe {
-        core::ptr::write(&mut *current_process, Some(p.0));
-        load_context(current_process.as_ref().unwrap());
-    }
+    core::ptr::write(&mut CURR_PROC, Some(p.0));
+    load_context(CURR_PROC.as_ref().unwrap());
 }
 
 /// Returns the address of the Task State Segment.
@@ -292,11 +296,12 @@ pub unsafe fn load_context(p: &Process) -> ! {
 
     push {0:r}
     push {rsp}
-    pushfq
+    push {flags}
     push {1:r}
     push {rip}
     ",
         in(reg)data_segment, in(reg)code_segment,
+        flags=in(reg)p.flags,
         rsp=in(reg)p.stack_pointer, rip=in(reg)p.instruction_pointer
     );
     // Push the future `rbx` and `rbp` to later pop them.
