@@ -1,5 +1,5 @@
 use super::memory;
-use crate::mutex::Mutex;
+use crate::mutex::{Mutex, MutexGuard};
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
@@ -15,7 +15,7 @@ lazy_static! {
     pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
 }
 
-static mut CURR_PROC: Option<Process> = None;
+static CURR_PROC: Mutex<Option<Process>> = Mutex::new(None);
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
@@ -111,8 +111,10 @@ pub struct Process {
     pub kernel_task: bool,
 }
 
-pub fn get_running_process() -> Option<&'static mut Process> {
-    unsafe { CURR_PROC.as_mut() }
+/// Returns a mutable reference to the currently running process.
+/// Should not be used in a multi-threaded situation.
+pub fn get_running_process() -> MutexGuard<'static, Option<Process>> {
+    CURR_PROC.lock()
 }
 
 /// function that push process into the process queue
@@ -142,15 +144,15 @@ pub fn add_to_the_queue(p: Process) {
 pub fn load_from_queue() -> ! {
     let mut proc_queue = PROC_QUEUE.lock();
     let p = proc_queue.pop().unwrap();
+    let mut current_process = CURR_PROC.lock();
 
-    // SFAETY: The scheduler should always be one-threaded because it is running the tasks.
+    if let Some(process) = &*current_process {
+        unsafe { add_to_the_queue(core::ptr::read(process)) }
+    }
     unsafe {
-        if let Some(process) = &CURR_PROC {
-            add_to_the_queue(core::ptr::read(process));
-        }
-        core::ptr::write(&mut CURR_PROC, Some(p.0));
-        load_context(CURR_PROC.as_ref().unwrap())
-    };
+        core::ptr::write(&mut *current_process, Some(p.0));
+        load_context(current_process.as_ref().unwrap());
+    }
 }
 
 /// Returns the address of the Task State Segment.
