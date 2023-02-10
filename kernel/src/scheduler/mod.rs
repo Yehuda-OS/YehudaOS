@@ -2,11 +2,14 @@ use super::memory;
 use crate::mutex::Mutex;
 use alloc::vec::Vec;
 use core::arch::asm;
+use core::fmt;
 use lazy_static::lazy_static;
 use x86_64::{
     structures::paging::{PageSize, Size4KiB},
     PhysAddr,
 };
+mod kernel_tasks;
+mod loader;
 
 lazy_static! {
     pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
@@ -14,44 +17,10 @@ lazy_static! {
 
 pub static mut CURR_PROC: Option<Process> = None;
 
-/// function that push process into the process queue
-///
-/// # Arguments
-/// - `p` - the process
-pub fn add_to_the_queue(p: Process) {
-    let mut proc_queue = PROC_QUEUE.lock();
-
-    let proc: (Process, u8) = if p.kernel_task {
-        (p, 15) // if the procrss is kernel task it gets higher priority
-    } else {
-        (p, 0)
-    };
-
-    proc_queue.push(proc);
-    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-    for i in 0..proc_queue.len() {
-        proc_queue[i].1 += 1;
-    }
-}
-
-pub fn load_from_queue() {
-    let mut proc_queue = PROC_QUEUE.lock();
-
-    if let Some(p) = proc_queue.pop() {
-        unsafe {
-            if CURR_PROC.is_some() {
-                add_to_the_queue(CURR_PROC.unwrap());
-            }
-            CURR_PROC = Some(p.0);
-            load_context(&CURR_PROC.unwrap())
-        };
-    }
-}
-
-pub mod loader;
-
-const CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
-const DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
+const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
+const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
+const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
+const USER_DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -70,6 +39,19 @@ static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved3: 0,
     io_permission_bitmap: 0,
 };
+
+#[derive(Debug)]
+pub enum SchedulerError {
+    OutOfMemory,
+}
+
+impl fmt::Display for SchedulerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            SchedulerError::OutOfMemory => write!(f, "not enough memory to create a process"),
+        }
+    }
+}
 
 #[repr(packed)]
 #[allow(unused)]
@@ -119,7 +101,7 @@ pub enum ProcessStates {
     Terminate,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Process {
     pub registers: Registers,
     pub page_table: PhysAddr,
@@ -129,26 +111,38 @@ pub struct Process {
     pub kernel_task: bool,
 }
 
-impl Process {
-    /// Returns a new `Process` struct and creates a page table for it, or `None` if there
-    /// is no free space for a page table.
-    ///
-    /// # Arguments
-    /// - `rip` - The process' instruction pointer.
-    /// - `rsp` - The process' stack pointer.
-    /// - `kernel_task` - Whether the process is a kernel task.
-    ///
-    /// # Safety
-    /// A valid kernel's page table is required.
-    pub unsafe fn new(rip: u64, rsp: u64, kernel_task: bool) -> Option<Self> {
-        Some(Process {
-            registers: Registers::default(),
-            page_table: create_page_table()?,
-            stack_pointer: rsp,
-            instruction_pointer: rip,
-            flags: 0,
-            kernel_task,
-        })
+/// function that push process into the process queue
+///
+/// # Arguments
+/// - `p` - the process
+pub fn add_to_the_queue(p: Process) {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    let proc: (Process, u8) = if p.kernel_task {
+        (p, 15) // if the procrss is kernel task it gets higher priority
+    } else {
+        (p, 0)
+    };
+
+    proc_queue.push(proc);
+    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+    for i in 0..proc_queue.len() {
+        proc_queue[i].1 += 1;
+    }
+}
+
+/// Load a process from the queue.
+pub fn load_from_queue() {
+    let mut proc_queue = PROC_QUEUE.lock();
+
+    if let Some(p) = proc_queue.pop() {
+        unsafe {
+            if CURR_PROC.is_some() {
+                add_to_the_queue(core::ptr::read(CURR_PROC.as_ref().unwrap()));
+            }
+            CURR_PROC = Some(p.0);
+            load_context(CURR_PROC.as_ref().unwrap())
+        };
     }
 }
 
@@ -253,6 +247,12 @@ pub unsafe fn save_context() -> Registers {
 /// This function is unsafe because it jumps to a code at a specific
 /// address and deletes the entire call stack.
 pub unsafe fn load_context(p: &Process) -> ! {
+    let (code_segment, data_segment) = if p.kernel_task {
+        (KERNEL_CODE_SEGMENT, KERNEL_DATA_SEGMENT)
+    } else {
+        (USER_CODE_SEGMENT, USER_DATA_SEGMENT)
+    };
+
     memory::load_tables_to_cr3(p.page_table);
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
@@ -268,7 +268,7 @@ pub unsafe fn load_context(p: &Process) -> ! {
     push {1:r}
     push {rip}
     ",
-        in(reg)DATA_SEGMENT, in(reg)CODE_SEGMENT,
+        in(reg)data_segment, in(reg)code_segment,
         rsp=in(reg)p.stack_pointer, rip=in(reg)p.instruction_pointer
     );
     // Push the future `rbx` and `rbp` to later pop them.
@@ -312,7 +312,7 @@ pub unsafe fn load_context(p: &Process) -> ! {
 /// A valid kernel's page table is required.
 unsafe fn create_page_table() -> Option<PhysAddr> {
     let table = memory::vmm::create_page_table()?;
-    let high_kernel_table = memory::PAGE_TABLE + Size4KiB::SIZE / 2;
+    let high_kernel_table = memory::get_page_table() + Size4KiB::SIZE / 2;
     let high_user_table = table + Size4KiB::SIZE / 2;
 
     core::ptr::copy_nonoverlapping(

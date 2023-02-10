@@ -17,6 +17,11 @@ pub const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
 pub static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 pub static mut PAGE_TABLE: PhysAddr = PhysAddr::zero();
 
+/// Returns the kernel's page table.
+pub fn get_page_table() -> PhysAddr {
+    unsafe { PAGE_TABLE }
+}
+
 /// Unwrap the memory map response from the request.
 fn get_memmap() -> &'static LimineMemmapResponse {
     MEMMAP.get_response().get().unwrap()

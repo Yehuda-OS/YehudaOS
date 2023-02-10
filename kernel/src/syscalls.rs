@@ -66,7 +66,7 @@ pub unsafe fn handler() -> ! {
     let mut proc = scheduler::Process {
         registers,
         // After we change this to the running process the page table field will already be loaded.
-        page_table: unsafe { super::memory::PAGE_TABLE },
+        page_table: super::memory::get_page_table(),
         stack_pointer: 0,
         instruction_pointer: 0,
         flags: 0,
