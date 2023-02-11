@@ -1,5 +1,5 @@
 use super::memory;
-use crate::mutex::{Mutex, MutexGuard};
+use crate::{io, mutex::Mutex, syscalls};
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
@@ -283,15 +283,18 @@ pub unsafe fn load_context(p: &Process) -> ! {
     } else {
         (USER_CODE_SEGMENT, USER_DATA_SEGMENT)
     };
+    let p_address = p as *const Process as u64;
 
     memory::load_tables_to_cr3(p.page_table);
+    // Write the address of the process to later use it in the syscall handler.
+    io::wrmsr(syscalls::KERNEL_GS_BASE, p_address);
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
+    swapgs
     mov ds, {0:x}
     mov es, {0:x}
     mov fs, {0:x}
-    mov gs, {0:x}
 
     push {0:r}
     push {rsp}
