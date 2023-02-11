@@ -1,11 +1,11 @@
 use super::memory;
-use crate::mutex::Mutex;
+use crate::mutex::{Mutex, MutexGuard};
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
 use lazy_static::lazy_static;
 use x86_64::{
-    structures::paging::{PageSize, Size4KiB},
+    structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
 };
 mod kernel_tasks;
@@ -15,7 +15,7 @@ lazy_static! {
     pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
 }
 
-pub static mut CURR_PROC: Option<Process> = None;
+static mut CURR_PROC: Option<Process> = None;
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
@@ -111,6 +111,38 @@ pub struct Process {
     pub kernel_task: bool,
 }
 
+impl Drop for Process {
+    fn drop(&mut self) {
+        if self.kernel_task {
+            kernel_tasks::deallocate_stack(self.stack_pointer);
+        } else {
+            memory::vmm::page_table_walker(self.page_table, &|virt, physical| {
+                if virt.as_u64() < memory::HHDM_OFFSET {
+                    memory::vmm::unmap_address(self.page_table, virt).unwrap();
+                    unsafe {
+                        memory::page_allocator::free(PhysFrame::from_start_address_unchecked(
+                            physical,
+                        ))
+                    }
+                }
+            });
+        }
+    }
+}
+
+/// Get the `rsp0` field from the TSS.
+pub fn get_kernel_stack() -> u64 {
+    unsafe { TSS_ENTRY.rsp0 }
+}
+
+/// Returns a mutable reference to the currently running process.
+///
+/// # Safety
+/// Should not be used in a multi-threaded situation.
+pub unsafe fn get_running_process() -> &'static mut Option<Process> {
+    &mut CURR_PROC
+}
+
 /// function that push process into the process queue
 ///
 /// # Arguments
@@ -132,18 +164,18 @@ pub fn add_to_the_queue(p: Process) {
 }
 
 /// Load a process from the queue.
-pub fn load_from_queue() {
+///
+/// # Panics
+/// Panics if the process queue is empty.
+pub unsafe fn load_from_queue() -> ! {
     let mut proc_queue = PROC_QUEUE.lock();
+    let p = proc_queue.pop().unwrap();
 
-    if let Some(p) = proc_queue.pop() {
-        unsafe {
-            if CURR_PROC.is_some() {
-                add_to_the_queue(core::ptr::read(CURR_PROC.as_ref().unwrap()));
-            }
-            CURR_PROC = Some(p.0);
-            load_context(CURR_PROC.as_ref().unwrap())
-        };
+    if let Some(process) = &CURR_PROC {
+        add_to_the_queue(core::ptr::read(process))
     }
+    core::ptr::write(&mut CURR_PROC, Some(p.0));
+    load_context(CURR_PROC.as_ref().unwrap());
 }
 
 /// Returns the address of the Task State Segment.
@@ -264,11 +296,12 @@ pub unsafe fn load_context(p: &Process) -> ! {
 
     push {0:r}
     push {rsp}
-    pushfq
+    push {flags}
     push {1:r}
     push {rip}
     ",
         in(reg)data_segment, in(reg)code_segment,
+        flags=in(reg)p.flags,
         rsp=in(reg)p.stack_pointer, rip=in(reg)p.instruction_pointer
     );
     // Push the future `rbx` and `rbp` to later pop them.

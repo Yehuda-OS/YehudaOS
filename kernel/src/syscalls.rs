@@ -1,6 +1,8 @@
 use super::io;
 use super::scheduler;
 use crate::iostream::STDIN;
+use crate::memory;
+use core::arch::asm;
 use core::slice;
 use fs_rs::fs::is_dir;
 use fs_rs::fs::read as fread;
@@ -8,19 +10,30 @@ use fs_rs::fs::read as fread;
 const EFER: u32 = 0xc0000080;
 const STAR: u32 = 0xc0000081;
 const LSTAR: u32 = 0xc0000082;
+const KERNEL_GS_BASE: u32 = 0xc0000102;
+
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
 const STDERR_DESCRIPTOR: i32 = 2;
 const TO_SUB_FROM_FD_TO_GET_FILE_ID: i32 = 3;
 
+static mut KERNEL_STACK: u64 = 0;
+
+mod syscall {
+    pub const EXIT: u64 = 0x3c;
+}
+
 pub unsafe fn initialize() {
     let rip = handler as u64;
     let cs = u64::from(super::gdt::KERNEL_CODE) << 32;
+
+    KERNEL_STACK = scheduler::get_kernel_stack();
 
     io::wrmsr(LSTAR, rip);
     io::wrmsr(STAR, cs);
     // Enable syscalls by setting the first bit of the EFER MSR
     io::wrmsr(EFER, 1);
+    io::wrmsr(KERNEL_GS_BASE, &KERNEL_STACK as *const _ as u64);
 }
 
 /// Handle the syscall (Perform the action that the process has requested).
@@ -33,68 +46,78 @@ pub unsafe fn initialize() {
 /// - `arg3` - Stored in `r10`.
 /// - `arg4` - Stored in `r8`.
 /// - `arg5` - Stored in `r9`.
-pub fn handle_syscall(
-    syscall_number: u64,
-    arg0: u64,
-    arg1: u64,
-    arg2: u64,
-    arg3: u64,
-    arg4: u64,
-    arg5: u64,
-) {
+pub fn handle_syscall(registers: &scheduler::Registers) -> i64 {
+    let syscall_number = registers.rax;
+    let arg0 = registers.rdi;
+    let arg1 = registers.rsi;
+    let arg2 = registers.rdx;
+    let arg3 = registers.r10;
+    let arg4 = registers.r8;
+    let arg5 = registers.r9;
+
+    match syscall_number {
+        _ => -1,
+    }
 }
 
 pub unsafe fn int_0x80_handler() {
     let registers = super::scheduler::save_context();
 
-    handle_syscall(
-        registers.rax,
-        registers.rdi,
-        registers.rsi,
-        registers.rdx,
-        registers.r10,
-        registers.r8,
-        registers.r9,
-    );
+    handle_syscall(&registers);
 
     loop {}
 }
 
-pub unsafe fn handler() -> ! {
-    let registers = scheduler::save_context();
-    // TODO Change later to get the currently running process.
-    let mut proc = scheduler::Process {
-        registers,
-        // After we change this to the running process the page table field will already be loaded.
-        page_table: super::memory::get_page_table(),
-        stack_pointer: 0,
-        instruction_pointer: 0,
-        flags: 0,
-        kernel_task: false,
-    };
-
+/// Update the registers of a proccess when a syscall occurs.
+///
+/// # Arguments
+/// - `proc` - A mutable reference to the process.
+/// - `registers` - The process' registers.
+fn update_registers(proc: &mut scheduler::Process, registers: &scheduler::Registers) {
+    proc.registers = *registers;
     // The `syscall` instruction saves the instruction pointer in `rcx` and the cpu flags in `r11`.
     proc.instruction_pointer = proc.registers.rcx;
     proc.flags = proc.registers.r11;
-    // `rbp` holds the value of the stack pointer after pushing the original `rbp`.
-    core::arch::asm!("
-    mov {0}, rbp
-    add {0}, 8
-    ",
-        out(reg)proc.stack_pointer,
-    );
-    crate::println!("A syscall occured");
-    handle_syscall(
-        proc.registers.rax,
-        proc.registers.rdi,
-        proc.registers.rsi,
-        proc.registers.rdx,
-        proc.registers.r10,
-        proc.registers.r8,
-        proc.registers.r9,
-    );
+    // SAFETY: `rbp` holds the value of the stack pointer after pushing the original `rbp`.
+    unsafe {
+        core::arch::asm!("
+        mov {0}, rbp
+        add {0}, 8
+        ",
+            out(reg)proc.stack_pointer,
+        );
+    }
+}
 
-    scheduler::load_context(&proc);
+pub unsafe fn handler() -> ! {
+    asm!(
+        "
+    cli
+    swapgs
+    mov rsp, gs:0
+    mov rbp, rsp
+    swapgs
+    "
+    );
+    // let mut registers = scheduler::save_context();
+    // let mut currently_running = scheduler::get_running_process();
+
+    // Disable interrupts while handling a syscall.
+    memory::load_tables_to_cr3(memory::get_page_table());
+    loop {}
+    // crate::println!("A syscall occured");
+
+    // // If the syscall is `exit` it must be handled here because we have the reference to the
+    // // currently running process here.
+    // if registers.rax == syscall::EXIT {
+    //     *currently_running = None;
+    // } else {
+    //     registers.rax = handle_syscall(&registers) as u64;
+    //     // UNWRAP: Syscalls should not be called from inside the kernel.
+    //     update_registers(currently_running.as_mut().unwrap(), &registers);
+    // }
+
+    scheduler::load_from_queue();
 }
 
 /// implementation for `read` syscall
