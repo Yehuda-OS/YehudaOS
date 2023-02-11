@@ -1,6 +1,5 @@
 use super::{Process, SchedulerError};
 use crate::memory;
-use core::fmt;
 use fs_rs::fs;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, Size4KiB},
@@ -190,11 +189,7 @@ impl super::Process {
 
         for entry in &get_program_table(file_id, &header) {
             if entry.p_type == PT_LOAD {
-                map_segment(&p, entry).map_err(|e| {
-                    super::terminate_process(&p);
-
-                    e
-                })?;
+                map_segment(&p, entry)?;
                 write_segment(file_id, &p, entry);
             }
         }

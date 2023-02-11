@@ -12,7 +12,7 @@ mod kernel_tasks;
 mod loader;
 
 lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
+    static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
 }
 
 static mut CURR_PROC: Option<Process> = None;
@@ -357,8 +357,4 @@ unsafe fn create_page_table() -> Option<PhysAddr> {
     );
 
     Some(table)
-}
-
-fn terminate_process(p: &Process) {
-    // TODO
 }
