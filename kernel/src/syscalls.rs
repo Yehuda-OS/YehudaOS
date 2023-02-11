@@ -10,6 +10,7 @@ use fs_rs::fs::read as fread;
 const EFER: u32 = 0xc0000080;
 const STAR: u32 = 0xc0000081;
 const LSTAR: u32 = 0xc0000082;
+const FMASK: u32 = 0xc0000084;
 const KERNEL_GS_BASE: u32 = 0xc0000102;
 
 const STDIN_DESCRIPTOR: i32 = 0;
@@ -33,6 +34,8 @@ pub unsafe fn initialize() {
     io::wrmsr(STAR, cs);
     // Enable syscalls by setting the first bit of the EFER MSR
     io::wrmsr(EFER, 1);
+    // Write !0 to the `FMASK` MSR to clear all the bits of `rflags` when a syscall occurs.
+    io::wrmsr(FMASK, !0);
     io::wrmsr(KERNEL_GS_BASE, &KERNEL_STACK as *const _ as u64);
 }
 
