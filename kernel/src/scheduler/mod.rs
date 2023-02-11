@@ -101,11 +101,10 @@ pub enum ProcessStates {
     Terminate,
 }
 
-#[derive(Clone)]
 pub struct Process {
     pub registers: Registers,
-    pub page_table: PhysAddr,
     pub stack_pointer: u64,
+    pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
     pub kernel_task: bool,
