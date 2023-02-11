@@ -1,9 +1,8 @@
 use super::memory;
-use crate::{io, mutex::Mutex, syscalls};
+use crate::{io, syscalls};
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
-use lazy_static::lazy_static;
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
@@ -11,11 +10,8 @@ use x86_64::{
 mod kernel_tasks;
 mod loader;
 
-lazy_static! {
-    static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
-}
-
 static mut CURR_PROC: Option<Process> = None;
+static mut PROC_QUEUE: Vec<(Process, u8)> = Vec::new();
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
@@ -147,18 +143,19 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
 /// # Arguments
 /// - `p` - the process
 pub fn add_to_the_queue(p: Process) {
-    let mut proc_queue = PROC_QUEUE.lock();
-
     let proc: (Process, u8) = if p.kernel_task {
         (p, 15) // if the procrss is kernel task it gets higher priority
     } else {
         (p, 0)
     };
 
-    proc_queue.push(proc);
-    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-    for i in 0..proc_queue.len() {
-        proc_queue[i].1 += 1;
+    // SAFETY: The shceduler should not be referenced in a multithreaded situation.
+    unsafe {
+        PROC_QUEUE.push(proc);
+        PROC_QUEUE.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        for i in 0..PROC_QUEUE.len() {
+            PROC_QUEUE[i].1 += 1;
+        }
     }
 }
 
@@ -167,8 +164,7 @@ pub fn add_to_the_queue(p: Process) {
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let mut proc_queue = PROC_QUEUE.lock();
-    let p = proc_queue.pop().unwrap();
+    let p = PROC_QUEUE.pop().unwrap();
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
