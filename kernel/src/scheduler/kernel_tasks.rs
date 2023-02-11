@@ -100,7 +100,7 @@ impl super::Process {
             // UNWRAP: Assume the maximum amount of threads is not exceeded.
             stack_pointer: allocate_stack().unwrap(),
             instruction_pointer: function as u64,
-            flags: 0,
+            flags: super::INTERRUPT_FLAG_ON,
             kernel_task: true,
         };
 

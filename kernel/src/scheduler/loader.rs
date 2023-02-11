@@ -183,7 +183,7 @@ impl super::Process {
             page_table: super::create_page_table().ok_or(SchedulerError::OutOfMemory)?,
             stack_pointer: PROCESS_STACK_POINTER,
             instruction_pointer: header.e_entry,
-            flags: 0,
+            flags: super::INTERRUPT_FLAG_ON,
             kernel_task: false,
         };
 

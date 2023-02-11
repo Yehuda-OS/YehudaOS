@@ -17,6 +17,7 @@ const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
 const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const USER_DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
+const INTERRUPT_FLAG_ON: u64 = 0x200;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
