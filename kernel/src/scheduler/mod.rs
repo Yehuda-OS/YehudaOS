@@ -1,9 +1,8 @@
 use super::memory;
-use crate::mutex::{Mutex, MutexGuard};
+use crate::{io, syscalls};
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
-use lazy_static::lazy_static;
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
@@ -11,16 +10,14 @@ use x86_64::{
 mod kernel_tasks;
 mod loader;
 
-lazy_static! {
-    pub static ref PROC_QUEUE: Mutex<Vec<(Process, u8)>> = Mutex::new(Vec::new());
-}
-
 static mut CURR_PROC: Option<Process> = None;
+static mut PROC_QUEUE: Vec<(Process, u8)> = Vec::new();
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
 const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const USER_DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
+const INTERRUPT_FLAG_ON: u64 = 0x200;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -101,11 +98,10 @@ pub enum ProcessStates {
     Terminate,
 }
 
-#[derive(Clone)]
 pub struct Process {
     pub registers: Registers,
-    pub page_table: PhysAddr,
     pub stack_pointer: u64,
+    pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
     pub kernel_task: bool,
@@ -148,18 +144,19 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
 /// # Arguments
 /// - `p` - the process
 pub fn add_to_the_queue(p: Process) {
-    let mut proc_queue = PROC_QUEUE.lock();
-
     let proc: (Process, u8) = if p.kernel_task {
         (p, 15) // if the procrss is kernel task it gets higher priority
     } else {
         (p, 0)
     };
 
-    proc_queue.push(proc);
-    proc_queue.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-    for i in 0..proc_queue.len() {
-        proc_queue[i].1 += 1;
+    // SAFETY: The shceduler should not be referenced in a multithreaded situation.
+    unsafe {
+        PROC_QUEUE.push(proc);
+        PROC_QUEUE.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        for i in 0..PROC_QUEUE.len() {
+            PROC_QUEUE[i].1 += 1;
+        }
     }
 }
 
@@ -168,8 +165,7 @@ pub fn add_to_the_queue(p: Process) {
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let mut proc_queue = PROC_QUEUE.lock();
-    let p = proc_queue.pop().unwrap();
+    let p = PROC_QUEUE.pop().unwrap();
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
@@ -284,15 +280,18 @@ pub unsafe fn load_context(p: &Process) -> ! {
     } else {
         (USER_CODE_SEGMENT, USER_DATA_SEGMENT)
     };
+    let p_address = p as *const Process as u64;
 
     memory::load_tables_to_cr3(p.page_table);
+    // Write the address of the process to later use it in the syscall handler.
+    io::wrmsr(syscalls::KERNEL_GS_BASE, p_address);
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
+    swapgs
     mov ds, {0:x}
     mov es, {0:x}
     mov fs, {0:x}
-    mov gs, {0:x}
 
     push {0:r}
     push {rsp}
@@ -355,8 +354,4 @@ unsafe fn create_page_table() -> Option<PhysAddr> {
     );
 
     Some(table)
-}
-
-fn terminate_process(p: &Process) {
-    // TODO
 }
