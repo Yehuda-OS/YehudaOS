@@ -9,7 +9,7 @@ use crate::mutex::Mutex;
 use super::SchedulerError;
 
 const MAX_STACK_SIZE: u64 = 1024 * 4 * 20; // 80KiB
-const STACK_START: u64 = 0x2000_0000;
+const STACK_START: u64 = 0x4000_0000;
 
 static STACK_BITMAP: Mutex<u64> = Mutex::new(0);
 
@@ -61,9 +61,9 @@ unsafe fn terminate_task() {
 /// The function assumes the stack pointer is in the range of the stack the task has received.
 pub fn deallocate_stack(stack_pointer: u64) {
     let index = (stack_pointer + MAX_STACK_SIZE - STACK_START) / (MAX_STACK_SIZE + Size4KiB::SIZE);
-    // Get the lower edge of the stack.
-    let lower = VirtAddr::new(get_stack_address(index - 1) + Size4KiB::SIZE);
     let higher = VirtAddr::new(get_stack_address(index));
+    // Get the lower edge of the stack.
+    let lower = higher - MAX_STACK_SIZE;
 
     for addr in (lower..higher).step_by(Size4KiB::SIZE as usize) {
         if let Ok(page) = memory::vmm::virtual_to_physical(memory::get_page_table(), addr) {
