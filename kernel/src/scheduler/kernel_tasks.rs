@@ -69,7 +69,7 @@ pub fn deallocate_stack(stack_pointer: u64) {
         if let Ok(page) = memory::vmm::virtual_to_physical(memory::get_page_table(), addr) {
             // UNWRAP: The entry is unused because we checked if it is mapped
             // and the page table should not be null.
-            memory::vmm::unmap_address(page, addr).unwrap();
+            memory::vmm::unmap_address(memory::get_page_table(), addr).unwrap();
             // UNWRAP: The page was returned from the `virtual_to_physical` function.
             unsafe { memory::page_allocator::free(PhysFrame::from_start_address(page).unwrap()) }
         }
