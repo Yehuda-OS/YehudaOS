@@ -1,5 +1,5 @@
+use crate::mutex::{Mutex, MutexGuard};
 use alloc::string::String;
-use spin::{Mutex, MutexGuard};
 
 const BACKSPACE: char = '\x08';
 pub static mut STDIN: Stdin = Stdin::new();

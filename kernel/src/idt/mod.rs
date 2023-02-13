@@ -23,8 +23,8 @@ const PIT_HANDLER: u8 = 0x20;
 const SYSCALL_HANDLER: u8 = 0x80;
 const KEYBOARD_HANDLER: u8 = 0x21;
 
-pub static PICS: spin::Mutex<ChainedPics> =
-    spin::Mutex::new(unsafe { ChainedPics::new(PIC_OFFSET1, PIC_OFFSET2) });
+pub static PICS: crate::mutex::Mutex<ChainedPics> =
+    crate::mutex::Mutex::new(unsafe { ChainedPics::new(PIC_OFFSET1, PIC_OFFSET2) });
 
 lazy_static! {
     pub static ref IDT: Idt = {

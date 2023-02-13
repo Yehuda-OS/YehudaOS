@@ -331,7 +331,7 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     }
 }
 
-/// A wrapper around spin::Mutex to permit trait implementations.
+/// A wrapper around crate::mutex::Mutex to permit trait implementations.
 pub struct Locked<A> {
     inner: Mutex<A>,
 }

@@ -1,9 +1,9 @@
 mod keycode;
 use crate::iostream::key_handle;
 
+use crate::mutex::Mutex;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
-use spin::Mutex;
 
 /// PS/2 keyboard scancode wrapper
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
