@@ -34,7 +34,7 @@ impl<T> Mutex<T> {
                 "
             2:
                 mov rdx, 0
-                bts [{0}], rdx
+                lock bts [{0}], rdx
                 jc 2b
             ",
             in(reg)get(&self.locked)
@@ -55,7 +55,7 @@ impl<T> Mutex<T> {
             core::arch::asm!(
                 "
             mov rdx, 0
-            bts [{0}], rdx
+            lock bts [{0}], rdx
             jc 2f
             jmp 3f
             ",
