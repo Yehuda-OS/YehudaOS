@@ -165,12 +165,20 @@ pub fn add_to_the_queue(p: Process) {
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let p = PROC_QUEUE.pop().unwrap();
+    let p = PROC_QUEUE.pop();
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
     }
-    core::ptr::write(&mut CURR_PROC, Some(p.0));
+    if p.is_none() {
+        x86_64::instructions::interrupts::enable();
+        loop {
+            if p.is_some() {
+                break;
+            }
+        }
+    }
+    core::ptr::write(&mut CURR_PROC, Some(p.unwrap().0));
     load_context(CURR_PROC.as_ref().unwrap());
 }
 

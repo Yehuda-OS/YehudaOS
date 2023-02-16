@@ -22,6 +22,7 @@ static mut KERNEL_STACK: u64 = 0;
 
 mod syscall {
     pub const EXIT: u64 = 0x3c;
+    pub const READ: u64 = 0;
 }
 
 pub unsafe fn initialize() {
@@ -67,6 +68,7 @@ unsafe fn handle_syscall(
     arg5: u64,
 ) -> i64 {
     match syscall_number {
+        syscall::READ => read(arg0 as i32, arg2 as *mut u8, arg2 as usize) as i64,
         syscall::EXIT => exit(arg0 as i32),
         _ => -1,
     }
@@ -146,15 +148,20 @@ pub unsafe fn handler() -> ! {
 ///
 /// # Arguments
 /// - `fd` - the file descriptor
-unsafe fn read(fd: i32, buf: *mut u8, count: usize) -> isize {
+/// - `_buf` - the buffer to write into
+/// - `count` - the count of bytes to rea
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise
+unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> isize {
     if fd < 0 {
         return -1;
     }
 
-    let mut buf = alloc::string::String::new();
-    if buf.as_ptr().is_null() {
+    if _buf.is_null() {
         return -1;
     }
+    let mut buf = alloc::string::String::from_raw_parts(_buf, count, 1024); // capacity of 1 KB
     if fd < 3 && fd >= 0 {
         match fd {
             STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as isize,
