@@ -5,17 +5,22 @@
 #![feature(abi_x86_interrupt)]
 #![feature(const_mut_refs)]
 #![feature(naked_functions)]
+#![feature(asm_sym)]
 
 extern crate alloc;
+
+use fs_rs::fs;
 
 mod gdt;
 mod idt;
 mod io;
+mod iostream;
 mod memory;
+mod mutex;
 mod pit;
 mod scheduler;
+mod syscalls;
 mod terminal;
-
 
 /// Kernel Entry Point
 ///
@@ -38,8 +43,10 @@ pub extern "C" fn _start() -> ! {
             .set_page_table(memory::PAGE_TABLE);
         gdt::create();
         gdt::activate();
+        fs::init();
         scheduler::load_tss();
         idt::IDT.load();
+        syscalls::initialize();
         pit::start(19);
     }
     println!("Hello world");

@@ -3,6 +3,8 @@ use core::{
     ptr::null_mut,
 };
 
+use crate::mutex::Mutex;
+use crate::mutex::MutexGuard;
 use heap_block::HeapBlock;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
@@ -12,7 +14,6 @@ use x86_64::{
 mod heap_block;
 
 pub const HEAP_START: u64 = 0x_4444_4444_0000;
-pub const MAX_PAGES: u64 = 25; // 100 KiB
 
 const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
@@ -78,10 +79,6 @@ fn alloc_node(
     } else {
         (size + adjustment) / Size4KiB::SIZE + 1
     };
-
-    if allocator.pages + required_pages > MAX_PAGES {
-        return None;
-    }
     let mut success = true;
 
     for _ in 0..required_pages {
@@ -297,7 +294,7 @@ unsafe fn print_list(first: *mut HeapBlock) {
 
     println!("\n\n|LIST|");
     while curr != null_mut() {
-        println!("{:p} : {:?}", curr, *curr);
+        println!("{:p} : {:?}, size: {:#x}", curr, *curr, (*curr).size());
         curr = (*curr).next();
     }
 }
@@ -334,19 +331,19 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     }
 }
 
-/// A wrapper around spin::Mutex to permit trait implementations.
+/// A wrapper around crate::mutex::Mutex to permit trait implementations.
 pub struct Locked<A> {
-    inner: spin::Mutex<A>,
+    inner: Mutex<A>,
 }
 
 impl<A> Locked<A> {
     pub const fn new(inner: A) -> Self {
         Locked {
-            inner: spin::Mutex::new(inner),
+            inner: Mutex::new(inner),
         }
     }
 
-    pub fn lock(&self) -> spin::MutexGuard<A> {
+    pub fn lock(&self) -> MutexGuard<A> {
         self.inner.lock()
     }
 }

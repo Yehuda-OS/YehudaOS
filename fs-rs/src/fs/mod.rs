@@ -19,7 +19,7 @@ pub type DirList = Vec<DirListEntry>;
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
 const FILE_NAME_LEN: usize = 11;
-const BLOCK_SIZE: usize = 16;
+const BLOCK_SIZE: usize = 8192;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 const DISK_PARTS: DiskParts = calc_parts(blkdev::DEVICE_SIZE);
@@ -52,7 +52,7 @@ pub struct DirListEntry {
     pub file_size: usize,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Default)]
 struct DirEntry {
     name: [u8; FILE_NAME_LEN],
     id: usize,
@@ -92,21 +92,19 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     }
     // Check if the path is relative
     if path.chars().nth(0).unwrap_or(' ') != '/' {
-        if let Some(cwd) = cwd {
-            inode = cwd;
-        } else {
-            return None;
-        }
+        inode = cwd?;
     }
 
     while next_delimiter != None {
-        let mut data: Vec<u8> = vec![0; inode.size()];
-        unsafe { read(inode.id, data.as_mut_slice(), index) };
-        let dir_content = unsafe {
-            Box::from(slice::from_raw_parts(
-                data.as_ptr() as *const DirEntry,
-                data.len() / core::mem::size_of::<DirEntry>(),
-            ))
+        let mut dir_content =
+            vec![DirEntry::default(); inode.size() / core::mem::size_of::<DirEntry>()];
+
+        unsafe {
+            read(
+                inode.id,
+                core::slice::from_raw_parts_mut(dir_content.as_mut_ptr() as *mut u8, inode.size()),
+                index,
+            )
         };
         path = &path[(next_delimiter.unwrap() + 1)..];
         next_delimiter = path.find('/');
@@ -287,14 +285,11 @@ fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
         if buffer & (1 << i) == 0 {
             buffer ^= 1 << i; // flip the bit to mark as occupied
             unsafe {
-                blkdev::write(
-                    address,
-                    BYTES_IN_BUFFER,
-                    core::mem::transmute(&buffer as *const usize as *mut u8),
-                );
+                blkdev::write(address, BYTES_IN_BUFFER, &mut buffer as *mut _ as *mut u8);
             }
             // get the index in the bitmap
             address -= bitmap_start;
+            address *= BITS_IN_BYTE;
             address += i;
 
             // once we found unoccupied space, we finished our task
@@ -364,7 +359,11 @@ fn allocate_block() -> Option<usize> {
     address *= BLOCK_SIZE;
     address += DISK_PARTS.data;
 
-    Some(address)
+    if address + BLOCK_SIZE > blkdev::DEVICE_SIZE {
+        None
+    } else {
+        Some(address)
+    }
 }
 
 /// deallocate a block
@@ -499,7 +498,7 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
 ///
 /// # Returns
 /// `true` if the inode is directory and `false` if not
-fn is_dir(id: usize) -> bool {
+pub fn is_dir(id: usize) -> bool {
     if let Some(inode) = read_inode(id) {
         inode.directory
     } else {
@@ -711,16 +710,13 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
         return Some(0);
     }
 
-    remaining = if buffer.len() > inode.size() - offset {
-        inode.size() - offset
-    } else {
-        buffer.len()
-    };
+    remaining = core::cmp::min(buffer.len(), inode.size() - offset);
     if to_read > remaining {
         to_read = remaining;
     }
     while remaining != 0 {
         // If there is no pointer read null bytes
+        // UNWRAP: We check that we don't exceed the file's size
         if inode.get_ptr(pointer).unwrap() == 0 {
             for i in &mut buffer[(bytes_read + start)..(bytes_read + to_read)] {
                 *i = 0;
@@ -736,11 +732,7 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
         bytes_read += to_read;
         remaining -= to_read;
         pointer += 1;
-        to_read = if remaining < BLOCK_SIZE {
-            remaining
-        } else {
-            BLOCK_SIZE
-        };
+        to_read = core::cmp::min(remaining, BLOCK_SIZE);
     }
 
     Some(bytes_read)
@@ -752,20 +744,18 @@ pub unsafe fn read(file: usize, buffer: &mut [u8], offset: usize) -> Option<usiz
 /// If the file has been set to a smaller length, the extra data will be lost.
 ///
 /// # Arguments
-/// `file` - The `Inode` of the file.
-/// `size` - The required size.
+/// - `file` - The `Inode` of the file.
+/// - `size` - The required size.
 ///
 /// # Returns
 /// The function returns the `FileNotFound` or `MaximumSizeExceeded` error.
 pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
-    let last_ptr;
-    let resized_last_ptr = size / BLOCK_SIZE;
-    let mut current;
     let mut block;
     let mut resized = read_inode(file).ok_or(FsError::FileNotFound)?;
+    let resized_last_ptr = size / BLOCK_SIZE;
+    let last_ptr = resized.size() / BLOCK_SIZE;
+    let mut current = last_ptr;
 
-    last_ptr = resized.size() / BLOCK_SIZE;
-    current = last_ptr;
     // If the file has been resized to a smaller size, deallocate the unused blocks.
     while current > resized_last_ptr {
         block = resized.get_ptr(current)?;

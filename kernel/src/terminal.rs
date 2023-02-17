@@ -1,6 +1,6 @@
+use crate::mutex::Mutex;
 use core::fmt;
 use limine::LimineTerminalRequest;
-use spin::Mutex;
 
 pub static TERMINAL_REQUEST: LimineTerminalRequest = LimineTerminalRequest::new(0);
 

@@ -2,7 +2,7 @@ extern crate alloc;
 use alloc::vec;
 use vec::Vec;
 
-pub const DEVICE_SIZE: usize = 1024 * 1024;
+pub const DEVICE_SIZE: usize = 10 * 1024 * 1024;
 
 static mut DATA: Vec<u8> = Vec::new();
 
@@ -13,11 +13,13 @@ pub fn init() {
 }
 
 /// Set `size` bytes starting in offset `addr` to `value`.
-/// 
+///
 /// # Safety
 /// This operation is unsafe because it uses raw pointers.
 pub unsafe fn set(addr: usize, size: usize, value: u8) {
-    core::ptr::write(DATA.as_mut_ptr(), value);
+    for i in 0..size {
+        core::ptr::write(DATA.as_mut_ptr().add(addr + i), value);
+    }
 }
 
 /// Read from the block device.

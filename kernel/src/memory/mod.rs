@@ -17,6 +17,11 @@ pub const HHDM_OFFSET: u64 = 0xffff_8000_0000_0000;
 pub static MEMMAP: LimineMemmapRequest = LimineMemmapRequest::new(0);
 pub static mut PAGE_TABLE: PhysAddr = PhysAddr::zero();
 
+/// Returns the kernel's page table.
+pub fn get_page_table() -> PhysAddr {
+    unsafe { PAGE_TABLE }
+}
+
 /// Unwrap the memory map response from the request.
 fn get_memmap() -> &'static LimineMemmapResponse {
     MEMMAP.get_response().get().unwrap()
@@ -67,36 +72,18 @@ fn map_memmap_entry(
     flags: PageTableFlags,
 ) -> Result<(), vmm::MapError> {
     let mut offset = 0;
+    let mut physical;
 
     while offset < entry.len {
-        let physical = PhysAddr::new(entry.base + offset);
-        let remaining = entry.len - offset;
+        physical = PhysAddr::new(entry.base + offset);
 
-        if virtual_addr.is_aligned(Size1GiB::SIZE) && remaining >= Size1GiB::SIZE {
-            vmm::map_address(
-                unsafe { PAGE_TABLE },
-                VirtAddr::new(virtual_addr.as_u64() + offset),
-                PhysFrame::<Size1GiB>::from_start_address(physical).unwrap(),
-                flags | PageTableFlags::HUGE_PAGE,
-            )?;
-            offset += Size1GiB::SIZE;
-        } else if virtual_addr.is_aligned(Size2MiB::SIZE) && remaining >= Size2MiB::SIZE {
-            vmm::map_address(
-                unsafe { PAGE_TABLE },
-                VirtAddr::new(virtual_addr.as_u64() + offset),
-                PhysFrame::<Size2MiB>::from_start_address(physical).unwrap(),
-                flags | PageTableFlags::HUGE_PAGE,
-            )?;
-            offset += Size2MiB::SIZE;
-        } else {
-            vmm::map_address(
-                unsafe { PAGE_TABLE },
-                VirtAddr::new(virtual_addr.as_u64() + offset),
-                PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
-                flags,
-            )?;
-            offset += Size4KiB::SIZE;
-        }
+        vmm::map_address(
+            unsafe { PAGE_TABLE },
+            VirtAddr::new(virtual_addr.as_u64() + offset),
+            PhysFrame::<Size4KiB>::from_start_address(physical).unwrap(),
+            flags,
+        )?;
+        offset += Size4KiB::SIZE;
     }
 
     Ok(())
@@ -169,7 +156,7 @@ pub fn create_hhdm(pml4: PhysAddr) -> Result<(), vmm::MapError> {
 
 /// Identity map the framebuffer and any bootloader reclaimable memory that does not contain the
 /// page tables and the stack.
-pub fn map_bootloader_memory() -> Result<(), vmm::MapError>{
+pub fn map_bootloader_memory() -> Result<(), vmm::MapError> {
     let memmap = get_memmap();
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let mut entry;
