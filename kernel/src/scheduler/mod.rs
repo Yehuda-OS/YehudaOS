@@ -160,6 +160,21 @@ pub fn add_to_the_queue(p: Process) {
     }
 }
 
+/// Re-add the current process to the process queue and set the current process to `None`.
+///
+/// # Panics
+/// Panics if there is no current process.
+pub fn switch_current_process() {
+    // SAFETY: `CURR_PROC` is a valid `Process` struct and the ownership of it is now moved to the
+    // process queue, so no resources are leaked.
+    unsafe {
+        let curr = core::ptr::read(CURR_PROC.as_ref().unwrap());
+
+        core::ptr::write(&mut CURR_PROC, None);
+        add_to_the_queue(curr);
+    }
+}
+
 /// Load a process from the queue.
 ///
 /// # Panics
