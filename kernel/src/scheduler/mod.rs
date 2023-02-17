@@ -122,6 +122,12 @@ impl Drop for Process {
                     }
                 }
             });
+            // SAFETY: The page table has been created with `create_page_table`.
+            unsafe {
+                memory::page_allocator::free(PhysFrame::from_start_address_unchecked(
+                    self.page_table,
+                ))
+            }
         }
     }
 }
