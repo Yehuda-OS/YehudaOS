@@ -94,7 +94,7 @@ pub fn create_page_table() -> Option<PhysAddr> {
 
 /// Walk over all the used page table entries.
 /// Does not support huge pages.
-/// 
+///
 /// # Arguments
 /// - `pml4` - The page table to walk over.
 /// - `handler` - A callback function that will be called on each used entry.
@@ -168,7 +168,7 @@ pub fn virtual_to_physical(
         // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
         // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
         // by 55 to place the offset at the lower 9 bits.
-        let offset = ((virtual_address.as_u64() << used_bits) >> 55);
+        let offset = (virtual_address.as_u64() << used_bits) >> 55;
         // SAFETY: the offset is valid because it is 9 bits.
         let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
         let entry_flags = entry.flags();
@@ -193,7 +193,6 @@ pub fn virtual_to_physical(
         page_table + (virtual_address.as_u64() & (!0 >> used_bits)),
     ))
 }
-
 /// Maps a virtual address to a physical address.
 ///
 /// # Arguments
@@ -281,32 +280,6 @@ pub fn map_address<T: PageSize>(
     Ok(())
 }
 
-/// Get a page table a virtual address is using.
-///
-/// # Arguments
-/// * `virtual_address` - The virtual address to translate.
-/// * `level` - the level of the page table.
-fn virt_addr_to_page_table(level: u8, virtual_address: VirtAddr) -> PhysAddr {
-    let mut page_table = registers::control::Cr3::read().0.start_address().as_u64();
-    let mut used_bits = 16; // The highest 16 bits are unused
-
-    for _ in 0..(PAGE_TABLE_LEVELS - level) {
-        // The offset is 9 bits. To get the offset we shift to the left all of the bits we already
-        // used so that the 9 bits that we want are the top 9 bits, and then we shift to the right
-        // by 55 to place the offset at the lower 9 bits.
-        let offset = (virtual_address.as_u64() << used_bits) >> 55;
-        // SAFETY: the offset is valid because it is 9 bits.
-        let entry = unsafe { &*get_page_table_entry(PhysAddr::new(page_table), offset) };
-
-        // Get the physical address from the page table entry
-        page_table = entry.addr().as_u64();
-        // Mark the bits of the offset as used
-        used_bits += 9;
-    }
-
-    return PhysAddr::new(page_table);
-}
-
 /// check if the page table is free
 ///
 /// # Arguments
@@ -340,16 +313,20 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) -> Result<(), Un
     let mut page_table = pml4.as_u64();
     let mut used_bits = 16; // The highest 16 bits are unused
     let mut entry: *mut PageTableEntry = core::ptr::null_mut();
-    let mut level_counter: u8 = 0;
+    let mut page_tables = [0; PAGE_TABLE_LEVELS as usize];
+    let mut offsets = [0; PAGE_TABLE_LEVELS as usize];
+    let mut level_counter = 0;
 
     if pml4.is_null() {
         return Err(UnmapError::NullPageTable);
     }
 
-    for _ in 0..PAGE_TABLE_LEVELS {
+    for i in 0..PAGE_TABLE_LEVELS {
         let offset = (virtual_address.as_u64() << used_bits) >> 55;
         // SAFETY: the offset is valid because it is 9 bits.
         entry = unsafe { get_page_table_entry(PhysAddr::new(page_table), offset) };
+        page_tables[i as usize] = page_table;
+        offsets[i as usize] = offset;
 
         // Get the physical address from the page table entry
         page_table = unsafe { (*entry).addr().as_u64() };
@@ -372,13 +349,15 @@ pub fn unmap_address(pml4: PhysAddr, virtual_address: VirtAddr) -> Result<(), Un
         (*entry).set_unused();
     };
 
-    for i in 1..level_counter {
-        let table = virt_addr_to_page_table(i, VirtAddr::new(page_table));
+    for i in (1..level_counter).rev() {
+        let table = PhysAddr::new(page_tables[i]);
 
         if is_page_table_free(&table) {
-            unsafe { super::page_allocator::free(PhysFrame::from_start_address(table).unwrap()) };
-        } else {
-            break;
+            unsafe {
+                (*get_page_table_entry(PhysAddr::new(page_tables[i - 1]), offsets[i - 1]))
+                    .set_unused();
+                super::page_allocator::free(PhysFrame::from_start_address_unchecked(table));
+            }
         }
     }
 
