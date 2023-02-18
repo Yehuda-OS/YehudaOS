@@ -75,7 +75,7 @@ unsafe fn handle_syscall(
 }
 
 pub unsafe fn int_0x80_handler() {
-    let mut registers = super::scheduler::save_context();
+    let mut registers = scheduler::Registers::default();
 
     registers.rax = handle_syscall(
         registers.rax,

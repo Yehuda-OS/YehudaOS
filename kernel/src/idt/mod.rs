@@ -46,7 +46,7 @@ lazy_static! {
             PAGE_FAULT,
             interrupt_handler!(page_fault_handler => p_fault) as u64,
         );
-        idt.set_handler(PIT_HANDLER, super::pit::handler as u64);
+        idt.set_handler(PIT_HANDLER, crate::pit::handler_save_context as u64);
         idt.set_handler(KEYBOARD_HANDLER, keyboard::handler as u64);
         idt.set_handler(
             SYSCALL_HANDLER,

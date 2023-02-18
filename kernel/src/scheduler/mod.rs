@@ -122,6 +122,12 @@ impl Drop for Process {
                     }
                 }
             });
+            // SAFETY: The page table has been created with `create_page_table`.
+            unsafe {
+                memory::page_allocator::free(PhysFrame::from_start_address_unchecked(
+                    self.page_table,
+                ))
+            }
         }
     }
 }
@@ -160,25 +166,32 @@ pub fn add_to_the_queue(p: Process) {
     }
 }
 
+/// Re-add the current process to the process queue and set the current process to `None`.
+///
+/// # Panics
+/// Panics if there is no current process.
+pub fn switch_current_process() {
+    // SAFETY: `CURR_PROC` is a valid `Process` struct and the ownership of it is now moved to the
+    // process queue, so no resources are leaked.
+    unsafe {
+        let curr = core::ptr::read(CURR_PROC.as_ref().unwrap());
+
+        core::ptr::write(&mut CURR_PROC, None);
+        add_to_the_queue(curr);
+    }
+}
+
 /// Load a process from the queue.
 ///
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let p = PROC_QUEUE.pop();
+    let p = PROC_QUEUE.pop().unwrap();
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
     }
-    if p.is_none() {
-        x86_64::instructions::interrupts::enable();
-        loop {
-            if p.is_some() {
-                break;
-            }
-        }
-    }
-    core::ptr::write(&mut CURR_PROC, Some(p.unwrap().0));
+    core::ptr::write(&mut CURR_PROC, Some(p.0));
     load_context(CURR_PROC.as_ref().unwrap());
 }
 
@@ -195,83 +208,6 @@ pub fn get_tss_address() -> u64 {
 pub unsafe fn load_tss() {
     asm!("mov {0}, rsp", out(reg)TSS_ENTRY.rsp0);
     asm!("ltr ax", in("ax")super::gdt::TSS);
-}
-
-/// Save all the general purpose registers of a process.
-///
-/// # Returns
-/// A data structure with the saved values of the registers.
-///
-/// # Safety
-/// This function is unsafe because it assumes the saved value of the `rbp` register is on
-/// the top of the stack and the `rbp` register contains the pointer to it
-/// (Happens with every function that uses a stack frame).
-/// This is unsafe because the function reads the caller's stack.
-#[inline(always)]
-pub unsafe fn save_context() -> Registers {
-    let mut registers: Registers;
-
-    asm!(
-        "
-        push r15
-        push r14
-        push r13
-        push r12
-        push r11
-        push r10
-        push r9
-        push r8
-        mov r8, [rbp]
-        push r8
-        push rdi
-        push rsi
-        push rdx
-        push rcx
-        push rbx
-        push rax
-        "
-    );
-    registers = Registers::default();
-    asm!(
-        "
-        pop {0}
-        pop {1}
-        pop {2}
-        pop {3}
-        pop {4}
-        pop {5}
-        pop {6}
-        pop {7}
-        pop {8}
-        pop {9}
-        pop {10}
-        pop {11}
-        pop {12}
-        pop {13}
-        ",
-        out(reg)registers.rax,
-        out(reg)registers.rbx,
-        out(reg)registers.rcx,
-        out(reg)registers.rdx,
-        out(reg)registers.rsi,
-        out(reg)registers.rdi,
-        out(reg)registers.rbp,
-        out(reg)registers.r8,
-        out(reg)registers.r9,
-        out(reg)registers.r10,
-        out(reg)registers.r11,
-        out(reg)registers.r12,
-        out(reg)registers.r13,
-        out(reg)registers.r14,
-    );
-    asm!(
-        "
-        pop {0}
-        ",
-        out(reg)registers.r15,
-    );
-
-    registers
 }
 
 /// Start running a user process in ring 3.
