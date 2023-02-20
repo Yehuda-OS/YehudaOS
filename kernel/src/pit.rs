@@ -37,7 +37,7 @@ pub unsafe fn start(tps: u32) {
 pub unsafe extern "C" fn handler_save_context() {
     asm!(
         "
-        mov gs:0, rax
+        mov gs:0x0, rax
         mov gs:0x8, rbx
         mov gs:0x10, rcx
         mov gs:0x18, rdx
@@ -58,10 +58,10 @@ pub unsafe extern "C" fn handler_save_context() {
         // Move the `kernel_task` boolean to `al`.
         mov al, gs:0x80
         swapgs
-        cmp al, 0
-        jz 2f
         // Restore the kernel's stack because if we just executed a 
         // kernel task because the CPU does restore the stack if there was no change in privilege level.
+        cmp al, 1
+        jnz 2f
         mov rsp, gs:0
 
         2:
