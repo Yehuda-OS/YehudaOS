@@ -98,13 +98,14 @@ pub enum ProcessStates {
     Terminate,
 }
 
+#[repr(C)]
 pub struct Process {
     pub registers: Registers,
     pub stack_pointer: u64,
+    pub kernel_task: bool,
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
-    pub kernel_task: bool,
 }
 
 impl Drop for Process {

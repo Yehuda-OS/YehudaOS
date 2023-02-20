@@ -37,23 +37,34 @@ pub unsafe fn start(tps: u32) {
 pub unsafe extern "C" fn handler_save_context() {
     asm!(
         "
-        mov gs:0, rax
-        mov gs:8, rbx
-        mov gs:16, rcx
-        mov gs:24, rdx
-        mov gs:32, rsi
-        mov gs:40, rdi
-        mov gs:48, rbp
-        mov gs:56, r8
-        mov gs:64, r9
-        mov gs:72, r10
-        mov gs:80, r11
-        mov gs:88, r12
-        mov gs:96, r13
-        mov gs:104, r14
-        mov gs:112, r15
-        swapgs
+        mov gs:0x0, rax
+        mov gs:0x8, rbx
+        mov gs:0x10, rcx
+        mov gs:0x18, rdx
+        mov gs:0x20, rsi
+        mov gs:0x28, rdi
+        mov gs:0x30, rbp
+        mov gs:0x38, r8
+        mov gs:0x40, r9
+        mov gs:0x48, r10
+        mov gs:0x50, r11
+        mov gs:0x58, r12
+        mov gs:0x60, r13
+        mov gs:0x68, r14
+        mov gs:0x70, r15
+
+        // Move the interrupt stack frame struct to `rdi` to send it as a parameter.
         mov rdi, rsp
+        // Move the `kernel_task` boolean to `al`.
+        mov al, gs:0x80
+        swapgs
+        // Restore the kernel's stack because if we just executed a 
+        // kernel task because the CPU does restore the stack if there was no change in privilege level.
+        cmp al, 1
+        jnz 2f
+        mov rsp, gs:0
+
+        2:
         call pit_handler
     ",
         options(noreturn)
@@ -65,9 +76,9 @@ unsafe extern "C" fn pit_handler(frame: &InterruptStackFrame) {
     let curr = scheduler::get_running_process().as_mut().unwrap();
 
     memory::load_tables_to_cr3(memory::get_page_table());
-    curr.instruction_pointer = (*frame).instruction_pointer.as_u64();
-    curr.stack_pointer = (*frame).stack_pointer.as_u64();
-    curr.flags = (*frame).cpu_flags;
+    curr.instruction_pointer = frame.instruction_pointer.as_u64();
+    curr.stack_pointer = frame.stack_pointer.as_u64();
+    curr.flags = frame.cpu_flags;
 
     crate::print!(".");
 
