@@ -178,16 +178,51 @@ fn read_file(inode: &Inode) -> Box<&[u8]> {
     unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
 }
 
-#[deprecated]
-fn read_dir(inode: &Inode) -> Box<&[DirEntry]> {
-    let data = read_file(inode);
-
+fn read_dir_entry(ptr: usize) -> DirEntry {
+    let mut entry = DirEntry::default();
     unsafe {
-        Box::from(slice::from_raw_parts(
-            data.as_ptr() as *const DirEntry,
-            data.len() / core::mem::size_of::<DirEntry>(),
-        ))
+        blkdev::read(
+            ptr,
+            core::mem::size_of::<DirEntry>(),
+            &mut entry as *mut _ as *mut u8,
+        )
     }
+    entry
+}
+
+pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
+    let inode = read_inode(file)?;
+    let mut start = offset % BLOCK_SIZE;
+    let mut to_read = BLOCK_SIZE - start;
+    let mut pointer = offset / BLOCK_SIZE;
+    let mut bytes_read = 0;
+    let mut remaining;
+
+    if offset >= inode.size() {
+        return Some(0);
+    }
+
+    remaining = core::cmp::min(buffer.len(), inode.size() - offset);
+    if to_read > remaining {
+        to_read = remaining;
+    }
+    while remaining != 0 {
+        let entry = read_dir_entry(inode.get_ptr(pointer).ok()?);
+        let entry_size = core::mem::size_of::<DirEntry>();
+        let entry_bytes = entry_size.min(to_read);
+        let bytes_to_copy = entry_bytes - start;
+        if bytes_to_copy > 0 {
+            buffer[bytes_read..bytes_read + bytes_to_copy]
+                .copy_from_slice(&entry.name[start..start + bytes_to_copy]);
+            start = 0;
+        }
+        bytes_read += bytes_to_copy;
+        remaining -= bytes_to_copy;
+        pointer += 1;
+        to_read = core::cmp::min(remaining, BLOCK_SIZE);
+    }
+
+    Some(bytes_read)
 }
 
 /// Returns `true` if a bit in a bitmap is set to 1.
