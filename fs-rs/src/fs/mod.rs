@@ -178,19 +178,42 @@ fn read_file(inode: &Inode) -> Box<&[u8]> {
     unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
 }
 
-fn read_dir_entry(ptr: usize) -> DirEntry {
-    let mut entry = DirEntry::default();
-    unsafe {
-        blkdev::read(
-            ptr,
-            core::mem::size_of::<DirEntry>(),
-            &mut entry as *mut _ as *mut u8,
-        )
+/// function that reads dir entry
+///
+/// # Arguments
+/// - `ptr` - the pointer of the dir entry
+///
+/// # Returns
+/// the dir entry if exist, None otherwise
+fn read_dir_entry(ptr: usize, inode_id: usize) -> Option<DirEntry> {
+    if is_allocated(DISK_PARTS.inode_bit_map, inode_id) {
+        let mut entry = DirEntry::default();
+        unsafe {
+            blkdev::read(
+                ptr,
+                core::mem::size_of::<DirEntry>(),
+                &mut entry as *mut _ as *mut u8,
+            )
+        }
+        Some(entry)
+    } else {
+        None
     }
-    entry
 }
 
+/// function that read dir
+///
+/// # Arguments
+/// - `file` - the file id
+/// - `buffer` - the buffer to read to
+/// - `offset` - The offset inside the dir to read into.
+///
+/// # Returns
+/// The amount of bytes read or `None` if the dir does not exist.
 pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
+    if !read_inode(file)?.directory {
+        return None;
+    }
     let inode = read_inode(file)?;
     let mut start = offset % BLOCK_SIZE;
     let mut to_read = BLOCK_SIZE - start;
@@ -207,7 +230,7 @@ pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<
         to_read = remaining;
     }
     while remaining != 0 {
-        let entry = read_dir_entry(inode.get_ptr(pointer).ok()?);
+        let entry = read_dir_entry(inode.get_ptr(pointer).ok()?, inode.id)?;
         let entry_size = core::mem::size_of::<DirEntry>();
         let entry_bytes = entry_size.min(to_read);
         let bytes_to_copy = entry_bytes - start;
