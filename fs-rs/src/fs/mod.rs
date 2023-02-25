@@ -178,29 +178,6 @@ fn read_file(inode: &Inode) -> Box<&[u8]> {
     unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
 }
 
-/// function that reads dir entry
-///
-/// # Arguments
-/// - `ptr` - the pointer of the dir entry
-///
-/// # Returns
-/// the dir entry if exist, None otherwise
-fn read_dir_entry(ptr: usize, inode_id: usize) -> Option<DirEntry> {
-    if is_allocated(DISK_PARTS.inode_bit_map, inode_id) {
-        let mut entry = DirEntry::default();
-        unsafe {
-            blkdev::read(
-                ptr,
-                core::mem::size_of::<DirEntry>(),
-                &mut entry as *mut _ as *mut u8,
-            )
-        }
-        Some(entry)
-    } else {
-        None
-    }
-}
-
 /// function that read dir
 ///
 /// # Arguments
@@ -214,38 +191,11 @@ pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<
     if !read_inode(file)?.directory {
         return None;
     }
-    let inode = read_inode(file)?;
-    let mut start = offset % BLOCK_SIZE;
-    let mut to_read = BLOCK_SIZE - start;
-    let mut pointer = offset / BLOCK_SIZE;
-    let mut bytes_read = 0;
-    let mut remaining;
-
-    if offset >= inode.size() {
-        return Some(0);
-    }
-
-    remaining = core::cmp::min(buffer.len(), inode.size() - offset);
-    if to_read > remaining {
-        to_read = remaining;
-    }
-    while remaining != 0 {
-        let entry = read_dir_entry(inode.get_ptr(pointer).ok()?, inode.id)?;
-        let entry_size = core::mem::size_of::<DirEntry>();
-        let entry_bytes = entry_size.min(to_read);
-        let bytes_to_copy = entry_bytes - start;
-        if bytes_to_copy > 0 {
-            buffer[bytes_read..bytes_read + bytes_to_copy]
-                .copy_from_slice(&entry.name[start..start + bytes_to_copy]);
-            start = 0;
-        }
-        bytes_read += bytes_to_copy;
-        remaining -= bytes_to_copy;
-        pointer += 1;
-        to_read = core::cmp::min(remaining, BLOCK_SIZE);
-    }
-
-    Some(bytes_read)
+    read(
+        file,
+        slice::from_raw_parts_mut(buffer.as_mut_ptr(), core::mem::size_of::<DirEntry>()),
+        offset,
+    )
 }
 
 /// Returns `true` if a bit in a bitmap is set to 1.
