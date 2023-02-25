@@ -11,7 +11,9 @@ use x86_64::addr::VirtAddr;
 use x86_64::registers::segmentation::{Segment, CS};
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::idt::PageFaultErrorCode;
-use x86_64::PrivilegeLevel;
+use x86_64::structures::paging::page_table::PageTableEntry;
+use x86_64::structures::paging::{PageSize, PageTableFlags, Size4KiB};
+use x86_64::{PhysAddr, PrivilegeLevel};
 
 const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
@@ -189,15 +191,35 @@ unsafe fn page_fault_handler(
     stack_frame: &ExceptionStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
-    println!("============");
-    println!("|Page Fault|");
-    println!("============");
-    println!(
-        "Page fault at address {:#x}",
-        x86_64::registers::control::Cr2::read().as_u64()
-    );
-    println!("Stack Frame: {:#x?}", stack_frame);
-    println!("Error Code: {:#x?}", error_code);
+    let curr = crate::scheduler::get_running_process().as_mut().unwrap();
+    let mut stack_pointer = stack_frame.stack_pointer;
+    let new_stack_page;
+    match crate::memory::page_allocator::allocate()
+        .ok_or(crate::scheduler::SchedulerError::OutOfMemory)
+    {
+        Ok(v) => new_stack_page = v,
+        Err(e) => {
+            panic!("{}", e)
+        }
+    }
 
-    loop {}
+    loop {
+        if crate::memory::vmm::virtual_to_physical(curr.page_table, VirtAddr::new(stack_pointer))
+            .is_err()
+        {
+            break;
+        }
+
+        stack_pointer += Size4KiB::SIZE;
+    }
+
+    if let Err(e) = crate::memory::vmm::map_address(
+        curr.page_table,
+        VirtAddr::new(stack_pointer),
+        new_stack_page,
+        PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
+    ) {
+        panic!("{}", e);
+    }
+    crate::scheduler::load_from_queue();
 }
