@@ -185,6 +185,13 @@ unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> i64 {
     }
 }
 
+/// function that execute a process
+///
+/// # Arguments
+/// - `name` - pointer to i8 (the equivalent to c char) and execute the file that have this name
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise
 unsafe fn exec(name: *const i8) -> i64 {
     let mut len: usize = 0;
     while *(name.add(len)) != 0 {
