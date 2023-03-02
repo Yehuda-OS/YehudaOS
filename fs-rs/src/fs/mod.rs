@@ -13,12 +13,13 @@ use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
 use inode::Inode;
+pub use inode::MAX_FILE_SIZE;
 
 pub type DirList = Vec<DirListEntry>;
 
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
-const FILE_NAME_LEN: usize = 11;
+pub const FILE_NAME_LEN: usize = 11;
 const BLOCK_SIZE: usize = 8192;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
