@@ -55,16 +55,7 @@ pub unsafe extern "C" fn handler_save_context() {
 
         // Move the interrupt stack frame struct to `rdi` to send it as a parameter.
         mov rdi, rsp
-        // Move the `kernel_task` boolean to `al`.
-        mov al, gs:0x80
         swapgs
-        // Restore the kernel's stack because if we just executed a 
-        // kernel task because the CPU does restore the stack if there was no change in privilege level.
-        cmp al, 1
-        jnz 2f
-        mov rsp, gs:0
-
-        2:
         call pit_handler
     ",
         options(noreturn)

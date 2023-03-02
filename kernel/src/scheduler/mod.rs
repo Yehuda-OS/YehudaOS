@@ -208,6 +208,7 @@ pub fn get_tss_address() -> u64 {
 /// This function is unsafe because it requires a valid GDT with a TSS segment descriptor.
 pub unsafe fn load_tss() {
     asm!("mov {0}, rsp", out(reg)TSS_ENTRY.rsp0);
+    asm!("mov {0}, rsp", out(reg)TSS_ENTRY.ist1);
     asm!("ltr ax", in("ax")super::gdt::TSS);
 }
 

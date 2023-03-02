@@ -5,7 +5,6 @@
 #![feature(abi_x86_interrupt)]
 #![feature(const_mut_refs)]
 #![feature(naked_functions)]
-#![feature(asm_sym)]
 
 extern crate alloc;
 
