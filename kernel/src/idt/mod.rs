@@ -49,7 +49,7 @@ lazy_static! {
         idt.set_handler_entry(
             PIT_HANDLER,
             *Entry::new(
-                SegmentSelector::new(crate::gdt::KERNEL_CODE, PrivilegeLevel::Ring0),
+                SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
                 crate::pit::handler_save_context as u64,
             )
             .set_stack_index(1),
@@ -164,7 +164,7 @@ impl Idt {
 
     pub fn set_handler(&mut self, entry: u8, handler: u64) {
         self.0[entry as usize] = Entry::new(
-            SegmentSelector::new(crate::gdt::KERNEL_CODE, PrivilegeLevel::Ring0),
+            SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
             handler,
         );
     }
