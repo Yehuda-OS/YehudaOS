@@ -8,7 +8,6 @@ use core::arch::asm;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
-use x86_64::registers::segmentation::{Segment, CS};
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::idt::PageFaultErrorCode;
 use x86_64::PrivilegeLevel;
@@ -47,6 +46,14 @@ lazy_static! {
             interrupt_handler!(page_fault_handler => p_fault) as u64,
         );
         idt.set_handler(PIT_HANDLER, crate::pit::handler_save_context as u64);
+        idt.set_handler_entry(
+            PIT_HANDLER,
+            *Entry::new(
+                SegmentSelector::new(crate::gdt::KERNEL_CODE, PrivilegeLevel::Ring0),
+                crate::pit::handler_save_context as u64,
+            )
+            .set_stack_index(1),
+        );
         idt.set_handler(KEYBOARD_HANDLER, keyboard::handler as u64);
         idt.set_handler(
             SYSCALL_HANDLER,
@@ -121,13 +128,21 @@ impl Entry {
     fn new(gdt_selector: SegmentSelector, handler: u64) -> Self {
         let pointer = handler as u64;
         Entry {
-            gdt_selector: gdt_selector,
+            gdt_selector,
             pointer_low: pointer as u16,
             pointer_middle: (pointer >> 16) as u16,
             pointer_high: (pointer >> 32) as u32,
             options: EntryOptions::new(),
             reserved: 0,
         }
+    }
+
+    fn set_stack_index(&mut self, index: u16) -> &mut Self {
+        let mut copy = self.options;
+
+        self.options = *copy.set_stack_index(index);
+
+        self
     }
 
     fn missing() -> Self {
@@ -148,7 +163,14 @@ impl Idt {
     }
 
     pub fn set_handler(&mut self, entry: u8, handler: u64) {
-        self.0[entry as usize] = Entry::new(CS::get_reg(), handler);
+        self.0[entry as usize] = Entry::new(
+            SegmentSelector::new(crate::gdt::KERNEL_CODE, PrivilegeLevel::Ring0),
+            handler,
+        );
+    }
+
+    pub fn set_handler_entry(&mut self, index: u8, handler: Entry) {
+        self.0[index as usize] = handler;
     }
 
     pub fn load(&'static self) {
