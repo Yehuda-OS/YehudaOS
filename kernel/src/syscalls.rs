@@ -4,8 +4,8 @@ use crate::iostream::STDIN;
 use crate::memory;
 use core::arch::asm;
 use core::slice;
-use fs_rs::fs::is_dir;
 use fs_rs::fs::read as fread;
+use fs_rs::fs::{get_file_id, is_dir, FILE_NAME_LEN};
 
 const EFER: u32 = 0xc0000080;
 const STAR: u32 = 0xc0000081;
@@ -21,6 +21,7 @@ const TO_SUB_FROM_FD_TO_GET_FILE_ID: i32 = 3;
 static mut KERNEL_STACK: u64 = 0;
 
 mod syscall {
+    pub const EXEC: u64 = 0x3b;
     pub const EXIT: u64 = 0x3c;
     pub const READ: u64 = 0;
 }
@@ -69,6 +70,7 @@ unsafe fn handle_syscall(
 ) -> i64 {
     match syscall_number {
         syscall::READ => read(arg0 as i32, arg2 as *mut u8, arg2 as usize) as i64,
+        syscall::EXEC => exec(arg0 as *const i8),
         syscall::EXIT => exit(arg0 as i32),
         _ => -1,
     }
@@ -153,7 +155,7 @@ pub unsafe fn handler() -> ! {
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise
-unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> isize {
+unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> i64 {
     if fd < 0 {
         return -1;
     }
@@ -164,7 +166,7 @@ unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> isize {
     let mut buf = alloc::string::String::from_raw_parts(_buf, count, 1024); // capacity of 1 KB
     if fd < 3 && fd >= 0 {
         match fd {
-            STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as isize,
+            STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as i64,
             STDOUT_DESCRIPTOR => return 0, // STDOUT still not implemented
             STDERR_DESCRIPTOR => return 0, // STDERR still not implemented
             _ => {}
@@ -177,8 +179,46 @@ unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> isize {
             if is_dir((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize) {
                 return -1;
             }
-            b as isize
+            b as i64
         }
         None => -1,
     }
+}
+
+/// function that execute a process
+///
+/// # Arguments
+/// - `name` - pointer to i8 (the equivalent to c char) and execute the file that have this name
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise
+unsafe fn exec(name: *const i8) -> i64 {
+    let mut len: usize = 0;
+    while *(name.add(len)) != 0 {
+        len += 1;
+        if len > FILE_NAME_LEN {
+            return -1;
+        }
+    }
+
+    let bytes: &[u8] = slice::from_raw_parts(name as *mut u8, len);
+    let file_name = if let Ok(v) = core::str::from_utf8(bytes) {
+        v
+    } else {
+        return -1;
+    };
+
+    let id = if let Some(id) = get_file_id(file_name, None) {
+        id
+    } else {
+        return -1;
+    };
+
+    if let Ok(proc) = scheduler::Process::user_process(id as u64) {
+        scheduler::add_to_the_queue(proc);
+    } else {
+        return -1;
+    };
+
+    0
 }
