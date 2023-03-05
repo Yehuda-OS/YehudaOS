@@ -2,7 +2,7 @@ pub mod keyboard;
 mod macros;
 
 use crate::syscalls::int_0x80_handler as syscall_handler;
-use crate::{interrupt_handler, print, println};
+use crate::{interrupt_handler, print, println, scheduler};
 use bit_field::BitField;
 use core::arch::asm;
 use lazy_static::lazy_static;
@@ -10,8 +10,8 @@ use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
 use x86_64::registers::segmentation::{Segment, CS};
 use x86_64::structures::gdt::SegmentSelector;
+use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::structures::idt::PageFaultErrorCode;
-use x86_64::structures::paging::page_table::PageTableEntry;
 use x86_64::structures::paging::{PageSize, PageTableFlags, Size4KiB};
 use x86_64::{PhysAddr, PrivilegeLevel};
 
@@ -57,16 +57,6 @@ lazy_static! {
 
         idt
     };
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct ExceptionStackFrame {
-    instruction_pointer: u64,
-    code_segment: u64,
-    cpu_flags: u64,
-    stack_pointer: u64,
-    stack_segment: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -170,56 +160,62 @@ impl Idt {
     }
 }
 
-unsafe fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn divide_by_zero_handler(stack_frame: &InterruptStackFrame) -> ! {
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
         &*stack_frame
     });
     loop {}
 }
 
-unsafe fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+unsafe fn breakpoint_handler(stack_frame: &InterruptStackFrame) {
     print!("EXCEPTION: BREAKPOINT");
     loop {}
 }
 
-unsafe fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn double_fault_handler(stack_frame: &InterruptStackFrame) -> ! {
     print!("EXCEPTION: double fault occured");
     loop {}
 }
 
 unsafe fn page_fault_handler(
-    stack_frame: &ExceptionStackFrame,
+    stack_frame: &InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
-    let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-    let mut stack_pointer = stack_frame.stack_pointer;
-    let new_stack_page;
-    match crate::memory::page_allocator::allocate()
-        .ok_or(crate::scheduler::SchedulerError::OutOfMemory)
-    {
-        Ok(v) => new_stack_page = v,
-        Err(e) => {
-            panic!("{}", e)
-        }
-    }
+    if x86_64::registers::control::Cr2::read() == stack_frame.stack_pointer {
+        let curr = crate::scheduler::get_running_process().as_mut().unwrap();
+        let mut stack_pointer = stack_frame.stack_pointer;
+        let new_stack_page = crate::memory::page_allocator::allocate().unwrap();
 
-    loop {
-        if crate::memory::vmm::virtual_to_physical(curr.page_table, VirtAddr::new(stack_pointer))
-            .is_err()
-        {
-            break;
+        loop {
+            if crate::memory::vmm::virtual_to_physical(curr.page_table, stack_pointer).is_err() {
+                break;
+            }
+
+            stack_pointer -= Size4KiB::SIZE;
+            if stack_frame.stack_pointer < stack_pointer + scheduler::MAX_STACK_SIZE {
+                panic!("ERROR: Cant have more than 80 KiB for the stack");
+            }
         }
 
-        stack_pointer += Size4KiB::SIZE;
-    }
+        crate::memory::vmm::map_address(
+            curr.page_table,
+            stack_pointer,
+            new_stack_page,
+            PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
+        )
+        .unwrap();
 
-    if let Err(e) = crate::memory::vmm::map_address(
-        curr.page_table,
-        VirtAddr::new(stack_pointer),
-        new_stack_page,
-        PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
-    ) {
-        panic!("{}", e);
+        crate::scheduler::load_from_queue();
+    } else {
+        println!("============");
+        println!("|Page Fault|");
+        println!("============");
+        println!(
+            "Page fault at address {:#x}",
+            x86_64::registers::control::Cr2::read().as_u64()
+        );
+        println!("Stack Frame: {:#x?}", stack_frame);
+        println!("Error Code: {:#x?}", error_code); // the only panic so it will stop after it
+        loop {}
     }
-    crate::scheduler::load_from_queue();
 }

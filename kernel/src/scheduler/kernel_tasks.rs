@@ -1,3 +1,4 @@
+use super::MAX_STACK_SIZE;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     VirtAddr,
@@ -8,7 +9,6 @@ use crate::mutex::Mutex;
 
 use super::SchedulerError;
 
-const MAX_STACK_SIZE: u64 = 1024 * 4 * 20; // 80KiB
 const STACK_START: u64 = 0x4000_0000;
 
 static STACK_BITMAP: Mutex<u64> = Mutex::new(0);
