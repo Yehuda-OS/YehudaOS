@@ -665,7 +665,8 @@ pub fn remove_file(path_str: &str) -> Result<(), FsError> {
     let dir = get_inode(&path_str[0..(last_delimeter)], None).ok_or(FsError::FileNotFound)?;
     let file = get_inode(file_name.as_str(), Some(dir)).ok_or(FsError::FileNotFound)?;
 
-    if file.directory && file.size() > 0 {
+    // An empty directory contains to directory entries.
+    if file.directory && file.size() != 2 * core::mem::size_of::<DirEntry>() {
         Err(FsError::DirNotEmpty)
     } else {
         // `set_len` will not return `MaximumSizeExceeded` because we shrink the size.
