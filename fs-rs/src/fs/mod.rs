@@ -72,6 +72,15 @@ impl fmt::Display for FsError {
     }
 }
 
+impl DirEntry {
+    const fn new() -> Self {
+        DirEntry {
+            id: 0,
+            name: [0; FILE_NAME_LEN],
+        }
+    }
+}
+
 /// function that returns the root dir (/)
 ///
 /// # Returns
@@ -99,7 +108,9 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     let mut next_delimiter = path.find('/');
     let mut next_folder;
     let mut inode = get_root_dir();
-    let mut index: usize = 0;
+    let mut dir_entry = DirEntry::new();
+    let mut index;
+    let mut entry_count;
 
     if path == "/" {
         return Some(inode);
@@ -107,47 +118,42 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     // Check if the path is relative
     if path.chars().nth(0).unwrap_or(' ') != '/' {
         inode = cwd?;
+    } else {
+        path = &path[1..];
     }
 
-    while next_delimiter != None {
-        let mut dir_content =
-            vec![DirEntry::default(); inode.size() / core::mem::size_of::<DirEntry>()];
-
-        unsafe {
-            read(
-                inode.id,
-                core::slice::from_raw_parts_mut(dir_content.as_mut_ptr() as *mut u8, inode.size()),
-                index,
-            )
+    loop {
+        // The first 2 entries are the special folders.
+        index = 2;
+        entry_count = inode.size() / core::mem::size_of::<DirEntry>();
+        path = match next_delimiter {
+            Some(delimiter) => &path[delimiter + 1..],
+            None => &path,
         };
-        path = &path[(next_delimiter.unwrap() + 1)..];
         next_delimiter = path.find('/');
         next_folder = match next_delimiter {
-            Some(delimeter) => &path[0..delimeter],
-            None => &path[0..],
+            Some(delimiter) => &path[0..delimiter],
+            None => path,
         };
-        while index != dir_content.len()
-            && core::str::from_utf8(
-                &dir_content[index].name[..dir_content[index]
-                    .name
-                    .iter()
-                    .position(|x| *x == 0)
-                    .unwrap_or(FILE_NAME_LEN)],
-            )
-            .unwrap()
-                != next_folder
-        {
+
+        while index < entry_count {
+            // UNWRAP: Already checked if the folder exists.
+            dir_entry = unsafe { read_dir(inode.id, index).unwrap() };
+
+            if core::str::from_utf8(&dir_entry.name).unwrap() == next_folder {
+                break;
+            }
             index += 1;
         }
-        if index >= dir_content.len() {
+        if index > entry_count {
             return None;
         }
-        match read_inode(dir_content[index].id) {
-            Some(file) => inode = file,
-            None => return None,
-        }
+        // UNWRAP: The id is from the directory data so it must exist.
+        inode = read_inode(dir_entry.id).unwrap();
 
-        index = 0;
+        if next_delimiter.is_none() {
+            break;
+        }
     }
 
     Some(inode)
@@ -662,7 +668,7 @@ pub fn create_file(path_str: &str, directory: bool) -> Result<(), &'static str> 
 pub fn remove_file(path_str: &str) -> Result<(), FsError> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
-    let dir = get_inode(&path_str[0..(last_delimeter)], None).ok_or(FsError::FileNotFound)?;
+    let dir = get_inode(&path_str[0..(last_delimeter + 1)], None).ok_or(FsError::FileNotFound)?;
     let file = get_inode(file_name.as_str(), Some(dir)).ok_or(FsError::FileNotFound)?;
 
     // An empty directory contains to directory entries.
