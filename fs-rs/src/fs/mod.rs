@@ -14,6 +14,7 @@ use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
 use inode::Inode;
 pub use inode::MAX_FILE_SIZE;
+use std::fmt;
 
 pub type DirList = Vec<DirListEntry>;
 
@@ -30,6 +31,7 @@ pub enum FsError {
     NotEnoughDiskSpace,
     MaximumSizeExceeded,
     FileNotFound,
+    DirNotEmpty,
 }
 
 struct Header {
@@ -57,6 +59,17 @@ pub struct DirListEntry {
 pub struct DirEntry {
     name: [u8; FILE_NAME_LEN],
     id: usize,
+}
+
+impl fmt::Display for FsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            FsError::NotEnoughDiskSpace => write!(f, "not enough disk space"),
+            FsError::MaximumSizeExceeded => write!(f, "maximum file size exceeded"),
+            FsError::FileNotFound => write!(f, "the file was not found"),
+            FsError::DirNotEmpty => write!(f, "found a not empty directory"),
+        }
+    }
 }
 
 /// function that returns the root dir (/)
@@ -594,7 +607,7 @@ pub fn format() {
 }
 
 #[deprecated]
-pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str> {
+pub fn create_file(path_str: &str, directory: bool) -> Result<(), &'static str> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
     let mut file = Inode::new();

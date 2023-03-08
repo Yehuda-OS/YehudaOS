@@ -140,7 +140,7 @@ fn main() {
 
             REMOVE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::remove_file((&cmd[1]).to_string(), false) {
+                    if let Err(e) = fs::remove_file(&cmd[1]) {
                         println!("{}", e);
                     }
                 } else {
@@ -150,7 +150,7 @@ fn main() {
 
             REMOVE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::remove_file((&cmd[1]).to_string(), true) {
+                    if let Err(e) = fs::remove_file(&cmd[1]) {
                         println!("{}", e);
                     }
                 } else {
