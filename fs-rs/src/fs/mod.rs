@@ -808,7 +808,10 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
 /// created in the file. Reading from the hole will return null bytes.
 ///
 /// # Returns
-/// If the function fails, an error will be returned.
+/// The function might return the errors:
+/// - `FileNotFound`
+/// - `NotEnoughDiskSpace`
+/// - `MaximumSizeExceeded`
 pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsError> {
     let mut start = offset % BLOCK_SIZE;
     let mut to_write = BLOCK_SIZE - start;
