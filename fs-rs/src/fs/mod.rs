@@ -32,6 +32,7 @@ pub enum FsError {
     MaximumSizeExceeded,
     FileNotFound,
     DirNotEmpty,
+    FileAlreadyExists,
 }
 
 struct Header {
@@ -68,6 +69,7 @@ impl fmt::Display for FsError {
             FsError::MaximumSizeExceeded => write!(f, "maximum file size exceeded"),
             FsError::FileNotFound => write!(f, "the file was not found"),
             FsError::DirNotEmpty => write!(f, "found a not empty directory"),
+            FsError::FileAlreadyExists => write!(f, "the file already exists"),
         }
     }
 }
@@ -641,6 +643,7 @@ pub fn format() {
 /// - `FileNotFound`
 /// - `NotEnoughDiskSpace`
 /// - `MaximumSizeExceeded`
+/// - `FileAlreadyExists`
 pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Result<(), FsError> {
     let last_delimeter = path_str.rfind('/');
     let file_name = match last_delimeter {
@@ -658,6 +661,13 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
     )
     .ok_or(FsError::FileNotFound)?;
     let mut file_details = DirEntry::new();
+
+    if file_name == "" {
+        return Err(FsError::FileNotFound);
+    }
+    if get_inode(file_name, Some(dir)).is_some() {
+        return Err(FsError::FileAlreadyExists);
+    }
 
     file.id = allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?;
     file.directory = directory;
