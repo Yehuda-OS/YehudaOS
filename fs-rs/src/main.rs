@@ -86,7 +86,7 @@ fn main() {
 
             CREATE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::create_file(cmd[1], false) {
+                    if let Err(e) = fs::create_file(cmd[1], false, None) {
                         println!("{}", e);
                     }
                 } else {
@@ -132,7 +132,7 @@ fn main() {
 
             CREATE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    fs::create_file((&cmd[1]), true);
+                    fs::create_file((&cmd[1]), true, None);
                 } else {
                     println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
                 }

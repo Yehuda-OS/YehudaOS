@@ -424,7 +424,11 @@ fn deallocate_block(address: usize) {
 /// - `folder` - the folder that `file` is going to be added to
 ///
 /// # Returns
-/// Inode of the folder after the file was added or `FsError` otherwise
+/// Inode of the folder after the file was added or `FsError` otherwise.
+/// Returns the following variants:
+/// - `FileNotFound`
+/// - `NotEnoughDiskSpace`
+/// - `MaximumSizeExceeded`
 fn add_file_to_folder(file: &DirEntry, folder: usize) -> Result<(), FsError> {
     let folder_size = read_inode(folder).ok_or(FsError::FileNotFound)?.size();
     let buffer: &[u8] = unsafe {
@@ -612,23 +616,37 @@ pub fn format() {
     add_special_folders(&root.clone(), &mut root);
 }
 
-#[deprecated]
-pub fn create_file(path_str: &str, directory: bool) -> Result<(), &'static str> {
-    let last_delimeter = path_str.rfind('/').unwrap_or(0);
-    let file_name = path_str[last_delimeter + 1..].to_string();
-    let mut file = Inode::new();
-    let dir;
-    if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
-        dir = inode
-    } else {
-        return Err("Error: invalid path");
-    }
-    let mut file_details = DirEntry {
-        name: [0; FILE_NAME_LEN],
-        id: 0,
+/// Create a new file or folder.
+///
+/// # Arguments
+/// - `path_str` - Path to the new file.
+/// - `directory` - Whether to create a directory or not.
+/// - `cwd` - The ID of the current working directory.
+///
+/// # Returns
+/// The function might return the errors:
+/// - `FileNotFound`
+/// - `NotEnoughDiskSpace`
+/// - `MaximumSizeExceeded`
+pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Result<(), FsError> {
+    let last_delimeter = path_str.rfind('/');
+    let file_name = match last_delimeter {
+        Some(delimiter) => &path_str[delimiter + 1..],
+        None => path_str,
     };
+    let mut file = Inode::new();
+    let dir = get_inode(
+        &path_str[0..last_delimeter.unwrap_or(0) + 1],
+        if let Some(cwd) = cwd {
+            read_inode(cwd)
+        } else {
+            None
+        },
+    )
+    .ok_or(FsError::FileNotFound)?;
+    let mut file_details = DirEntry::new();
 
-    file.id = allocate_inode().unwrap();
+    file.id = allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?;
     file.directory = directory;
     write_inode(&file);
     if file.directory {
@@ -649,10 +667,8 @@ pub fn create_file(path_str: &str, directory: bool) -> Result<(), &'static str> 
         name
     };
     file_details.id = file.id;
-    match add_file_to_folder(&file_details, dir.id) {
-        Ok(_) => Ok(()),
-        Err(_) => Err("Error: failed to add the file to the folder"),
-    }
+
+    add_file_to_folder(&file_details, dir.id)
 }
 
 /// function that removes a file
