@@ -54,7 +54,7 @@ pub struct DirListEntry {
 }
 
 #[derive(Clone, PartialEq, Eq, Default)]
-struct DirEntry {
+pub struct DirEntry {
     name: [u8; FILE_NAME_LEN],
     id: usize,
 }
@@ -184,19 +184,32 @@ fn read_file(inode: &Inode) -> Box<&[u8]> {
 /// # Arguments
 /// - `file` - the file id
 /// - `buffer` - the buffer to read to
-/// - `offset` - The offset inside the dir to read into.
+/// - `offset` - The offset **in files** inside the dir to read into.
 ///
 /// # Returns
 /// The amount of bytes read or `None` if the dir does not exist.
-pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
+pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
+    let mut buffer = DirEntry {
+        id: 0,
+        name: [0; FILE_NAME_LEN],
+    };
+
     if !read_inode(file)?.directory {
         return None;
     }
-    read(
+    if read(
         file,
-        slice::from_raw_parts_mut(buffer.as_mut_ptr(), core::mem::size_of::<DirEntry>()),
-        offset,
-    )
+        core::slice::from_raw_parts_mut(
+            &mut buffer as *mut DirEntry as *mut u8,
+            core::mem::size_of::<DirEntry>(),
+        ),
+        offset * core::mem::size_of::<DirEntry>(),
+    )? < core::mem::size_of::<DirEntry>()
+    {
+        return None;
+    }
+
+    Some(buffer)
 }
 
 /// Returns `true` if a bit in a bitmap is set to 1.
