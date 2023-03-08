@@ -643,53 +643,24 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
 /// - `directory` - if the file is a directory
 ///
 /// # Returns
-/// `Ok(())` if the file was removed successfully and `Err` if not
-pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str> {
+/// The function might return the errors:
+/// - `FileNotFound`
+/// - `DirNotEmpty` - If the file is an unempty directory.
+pub fn remove_file(path_str: &str) -> Result<(), FsError> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
-    let dir;
-    if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
-        dir = inode
+    let dir = get_inode(&path_str[0..(last_delimeter)], None).ok_or(FsError::FileNotFound)?;
+    let file = get_inode(file_name.as_str(), Some(dir)).ok_or(FsError::FileNotFound)?;
+
+    if file.directory && file.size() > 0 {
+        Err(FsError::DirNotEmpty)
     } else {
-        return Err("Error: invalid path");
-    }
+        // `set_len` will not return `MaximumSizeExceeded` because we shrink the size.
+        set_len(file.id, 0)?;
+        remove_file_from_folder(file.id, dir.id)?;
 
-    let mut file_details = DirEntry {
-        name: [0; FILE_NAME_LEN],
-        id: 0,
-    };
-    // check if file exists
-    if get_file_id(&path_str, None).is_none() {
-        return Err("Error: file does not exist");
+        Ok(())
     }
-    file_details.name = {
-        let mut name: [u8; FILE_NAME_LEN] = [0; FILE_NAME_LEN];
-        let temp = file_name.as_bytes();
-        if temp.len() >= FILE_NAME_LEN {
-            name = temp[..FILE_NAME_LEN].try_into().unwrap();
-        } else {
-            for i in 0..temp.len() {
-                name[i] = temp[i];
-            }
-        }
-
-        name
-    };
-    file_details.id = get_file_id(&path_str, None).unwrap();
-    // An empty folder contains 2 entries
-    if directory == true
-        && read_inode(file_details.id).unwrap().size() > 2 * core::mem::size_of::<DirEntry>()
-    {
-        return Err("Error: folder is not empty");
-    } else if directory == false && is_dir(file_details.id) == true {
-        return Err("Error: rm is used for file, not for directories");
-    } else if directory == true && is_dir(file_details.id) == false {
-        return Err("Error: rmdir is used for directories, not for files");
-    }
-    remove_file_from_folder(file_details.id, dir.id)
-        .map_err(|_| "Error: failed to remove the file from the folder")?;
-
-    Ok(())
 }
 
 /// Get a file's `Inode` id.
