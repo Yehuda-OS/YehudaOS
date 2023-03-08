@@ -111,6 +111,8 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     let mut dir_entry = DirEntry::new();
     let mut index;
     let mut entry_count;
+    let mut found;
+    let mut equals;
 
     if path == "/" {
         return Some(inode);
@@ -123,8 +125,8 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     }
 
     loop {
-        // The first 2 entries are the special folders.
-        index = 2;
+        index = 0;
+        found = false;
         entry_count = inode.size() / core::mem::size_of::<DirEntry>();
         path = match next_delimiter {
             Some(delimiter) => &path[delimiter + 1..],
@@ -134,18 +136,29 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         next_folder = match next_delimiter {
             Some(delimiter) => &path[0..delimiter],
             None => path,
-        };
+        }
+        .as_bytes();
 
-        while index < entry_count {
+        while index < entry_count && !found {
             // UNWRAP: Already checked if the folder exists.
             dir_entry = unsafe { read_dir(inode.id, index).unwrap() };
+            equals = true;
 
-            if core::str::from_utf8(&dir_entry.name).unwrap() == next_folder {
-                break;
+            for i in 0..FILE_NAME_LEN {
+                if dir_entry.name[i] != 0 {
+                    if next_folder.len() <= i || next_folder[i] != dir_entry.name[i] {
+                        equals = false;
+                    }
+                } else if next_folder.len() > i && next_folder[i] != 0 {
+                    equals = false;
+                }
+            }
+            if equals {
+                found = true;
             }
             index += 1;
         }
-        if index > entry_count {
+        if !found {
             return None;
         }
         // UNWRAP: The id is from the directory data so it must exist.
