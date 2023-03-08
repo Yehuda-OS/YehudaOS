@@ -5,7 +5,7 @@ const MAX_LIMIT: u32 = 0xfffff;
 
 pub const KERNEL_CODE: u16 = 0x28;
 pub const KERNEL_DATA: u16 = 0x30;
-pub const USER_CODE: u16  = 0x38;
+pub const USER_CODE: u16 = 0x38;
 pub const USER_DATA: u16 = 0x40;
 pub const TSS: u16 = 0x48;
 

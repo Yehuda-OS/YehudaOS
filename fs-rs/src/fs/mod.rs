@@ -13,12 +13,13 @@ use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
 use inode::Inode;
+pub use inode::MAX_FILE_SIZE;
 
 pub type DirList = Vec<DirListEntry>;
 
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
-const FILE_NAME_LEN: usize = 11;
+pub const FILE_NAME_LEN: usize = 11;
 const BLOCK_SIZE: usize = 8192;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
@@ -178,16 +179,24 @@ fn read_file(inode: &Inode) -> Box<&[u8]> {
     unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
 }
 
-#[deprecated]
-fn read_dir(inode: &Inode) -> Box<&[DirEntry]> {
-    let data = read_file(inode);
-
-    unsafe {
-        Box::from(slice::from_raw_parts(
-            data.as_ptr() as *const DirEntry,
-            data.len() / core::mem::size_of::<DirEntry>(),
-        ))
+/// function that read dir
+///
+/// # Arguments
+/// - `file` - the file id
+/// - `buffer` - the buffer to read to
+/// - `offset` - The offset inside the dir to read into.
+///
+/// # Returns
+/// The amount of bytes read or `None` if the dir does not exist.
+pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
+    if !read_inode(file)?.directory {
+        return None;
     }
+    read(
+        file,
+        slice::from_raw_parts_mut(buffer.as_mut_ptr(), core::mem::size_of::<DirEntry>()),
+        offset,
+    )
 }
 
 /// Returns `true` if a bit in a bitmap is set to 1.
