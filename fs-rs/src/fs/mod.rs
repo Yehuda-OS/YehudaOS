@@ -9,12 +9,12 @@ use alloc::{
     vec,
     vec::Vec,
 };
+use core::fmt;
 use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
 use inode::Inode;
 pub use inode::MAX_FILE_SIZE;
-use std::fmt;
 
 pub type DirList = Vec<DirListEntry>;
 
