@@ -176,34 +176,6 @@ fn get_inode_address(id: usize) -> usize {
     DISK_PARTS.root + id * core::mem::size_of::<Inode>()
 }
 
-#[deprecated]
-fn read_file(inode: &Inode) -> Box<&[u8]> {
-    let last_pointer: usize = inode.size() / BLOCK_SIZE;
-    let mut pointer = 0;
-    let mut to_read;
-    let mut bytes_read = 0;
-    let mut buffer = Box::new(vec![0; inode.size()]);
-
-    while bytes_read != inode.size() {
-        to_read = if pointer == last_pointer {
-            inode.size() % BLOCK_SIZE
-        } else {
-            BLOCK_SIZE
-        };
-        unsafe {
-            blkdev::read(
-                inode.addresses[pointer],
-                to_read,
-                (*buffer).as_mut_ptr().add(bytes_read),
-            );
-        };
-        bytes_read += to_read;
-        pointer += 1;
-    }
-
-    unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
-}
-
 /// function that read dir
 ///
 /// # Arguments
@@ -360,39 +332,6 @@ fn deallocate(bitmap_start: usize, n: usize) {
     unsafe { blkdev::read(byte_address, 1, &mut byte as *mut u8) };
     byte ^= 1 << offset; // flip the bit to mark as unoccupied
     unsafe { blkdev::write(byte_address, 1, &mut byte as *mut u8) };
-}
-
-#[deprecated]
-fn reallocate_blocks(inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
-    let required_blocks = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
-    let blocks_to_allocate;
-    let mut used_blocks = 0;
-    let mut new_addresses = *inode;
-
-    if required_blocks > inode::DIRECT_POINTERS {
-        return Err("too many blocks are required");
-    }
-
-    while new_addresses.addresses[used_blocks as usize] != 0 {
-        used_blocks += 1;
-    }
-
-    blocks_to_allocate = (required_blocks as isize - used_blocks) as isize;
-
-    if blocks_to_allocate > 0 {
-        for _ in 0..blocks_to_allocate {
-            new_addresses.addresses[used_blocks as usize] = allocate_block().unwrap();
-            used_blocks += 1;
-        }
-    } else if blocks_to_allocate < 0 {
-        for _ in 0..(-blocks_to_allocate) {
-            used_blocks -= 1;
-            deallocate_block(new_addresses.addresses[used_blocks as usize]);
-            new_addresses.addresses[used_blocks as usize] = 0;
-        }
-    }
-
-    Ok(new_addresses)
 }
 
 /// allocate a block

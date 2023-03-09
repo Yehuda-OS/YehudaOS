@@ -12,8 +12,8 @@ pub struct Inode {
     pub id: usize,
     directory: bool,
     size: usize,
-    pub addresses: [usize; DIRECT_POINTERS],
-    pub indirect_pointer: usize,
+    addresses: [usize; DIRECT_POINTERS],
+    indirect_pointer: usize,
 }
 
 impl Inode {
