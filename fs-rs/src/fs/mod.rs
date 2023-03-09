@@ -74,21 +74,12 @@ impl fmt::Display for FsError {
     }
 }
 
-impl DirEntry {
-    const fn new() -> Self {
-        DirEntry {
-            id: 0,
-            name: [0; FILE_NAME_LEN],
-        }
-    }
-}
-
 /// function that returns the root dir (/)
 ///
 /// # Returns
 /// the Inode of the root dir
 fn get_root_dir() -> Inode {
-    let mut ans = Inode::new();
+    let mut ans = Inode::default();
 
     unsafe {
         blkdev::read(
@@ -110,7 +101,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     let mut next_delimiter = path.find('/');
     let mut next_folder;
     let mut inode = get_root_dir();
-    let mut dir_entry = DirEntry::new();
+    let mut dir_entry = DirEntry::default();
     let mut index;
     let mut entry_count;
     let mut found;
@@ -267,7 +258,7 @@ fn is_allocated(bitmap_start: usize, i: usize) -> bool {
 /// # Arguments
 /// - `id` - The inode's ID.
 fn read_inode(id: usize) -> Option<Inode> {
-    let mut inode = Inode::new();
+    let mut inode = Inode::default();
 
     if is_allocated(DISK_PARTS.inode_bit_map, id) {
         unsafe {
@@ -599,7 +590,7 @@ pub fn format() {
         version: 0,
     };
     let bit_maps_size = DISK_PARTS.root - DISK_PARTS.block_bit_map;
-    let mut root = Inode::new();
+    let mut root = Inode::default();
 
     // put the header in place
     header.magic.copy_from_slice(&FS_MAGIC);
@@ -650,7 +641,7 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
         Some(delimiter) => &path_str[delimiter + 1..],
         None => path_str,
     };
-    let mut file = Inode::new();
+    let mut file = Inode::default();
     let dir = get_inode(
         &path_str[0..last_delimeter.unwrap_or(0) + 1],
         if let Some(cwd) = cwd {
@@ -660,7 +651,7 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
         },
     )
     .ok_or(FsError::FileNotFound)?;
-    let mut file_details = DirEntry::new();
+    let mut file_details = DirEntry::default();
 
     if file_name == "" {
         return Err(FsError::FileNotFound);
@@ -932,7 +923,7 @@ pub fn list_dir(path_str: &String) -> DirList {
             data.len() / core::mem::size_of::<DirEntry>(),
         ))
     };
-    let file = Inode::new();
+    let file = Inode::default();
 
     for i in 0..dir_content.len() {
         entry.name = Box::leak(

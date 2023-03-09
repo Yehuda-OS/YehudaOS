@@ -7,7 +7,7 @@ const POINTER_SIZE: usize = core::mem::size_of::<usize>();
 pub const MAX_FILE_SIZE: usize =
     DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Inode {
     pub id: usize,
     directory: bool,
@@ -17,16 +17,6 @@ pub struct Inode {
 }
 
 impl Inode {
-    pub const fn new() -> Self {
-        Inode {
-            id: 0,
-            directory: false,
-            size: 0,
-            addresses: [0; DIRECT_POINTERS],
-            indirect_pointer: 0,
-        }
-    }
-
     pub fn size(&self) -> usize {
         self.size
     }
