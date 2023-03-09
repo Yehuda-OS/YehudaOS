@@ -67,11 +67,12 @@ impl Inode {
     /// - `index` - The index of the pointer.
     pub fn get_ptr(&self, mut index: usize) -> Result<usize, FsError> {
         let mut offset;
-        let next_ptr;
         let mut ptr = 0;
 
         if index < DIRECT_POINTERS {
             return Ok(self.addresses[index]);
+        } else if index * BLOCK_SIZE >= MAX_FILE_SIZE {
+            return Err(FsError::MaximumSizeExceeded);
         }
 
         index -= DIRECT_POINTERS;
@@ -91,12 +92,8 @@ impl Inode {
             }
         } else {
             index -= POINTERS_PER_BLOCK;
-            next_ptr = index % POINTER_SIZE;
             offset = index / POINTERS_PER_BLOCK * POINTER_SIZE;
 
-            if offset >= BLOCK_SIZE {
-                return Err(FsError::MaximumSizeExceeded);
-            }
             if self.double_indirect_pointer == 0 {
                 ptr = 0;
             } else {
@@ -107,17 +104,11 @@ impl Inode {
                         &mut ptr as *mut _ as *mut u8,
                     )
                 }
-                offset = next_ptr * POINTER_SIZE;
-                if offset >= BLOCK_SIZE {
-                    return Err(FsError::MaximumSizeExceeded);
-                }
+                index %= POINTERS_PER_BLOCK;
+                offset = index * POINTER_SIZE;
                 if ptr != 0 {
                     unsafe {
-                        blkdev::read(
-                            self.double_indirect_pointer + offset,
-                            POINTER_SIZE,
-                            &mut ptr as *mut _ as *mut u8,
-                        )
+                        blkdev::read(ptr + offset, POINTER_SIZE, &mut ptr as *mut _ as *mut u8)
                     }
                 }
             }
