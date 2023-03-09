@@ -134,7 +134,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
 
         while index < entry_count && !found {
             // UNWRAP: Already checked if the folder exists.
-            dir_entry = unsafe { read_dir(inode.id, index).unwrap() };
+            dir_entry = unsafe { read_dir(inode.id(), index).unwrap() };
             equals = true;
 
             for i in 0..FILE_NAME_LEN {
@@ -254,7 +254,7 @@ fn read_inode(id: usize) -> Option<Inode> {
 fn write_inode(inode: &Inode) {
     unsafe {
         blkdev::write(
-            get_inode_address(inode.id),
+            get_inode_address(inode.id()),
             core::mem::size_of::<Inode>(),
             inode as *const _ as *mut u8,
         )
@@ -467,18 +467,18 @@ const fn calc_parts(device_size: usize) -> DiskParts {
 /// - `folder` - The folder to add to.
 fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
     let dot = DirEntry {
-        name: { ['.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        id: folder.id,
+        name: ['.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        id: folder.id(),
     };
     let dot_dot = DirEntry {
         name: ['.' as u8, '.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        id: containing_folder.id,
+        id: containing_folder.id(),
     };
 
-    add_file_to_folder(&dot, folder.id).unwrap();
-    *folder = read_inode(folder.id).unwrap();
-    add_file_to_folder(&dot_dot, folder.id).unwrap();
-    *folder = read_inode(folder.id).unwrap();
+    add_file_to_folder(&dot, folder.id()).unwrap();
+    *folder = read_inode(folder.id()).unwrap();
+    add_file_to_folder(&dot_dot, folder.id()).unwrap();
+    *folder = read_inode(folder.id()).unwrap();
 }
 
 /// function that checks if an inode is directory
@@ -550,7 +550,7 @@ pub fn format() {
     // create root directory Inode
     root.set_as_dir(true);
     // UNWRAP: No inodes have been allocated yet.
-    root.id = allocate_inode().unwrap();
+    root.set_id(allocate_inode().unwrap());
     unsafe {
         blkdev::write(
             DISK_PARTS.root,
@@ -599,7 +599,7 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
         return Err(FsError::FileAlreadyExists);
     }
 
-    file.id = allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?;
+    file.set_id(allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?);
     file.set_as_dir(directory);
     write_inode(&file);
     if file.is_dir() {
@@ -619,9 +619,9 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
 
         name
     };
-    file_details.id = file.id;
+    file_details.id = file.id();
 
-    add_file_to_folder(&file_details, dir.id)
+    add_file_to_folder(&file_details, dir.id())
 }
 
 /// function that removes a file
@@ -645,8 +645,8 @@ pub fn remove_file(path_str: &str) -> Result<(), FsError> {
         Err(FsError::DirNotEmpty)
     } else {
         // `set_len` will not return `MaximumSizeExceeded` because we shrink the size.
-        set_len(file.id, 0)?;
-        remove_file_from_folder(file.id, dir.id)?;
+        set_len(file.id(), 0)?;
+        remove_file_from_folder(file.id(), dir.id())?;
 
         Ok(())
     }
@@ -667,7 +667,7 @@ pub fn get_file_id(path: &str, cwd: Option<usize>) -> Option<usize> {
                 None
             },
         )?
-        .id,
+        .id(),
     )
 }
 
@@ -829,7 +829,7 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsE
 pub fn get_content(path_str: &String) -> Option<String> {
     let file: Inode = get_inode(path_str, None)?;
     let mut content: Vec<u8> = vec![0; file.size()];
-    unsafe { read(file.id, content.as_mut_slice(), 0) };
+    unsafe { read(file.id(), content.as_mut_slice(), 0) };
 
     let content = String::from_utf8_lossy(&*content.as_slice()).to_string();
     if content.trim().is_empty() {
@@ -855,7 +855,7 @@ pub fn list_dir(path_str: &String) -> DirList {
     };
     let dir = get_inode(path_str, None).unwrap();
     let mut data: Vec<u8> = vec![0; dir.size()];
-    unsafe { read(dir.id, data.as_mut_slice(), 0) };
+    unsafe { read(dir.id(), data.as_mut_slice(), 0) };
     let dir_content = unsafe {
         Box::from(slice::from_raw_parts(
             data.as_ptr() as *const DirEntry,
@@ -904,9 +904,9 @@ pub fn set_content(path_str: &String, content: &mut String) -> Result<(), &'stat
         return Err("Error: could not find the file");
     };
 
-    set_len(file.id, new_size).expect("Error: could not reallocate the block");
+    set_len(file.id(), new_size).expect("Error: could not reallocate the block");
 
-    if let Err(_) = unsafe { write(file.id, str_as_bytes, 0) } {
+    if let Err(_) = unsafe { write(file.id(), str_as_bytes, 0) } {
         return Err("Error: couldn't write to the file");
     }
 
