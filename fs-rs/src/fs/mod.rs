@@ -9,6 +9,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
+use core::fmt;
 use core::option::Option::None;
 use core::result::{Result, Result::Err, Result::Ok};
 use core::slice;
@@ -30,6 +31,8 @@ pub enum FsError {
     NotEnoughDiskSpace,
     MaximumSizeExceeded,
     FileNotFound,
+    DirNotEmpty,
+    FileAlreadyExists,
 }
 
 struct Header {
@@ -54,9 +57,30 @@ pub struct DirListEntry {
 }
 
 #[derive(Clone, PartialEq, Eq, Default)]
-struct DirEntry {
+pub struct DirEntry {
     name: [u8; FILE_NAME_LEN],
     id: usize,
+}
+
+impl fmt::Display for FsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            FsError::NotEnoughDiskSpace => write!(f, "not enough disk space"),
+            FsError::MaximumSizeExceeded => write!(f, "maximum file size exceeded"),
+            FsError::FileNotFound => write!(f, "the file was not found"),
+            FsError::DirNotEmpty => write!(f, "found a not empty directory"),
+            FsError::FileAlreadyExists => write!(f, "the file already exists"),
+        }
+    }
+}
+
+impl DirEntry {
+    const fn new() -> Self {
+        DirEntry {
+            id: 0,
+            name: [0; FILE_NAME_LEN],
+        }
+    }
 }
 
 /// function that returns the root dir (/)
@@ -86,7 +110,11 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     let mut next_delimiter = path.find('/');
     let mut next_folder;
     let mut inode = get_root_dir();
-    let mut index: usize = 0;
+    let mut dir_entry = DirEntry::new();
+    let mut index;
+    let mut entry_count;
+    let mut found;
+    let mut equals;
 
     if path == "/" {
         return Some(inode);
@@ -94,47 +122,53 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     // Check if the path is relative
     if path.chars().nth(0).unwrap_or(' ') != '/' {
         inode = cwd?;
+    } else {
+        path = &path[1..];
     }
 
-    while next_delimiter != None {
-        let mut dir_content =
-            vec![DirEntry::default(); inode.size() / core::mem::size_of::<DirEntry>()];
-
-        unsafe {
-            read(
-                inode.id,
-                core::slice::from_raw_parts_mut(dir_content.as_mut_ptr() as *mut u8, inode.size()),
-                index,
-            )
+    loop {
+        index = 0;
+        found = false;
+        entry_count = inode.size() / core::mem::size_of::<DirEntry>();
+        path = match next_delimiter {
+            Some(delimiter) => &path[delimiter + 1..],
+            None => &path,
         };
-        path = &path[(next_delimiter.unwrap() + 1)..];
         next_delimiter = path.find('/');
         next_folder = match next_delimiter {
-            Some(delimeter) => &path[0..delimeter],
-            None => &path[0..],
-        };
-        while index != dir_content.len()
-            && core::str::from_utf8(
-                &dir_content[index].name[..dir_content[index]
-                    .name
-                    .iter()
-                    .position(|x| *x == 0)
-                    .unwrap_or(FILE_NAME_LEN)],
-            )
-            .unwrap()
-                != next_folder
-        {
+            Some(delimiter) => &path[0..delimiter],
+            None => path,
+        }
+        .as_bytes();
+
+        while index < entry_count && !found {
+            // UNWRAP: Already checked if the folder exists.
+            dir_entry = unsafe { read_dir(inode.id, index).unwrap() };
+            equals = true;
+
+            for i in 0..FILE_NAME_LEN {
+                if dir_entry.name[i] != 0 {
+                    if next_folder.len() <= i || next_folder[i] != dir_entry.name[i] {
+                        equals = false;
+                    }
+                } else if next_folder.len() > i && next_folder[i] != 0 {
+                    equals = false;
+                }
+            }
+            if equals {
+                found = true;
+            }
             index += 1;
         }
-        if index >= dir_content.len() {
+        if !found {
             return None;
         }
-        match read_inode(dir_content[index].id) {
-            Some(file) => inode = file,
-            None => return None,
-        }
+        // UNWRAP: The id is from the directory data so it must exist.
+        inode = read_inode(dir_entry.id).unwrap();
 
-        index = 0;
+        if next_delimiter.is_none() {
+            break;
+        }
     }
 
     Some(inode)
@@ -184,19 +218,32 @@ fn read_file(inode: &Inode) -> Box<&[u8]> {
 /// # Arguments
 /// - `file` - the file id
 /// - `buffer` - the buffer to read to
-/// - `offset` - The offset inside the dir to read into.
+/// - `offset` - The offset **in files** inside the dir to read into.
 ///
 /// # Returns
 /// The amount of bytes read or `None` if the dir does not exist.
-pub unsafe fn read_dir(file: usize, buffer: &mut [u8], offset: usize) -> Option<usize> {
+pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
+    let mut buffer = DirEntry {
+        id: 0,
+        name: [0; FILE_NAME_LEN],
+    };
+
     if !read_inode(file)?.directory {
         return None;
     }
-    read(
+    if read(
         file,
-        slice::from_raw_parts_mut(buffer.as_mut_ptr(), core::mem::size_of::<DirEntry>()),
-        offset,
-    )
+        core::slice::from_raw_parts_mut(
+            &mut buffer as *mut DirEntry as *mut u8,
+            core::mem::size_of::<DirEntry>(),
+        ),
+        offset * core::mem::size_of::<DirEntry>(),
+    )? < core::mem::size_of::<DirEntry>()
+    {
+        return None;
+    }
+
+    Some(buffer)
 }
 
 /// Returns `true` if a bit in a bitmap is set to 1.
@@ -392,7 +439,11 @@ fn deallocate_block(address: usize) {
 /// - `folder` - the folder that `file` is going to be added to
 ///
 /// # Returns
-/// Inode of the folder after the file was added or `FsError` otherwise
+/// Inode of the folder after the file was added or `FsError` otherwise.
+/// Returns the following variants:
+/// - `FileNotFound`
+/// - `NotEnoughDiskSpace`
+/// - `MaximumSizeExceeded`
 fn add_file_to_folder(file: &DirEntry, folder: usize) -> Result<(), FsError> {
     let folder_size = read_inode(folder).ok_or(FsError::FileNotFound)?.size();
     let buffer: &[u8] = unsafe {
@@ -580,23 +631,45 @@ pub fn format() {
     add_special_folders(&root.clone(), &mut root);
 }
 
-#[deprecated]
-pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str> {
-    let last_delimeter = path_str.rfind('/').unwrap_or(0);
-    let file_name = path_str[last_delimeter + 1..].to_string();
-    let mut file = Inode::new();
-    let dir;
-    if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
-        dir = inode
-    } else {
-        return Err("Error: invalid path");
-    }
-    let mut file_details = DirEntry {
-        name: [0; FILE_NAME_LEN],
-        id: 0,
+/// Create a new file or folder.
+///
+/// # Arguments
+/// - `path_str` - Path to the new file.
+/// - `directory` - Whether to create a directory or not.
+/// - `cwd` - The ID of the current working directory.
+///
+/// # Returns
+/// The function might return the errors:
+/// - `FileNotFound`
+/// - `NotEnoughDiskSpace`
+/// - `MaximumSizeExceeded`
+/// - `FileAlreadyExists`
+pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Result<(), FsError> {
+    let last_delimeter = path_str.rfind('/');
+    let file_name = match last_delimeter {
+        Some(delimiter) => &path_str[delimiter + 1..],
+        None => path_str,
     };
+    let mut file = Inode::new();
+    let dir = get_inode(
+        &path_str[0..last_delimeter.unwrap_or(0) + 1],
+        if let Some(cwd) = cwd {
+            read_inode(cwd)
+        } else {
+            None
+        },
+    )
+    .ok_or(FsError::FileNotFound)?;
+    let mut file_details = DirEntry::new();
 
-    file.id = allocate_inode().unwrap();
+    if file_name == "" {
+        return Err(FsError::FileNotFound);
+    }
+    if get_inode(file_name, Some(dir)).is_some() {
+        return Err(FsError::FileAlreadyExists);
+    }
+
+    file.id = allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?;
     file.directory = directory;
     write_inode(&file);
     if file.directory {
@@ -617,10 +690,8 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
         name
     };
     file_details.id = file.id;
-    match add_file_to_folder(&file_details, dir.id) {
-        Ok(_) => Ok(()),
-        Err(_) => Err("Error: failed to add the file to the folder"),
-    }
+
+    add_file_to_folder(&file_details, dir.id)
 }
 
 /// function that removes a file
@@ -630,53 +701,25 @@ pub fn create_file(path_str: String, directory: bool) -> Result<(), &'static str
 /// - `directory` - if the file is a directory
 ///
 /// # Returns
-/// `Ok(())` if the file was removed successfully and `Err` if not
-pub fn remove_file(path_str: String, directory: bool) -> Result<(), &'static str> {
+/// The function might return the errors:
+/// - `FileNotFound`
+/// - `DirNotEmpty` - If the file is an unempty directory.
+pub fn remove_file(path_str: &str) -> Result<(), FsError> {
     let last_delimeter = path_str.rfind('/').unwrap_or(0);
     let file_name = path_str[last_delimeter + 1..].to_string();
-    let dir;
-    if let Some(inode) = get_inode(&path_str[0..(last_delimeter + 1)], None) {
-        dir = inode
+    let dir = get_inode(&path_str[0..(last_delimeter + 1)], None).ok_or(FsError::FileNotFound)?;
+    let file = get_inode(file_name.as_str(), Some(dir)).ok_or(FsError::FileNotFound)?;
+
+    // An empty directory contains to directory entries.
+    if file.directory && file.size() != 2 * core::mem::size_of::<DirEntry>() {
+        Err(FsError::DirNotEmpty)
     } else {
-        return Err("Error: invalid path");
-    }
+        // `set_len` will not return `MaximumSizeExceeded` because we shrink the size.
+        set_len(file.id, 0)?;
+        remove_file_from_folder(file.id, dir.id)?;
 
-    let mut file_details = DirEntry {
-        name: [0; FILE_NAME_LEN],
-        id: 0,
-    };
-    // check if file exists
-    if get_file_id(&path_str, None).is_none() {
-        return Err("Error: file does not exist");
+        Ok(())
     }
-    file_details.name = {
-        let mut name: [u8; FILE_NAME_LEN] = [0; FILE_NAME_LEN];
-        let temp = file_name.as_bytes();
-        if temp.len() >= FILE_NAME_LEN {
-            name = temp[..FILE_NAME_LEN].try_into().unwrap();
-        } else {
-            for i in 0..temp.len() {
-                name[i] = temp[i];
-            }
-        }
-
-        name
-    };
-    file_details.id = get_file_id(&path_str, None).unwrap();
-    // An empty folder contains 2 entries
-    if directory == true
-        && read_inode(file_details.id).unwrap().size() > 2 * core::mem::size_of::<DirEntry>()
-    {
-        return Err("Error: folder is not empty");
-    } else if directory == false && is_dir(file_details.id) == true {
-        return Err("Error: rm is used for file, not for directories");
-    } else if directory == true && is_dir(file_details.id) == false {
-        return Err("Error: rmdir is used for directories, not for files");
-    }
-    remove_file_from_folder(file_details.id, dir.id)
-        .map_err(|_| "Error: failed to remove the file from the folder")?;
-
-    Ok(())
 }
 
 /// Get a file's `Inode` id.
@@ -795,7 +838,10 @@ pub fn set_len(file: usize, size: usize) -> Result<(), FsError> {
 /// created in the file. Reading from the hole will return null bytes.
 ///
 /// # Returns
-/// If the function fails, an error will be returned.
+/// The function might return the errors:
+/// - `FileNotFound`
+/// - `NotEnoughDiskSpace`
+/// - `MaximumSizeExceeded`
 pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsError> {
     let mut start = offset % BLOCK_SIZE;
     let mut to_write = BLOCK_SIZE - start;

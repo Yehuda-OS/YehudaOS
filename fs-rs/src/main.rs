@@ -86,7 +86,7 @@ fn main() {
 
             CREATE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::create_file(cmd[1].to_string(), false) {
+                    if let Err(e) = fs::create_file(cmd[1], false, None) {
                         println!("{}", e);
                     }
                 } else {
@@ -132,7 +132,7 @@ fn main() {
 
             CREATE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    fs::create_file((&cmd[1]).to_string(), true);
+                    fs::create_file((&cmd[1]), true, None);
                 } else {
                     println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
                 }
@@ -140,7 +140,7 @@ fn main() {
 
             REMOVE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::remove_file((&cmd[1]).to_string(), false) {
+                    if let Err(e) = fs::remove_file(&cmd[1]) {
                         println!("{}", e);
                     }
                 } else {
@@ -150,7 +150,7 @@ fn main() {
 
             REMOVE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::remove_file((&cmd[1]).to_string(), true) {
+                    if let Err(e) = fs::remove_file(&cmd[1]) {
                         println!("{}", e);
                     }
                 } else {
