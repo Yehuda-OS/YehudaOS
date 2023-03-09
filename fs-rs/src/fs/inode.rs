@@ -4,8 +4,9 @@ use super::BLOCK_SIZE;
 
 pub const DIRECT_POINTERS: usize = 12;
 const POINTER_SIZE: usize = core::mem::size_of::<usize>();
+const POINTERS_PER_BLOCK: usize = BLOCK_SIZE / POINTER_SIZE;
 pub const MAX_FILE_SIZE: usize =
-    DIRECT_POINTERS * BLOCK_SIZE + BLOCK_SIZE / POINTER_SIZE * BLOCK_SIZE;
+    BLOCK_SIZE * (DIRECT_POINTERS + POINTERS_PER_BLOCK * (POINTERS_PER_BLOCK + 1));
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Inode {
@@ -60,32 +61,69 @@ impl Inode {
     }
 
     /// Returns the `index`th pointer of the inode or `MaximumSizeExceeded` if the `index`
-    /// exceeds the maximum file size divided by the block size.
+    /// exceeds the maximum file size divided by the pointer size.
     ///
     /// # Arguments
     /// - `index` - The index of the pointer.
-    pub fn get_ptr(&self, index: usize) -> Result<usize, FsError> {
-        let offset;
-        let mut ptr: usize = 0;
+    pub fn get_ptr(&self, mut index: usize) -> Result<usize, FsError> {
+        let mut offset;
+        let next_ptr;
+        let mut ptr = 0;
 
         if index < DIRECT_POINTERS {
             return Ok(self.addresses[index]);
         }
 
-        offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
-        if offset > BLOCK_SIZE {
-            return Err(FsError::MaximumSizeExceeded);
-        }
-        if self.indirect_pointer == 0 {
-            return Ok(0);
-        }
+        index -= DIRECT_POINTERS;
+        if index < POINTERS_PER_BLOCK {
+            offset = index * POINTER_SIZE;
 
-        unsafe {
-            blkdev::read(
-                self.indirect_pointer + offset,
-                POINTER_SIZE,
-                &mut ptr as *mut _ as *mut u8,
-            );
+            if self.indirect_pointer == 0 {
+                ptr = 0;
+            } else {
+                unsafe {
+                    blkdev::read(
+                        self.indirect_pointer + offset,
+                        POINTER_SIZE,
+                        &mut ptr as *mut _ as *mut u8,
+                    )
+                }
+            }
+        } else {
+            index -= POINTERS_PER_BLOCK;
+            next_ptr = index % POINTER_SIZE;
+            offset = index - next_ptr;
+
+            println!("{index:#x}");
+            if offset >= BLOCK_SIZE {
+                return Err(FsError::MaximumSizeExceeded);
+            }
+            if self.double_indirect_pointer == 0 {
+                ptr = 0;
+            } else {
+                unsafe {
+                    blkdev::read(
+                        self.double_indirect_pointer + offset,
+                        POINTER_SIZE,
+                        &mut ptr as *mut _ as *mut u8,
+                    )
+                }
+                offset = next_ptr * POINTER_SIZE;
+                if offset >= BLOCK_SIZE {
+                    return Err(FsError::MaximumSizeExceeded);
+                }
+                if self.double_indirect_pointer == 0 {
+                    ptr = 0;
+                } else {
+                    unsafe {
+                        blkdev::read(
+                            self.double_indirect_pointer + offset,
+                            POINTER_SIZE,
+                            &mut ptr as *mut _ as *mut u8,
+                        )
+                    }
+                }
+            }
         }
 
         Ok(ptr)
