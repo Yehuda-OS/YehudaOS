@@ -127,8 +127,9 @@ impl Inode {
     /// - `MaximumSizeExceeded` if the pointer exceeds the file's size.
     /// - `NotEnoughDiskSpace` if there is no free space for the pointer.
     /// - `Ok` otherwise.
-    pub fn set_ptr(&mut self, index: usize, value: usize) -> Result<(), FsError> {
-        let offset;
+    pub fn set_ptr(&mut self, mut index: usize, value: usize) -> Result<(), FsError> {
+        let mut offset;
+        let mut ptr = 0;
 
         if index * BLOCK_SIZE > self.size {
             return Err(FsError::MaximumSizeExceeded);
@@ -140,19 +141,57 @@ impl Inode {
             return Ok(());
         }
 
-        offset = (index - DIRECT_POINTERS) * POINTER_SIZE;
-        if self.indirect_pointer == 0 {
-            self.indirect_pointer = super::allocate_block().ok_or(FsError::NotEnoughDiskSpace)?;
-            // SAFETY: We checked that the allocation succeeded.
-            unsafe { blkdev::set(self.indirect_pointer, BLOCK_SIZE, 0) }
+        index -= DIRECT_POINTERS;
+        if index < POINTERS_PER_BLOCK {
+            offset = index * POINTER_SIZE;
+
+            if self.indirect_pointer == 0 {
+                self.indirect_pointer =
+                    super::allocate_block().ok_or(FsError::NotEnoughDiskSpace)?;
+                // SAFETY: We checked that the allocation succeeded.
+                unsafe { blkdev::set(self.indirect_pointer, BLOCK_SIZE, 0) }
+            }
+            unsafe {
+                blkdev::write(
+                    self.indirect_pointer + offset,
+                    POINTER_SIZE,
+                    &value as *const _ as *const u8,
+                )
+            }
+        } else {
+            index -= POINTERS_PER_BLOCK;
+            offset = index / POINTERS_PER_BLOCK * POINTER_SIZE;
+
+            if self.double_indirect_pointer == 0 {
+                self.double_indirect_pointer =
+                    super::allocate_block().ok_or(FsError::NotEnoughDiskSpace)?;
+                // SAFETY: We checked that the allocation succeeded.
+                unsafe { blkdev::set(self.double_indirect_pointer, BLOCK_SIZE, 0) }
+            }
+            unsafe {
+                blkdev::read(
+                    self.double_indirect_pointer + offset,
+                    POINTER_SIZE,
+                    &mut ptr as *mut _ as *mut u8,
+                )
+            }
+            if ptr == 0 {
+                ptr = super::allocate_block().ok_or(FsError::NotEnoughDiskSpace)?;
+
+                unsafe {
+                    blkdev::write(
+                        self.double_indirect_pointer + offset,
+                        POINTER_SIZE,
+                        &mut ptr as *mut _ as *mut u8,
+                    )
+                }
+            }
+            index %= POINTERS_PER_BLOCK;
+            offset = index * POINTER_SIZE;
+            unsafe {
+                blkdev::write(ptr + offset, POINTER_SIZE, &value as *const _ as *const u8);
+            }
         }
-        unsafe {
-            blkdev::write(
-                self.indirect_pointer + offset,
-                POINTER_SIZE,
-                &value as *const _ as *const u8,
-            );
-        };
 
         Ok(())
     }
