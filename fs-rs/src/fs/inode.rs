@@ -46,11 +46,29 @@ impl Inode {
     /// # Returns
     /// Returns a `MaximumSizeExceeded` error if the new size exceeds the maximum file size.
     pub fn set_size(&mut self, value: usize) -> Result<(), FsError> {
+        let index;
+        let mut ptr = 0;
+
         if value > MAX_FILE_SIZE {
             return Err(super::FsError::MaximumSizeExceeded);
         }
 
-        if value / BLOCK_SIZE <= DIRECT_POINTERS && self.indirect_pointer != 0 {
+        index = value / BLOCK_SIZE;
+        if index <= DIRECT_POINTERS + POINTERS_PER_BLOCK && self.double_indirect_pointer != 0 {
+            for i in (0..BLOCK_SIZE).step_by(POINTER_SIZE) {
+                unsafe {
+                    blkdev::read(
+                        self.double_indirect_pointer + i,
+                        POINTER_SIZE,
+                        &mut ptr as *mut _ as *mut u8,
+                    )
+                }
+                super::deallocate_block(ptr);
+            }
+            super::deallocate_block(self.double_indirect_pointer);
+            self.double_indirect_pointer = 0;
+        }
+        if index <= DIRECT_POINTERS && self.indirect_pointer != 0 {
             super::deallocate_block(self.indirect_pointer);
             self.indirect_pointer = 0;
         }
