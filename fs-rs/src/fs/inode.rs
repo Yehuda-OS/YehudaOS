@@ -92,9 +92,8 @@ impl Inode {
         } else {
             index -= POINTERS_PER_BLOCK;
             next_ptr = index % POINTER_SIZE;
-            offset = index - next_ptr;
+            offset = index / POINTERS_PER_BLOCK * POINTER_SIZE;
 
-            println!("{index:#x}");
             if offset >= BLOCK_SIZE {
                 return Err(FsError::MaximumSizeExceeded);
             }
