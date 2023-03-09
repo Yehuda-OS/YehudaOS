@@ -14,9 +14,26 @@ pub struct Inode {
     size: usize,
     addresses: [usize; DIRECT_POINTERS],
     indirect_pointer: usize,
+    double_indirect_pointer: usize,
 }
 
 impl Inode {
+    pub fn is_dir(&self) -> bool {
+        self.directory
+    }
+
+    pub fn set_as_dir(&mut self, value: bool) {
+        self.directory = value;
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub fn set_id(&mut self, value: usize) {
+        self.id = value;
+    }
+
     pub fn size(&self) -> usize {
         self.size
     }
@@ -40,22 +57,6 @@ impl Inode {
         self.size = value;
 
         Ok(())
-    }
-
-    pub fn is_dir(&self) -> bool {
-        self.directory
-    }
-
-    pub fn set_as_dir(&mut self, value: bool) {
-        self.directory = value;
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
-    pub fn set_id(&mut self, value: usize) {
-        self.id = value;
     }
 
     /// Returns the `index`th pointer of the inode or `MaximumSizeExceeded` if the `index`
