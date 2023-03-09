@@ -186,27 +186,16 @@ unsafe fn page_fault_handler(
             >= stack_frame.stack_pointer - scheduler::MAX_STACK_SIZE
     {
         let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-        let mut stack_pointer = stack_frame.stack_pointer;
         let new_stack_page = crate::memory::page_allocator::allocate().unwrap();
 
-        loop {
-            if crate::memory::vmm::virtual_to_physical(curr.page_table, stack_pointer).is_err() {
-                break;
-            }
-
-            stack_pointer -= Size4KiB::SIZE;
-            if stack_frame.stack_pointer < stack_pointer + scheduler::MAX_STACK_SIZE {
-                panic!("ERROR: Cant have more than 80 KiB for the stack");
-            }
-        }
-
-        crate::memory::vmm::map_address(
+        if let Err(_) = crate::memory::vmm::map_address(
             curr.page_table,
-            stack_pointer,
+            x86_64::registers::control::Cr2::read(),
             new_stack_page,
             PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
-        )
-        .unwrap();
+        ) {
+            *scheduler::get_running_process() = None;
+        }
 
         crate::scheduler::load_from_queue();
     } else {
