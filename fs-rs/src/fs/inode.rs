@@ -10,7 +10,7 @@ pub const MAX_FILE_SIZE: usize =
 #[derive(Clone, Copy, Debug)]
 pub struct Inode {
     pub id: usize,
-    pub directory: bool,
+    directory: bool,
     size: usize,
     pub addresses: [usize; DIRECT_POINTERS],
     pub indirect_pointer: usize,
@@ -50,6 +50,14 @@ impl Inode {
         self.size = value;
 
         Ok(())
+    }
+
+    pub fn is_dir(&self) -> bool {
+        self.directory
+    }
+
+    pub fn set_as_dir(&mut self, value: bool) {
+        self.directory = value;
     }
 
     /// Returns the `index`th pointer of the inode or `MaximumSizeExceeded` if the `index`

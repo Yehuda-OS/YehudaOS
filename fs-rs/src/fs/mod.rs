@@ -228,7 +228,7 @@ pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
         name: [0; FILE_NAME_LEN],
     };
 
-    if !read_inode(file)?.directory {
+    if !read_inode(file)?.is_dir() {
         return None;
     }
     if read(
@@ -560,7 +560,7 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
 /// `true` if the inode is directory and `false` if not
 pub fn is_dir(id: usize) -> bool {
     if let Some(inode) = read_inode(id) {
-        inode.directory
+        inode.is_dir()
     } else {
         false
     }
@@ -618,7 +618,7 @@ pub fn format() {
     };
 
     // create root directory Inode
-    root.directory = true;
+    root.set_as_dir(true);
     // UNWRAP: No inodes have been allocated yet.
     root.id = allocate_inode().unwrap();
     unsafe {
@@ -670,9 +670,9 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
     }
 
     file.id = allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?;
-    file.directory = directory;
+    file.set_as_dir(directory);
     write_inode(&file);
-    if file.directory {
+    if file.is_dir() {
         add_special_folders(&dir, &mut file)
     }
 
@@ -711,7 +711,7 @@ pub fn remove_file(path_str: &str) -> Result<(), FsError> {
     let file = get_inode(file_name.as_str(), Some(dir)).ok_or(FsError::FileNotFound)?;
 
     // An empty directory contains to directory entries.
-    if file.directory && file.size() != 2 * core::mem::size_of::<DirEntry>() {
+    if file.is_dir() && file.size() != 2 * core::mem::size_of::<DirEntry>() {
         Err(FsError::DirNotEmpty)
     } else {
         // `set_len` will not return `MaximumSizeExceeded` because we shrink the size.
@@ -948,7 +948,7 @@ pub fn list_dir(path_str: &String) -> DirList {
             )
         };
         entry.file_size = file.size();
-        entry.is_dir = file.directory;
+        entry.is_dir = file.is_dir();
         ans.push(entry.clone());
     }
 
