@@ -549,6 +549,34 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
     *folder = read_inode(folder.id).unwrap();
 }
 
+/// Get the folder that contains a file.
+///
+/// # Arguments
+/// `path` - The path to the file.
+/// `cwd` - The ID of the current working directory.
+///
+/// # Returns
+/// If the function succeeds the inode of the containing folder will be returned.
+/// Otherwise, a `FileNotFound` error will be returned.
+fn get_containing_folder(path: &str, cwd: Option<usize>) -> Result<Inode, FsError> {
+    let last_delimiter = path.rfind('/');
+
+    match last_delimiter {
+        Some(delimiter) => get_inode(
+            &path[0..delimiter + 1],
+            if let Some(cwd) = cwd {
+                read_inode(cwd)
+            } else {
+                None
+            },
+        ),
+        // If there's no '/', the path is relative and the file will be created in the current
+        // working directory.
+        None => read_inode(cwd.ok_or(FsError::FileNotFound)?),
+    }
+    .ok_or(FsError::FileNotFound)
+}
+
 /// function that checks if an inode is directory
 ///
 /// # Arguments
@@ -643,24 +671,29 @@ pub fn format() {
 /// - `MaximumSizeExceeded`
 /// - `FileAlreadyExists`
 pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Result<(), FsError> {
-    let last_delimeter = path_str.rfind('/');
-    let file_name = match last_delimeter {
+    let last_delimiter = path_str.rfind('/');
+    let file_name = match last_delimiter {
         Some(delimiter) => &path_str[delimiter + 1..],
         None => path_str,
     };
-    let mut file = Inode::new();
-    let dir = get_inode(
-        &path_str[0..last_delimeter.unwrap_or(0) + 1],
-        if let Some(cwd) = cwd {
-            read_inode(cwd)
-        } else {
-            None
-        },
-    )
+    let dir = match last_delimiter {
+        Some(delimiter) => get_inode(
+            &path_str[0..delimiter + 1],
+            if let Some(cwd) = cwd {
+                read_inode(cwd)
+            } else {
+                None
+            },
+        ),
+        // If there's no '/', the path is relative and the file will be created in the current
+        // working directory.
+        None => read_inode(cwd.ok_or(FsError::FileNotFound)?),
+    }
     .ok_or(FsError::FileNotFound)?;
+    let mut file = Inode::new();
     let mut file_details = DirEntry::new();
 
-    if file_name == "" {
+    if file_name.is_empty() {
         return Err(FsError::FileNotFound);
     }
     if get_inode(file_name, Some(dir)).is_some() {
@@ -695,20 +728,36 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
 /// function that removes a file
 ///
 /// # Arguments
-/// - `path_str` - the path to the file
-/// - `directory` - if the file is a directory
+/// - `path_str` - the path to the file.
+/// - `cwd` - The ID of the current working directory.
 ///
 /// # Returns
 /// The function might return the errors:
 /// - `FileNotFound`
 /// - `DirNotEmpty` - If the file is an unempty directory.
-pub fn remove_file(path_str: &str) -> Result<(), FsError> {
-    let last_delimeter = path_str.rfind('/').unwrap_or(0);
-    let file_name = path_str[last_delimeter + 1..].to_string();
-    let dir = get_inode(&path_str[0..(last_delimeter + 1)], None).ok_or(FsError::FileNotFound)?;
-    let file = get_inode(file_name.as_str(), Some(dir)).ok_or(FsError::FileNotFound)?;
+pub fn remove_file(path_str: &str, cwd: Option<usize>) -> Result<(), FsError> {
+    let last_delimiter = path_str.rfind('/');
+    let file_name = match last_delimiter {
+        Some(delimiter) => &path_str[delimiter + 1..],
+        None => path_str,
+    };
+    let dir = match last_delimiter {
+        Some(delimiter) => get_inode(
+            &path_str[0..delimiter + 1],
+            if let Some(cwd) = cwd {
+                read_inode(cwd)
+            } else {
+                None
+            },
+        ),
+        // If there's no '/', the path is relative and the file will be created in the current
+        // working directory.
+        None => read_inode(cwd.ok_or(FsError::FileNotFound)?),
+    }
+    .ok_or(FsError::FileNotFound)?;
+    let file = get_inode(file_name, Some(dir)).ok_or(FsError::FileNotFound)?;
 
-    // An empty directory contains to directory entries.
+    // An empty directory contains 2 directory entries.
     if file.directory && file.size() != 2 * core::mem::size_of::<DirEntry>() {
         Err(FsError::DirNotEmpty)
     } else {
