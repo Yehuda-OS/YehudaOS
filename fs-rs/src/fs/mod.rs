@@ -479,34 +479,6 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
     *folder = read_inode(folder.id()).unwrap();
 }
 
-/// Get the folder that contains a file.
-///
-/// # Arguments
-/// `path` - The path to the file.
-/// `cwd` - The ID of the current working directory.
-///
-/// # Returns
-/// If the function succeeds the inode of the containing folder will be returned.
-/// Otherwise, a `FileNotFound` error will be returned.
-fn get_containing_folder(path: &str, cwd: Option<usize>) -> Result<Inode, FsError> {
-    let last_delimiter = path.rfind('/');
-
-    match last_delimiter {
-        Some(delimiter) => get_inode(
-            &path[0..delimiter + 1],
-            if let Some(cwd) = cwd {
-                read_inode(cwd)
-            } else {
-                None
-            },
-        ),
-        // If there's no '/', the path is relative and the file will be created in the current
-        // working directory.
-        None => read_inode(cwd.ok_or(FsError::FileNotFound)?),
-    }
-    .ok_or(FsError::FileNotFound)
-}
-
 /// function that checks if an inode is directory
 ///
 /// # Arguments
