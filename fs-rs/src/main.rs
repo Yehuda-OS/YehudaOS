@@ -42,8 +42,10 @@ fn main() {
 
     // Declare `exit` as a mutable boolean
     let mut exit = false;
+    let cwd;
 
     fs::init();
+    cwd = fs::get_file_id("/", None).unwrap();
     // Start the main loop
     while !exit {
         println!("{}$ ", FS_NAME);
@@ -86,7 +88,7 @@ fn main() {
 
             CREATE_FILE_CMD => {
                 if cmd.len() == 2 {
-                    if let Err(e) = fs::create_file(cmd[1], false, None) {
+                    if let Err(e) = fs::create_file(cmd[1], false, Some(cwd)) {
                         println!("{}", e);
                     }
                 } else {
@@ -132,7 +134,9 @@ fn main() {
 
             CREATE_DIR_CMD => {
                 if cmd.len() == 2 {
-                    fs::create_file((&cmd[1]), true, None);
+                    if let Err(e) = fs::create_file(&cmd[1], true, Some(cwd)) {
+                        println!("{}", e);
+                    }
                 } else {
                     println!("{}{}", CREATE_DIR_CMD, ": one argument requested");
                 }
