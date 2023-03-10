@@ -63,7 +63,9 @@ impl Inode {
                         &mut ptr as *mut _ as *mut u8,
                     )
                 }
-                super::deallocate_block(ptr);
+                if ptr != 0 {
+                    super::deallocate_block(ptr);
+                }
             }
             super::deallocate_block(self.double_indirect_pointer);
             self.double_indirect_pointer = 0;

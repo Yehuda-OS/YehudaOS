@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 #![feature(strict_provenance)]
 #![feature(allocator_api)]
 
