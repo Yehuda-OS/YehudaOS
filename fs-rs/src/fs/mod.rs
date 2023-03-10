@@ -1,5 +1,5 @@
 mod blkdev;
-pub mod inode;
+mod inode;
 
 extern crate alloc;
 
