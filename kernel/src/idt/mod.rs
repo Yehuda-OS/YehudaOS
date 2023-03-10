@@ -12,7 +12,7 @@ use x86_64::registers::segmentation::{Segment, CS};
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::structures::idt::PageFaultErrorCode;
-use x86_64::structures::paging::{PageSize, PageTableFlags, Size4KiB};
+use x86_64::structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB};
 use x86_64::{PhysAddr, PrivilegeLevel};
 
 const DIV_0: u8 = 0;
@@ -186,7 +186,14 @@ unsafe fn page_fault_handler(
             >= stack_frame.stack_pointer - scheduler::MAX_STACK_SIZE
     {
         let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-        let new_stack_page = crate::memory::page_allocator::allocate().unwrap();
+        let new_stack_page: PhysFrame;
+        match crate::memory::page_allocator::allocate() {
+            Some(v) => new_stack_page = v,
+            None => {
+                *scheduler::get_running_process() = None;
+                crate::scheduler::load_from_queue();
+            }
+        }
 
         if let Err(_) = crate::memory::vmm::map_address(
             curr.page_table,
