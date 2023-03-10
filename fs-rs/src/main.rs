@@ -45,11 +45,6 @@ fn main() {
     let cwd;
 
     fs::init();
-    let mut i = fs::inode::Inode::default();
-
-    println!("{:?}", i.set_size(fs::MAX_FILE_SIZE));
-    println!("{:?}", i.set_ptr(64, 233));
-    println!("{:?}", i.get_ptr(64));
 
     cwd = fs::get_file_id("/", None).unwrap();
     // Start the main loop
