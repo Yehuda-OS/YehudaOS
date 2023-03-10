@@ -44,6 +44,12 @@ fn main() {
     let mut exit = false;
 
     fs::init();
+    let mut i = fs::inode::Inode::default();
+
+    println!("{:?}", i.set_size(fs::MAX_FILE_SIZE));
+    println!("{:?}", i.set_ptr(64, 233));
+    println!("{:?}", i.get_ptr(64));
+
     // Start the main loop
     while !exit {
         println!("{}$ ", FS_NAME);
