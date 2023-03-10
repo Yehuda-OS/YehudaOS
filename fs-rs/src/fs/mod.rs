@@ -122,8 +122,6 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     // Check if the path is relative
     if path.chars().nth(0).unwrap_or(' ') != '/' {
         inode = cwd?;
-    } else {
-        path = &path[1..];
     }
 
     loop {
