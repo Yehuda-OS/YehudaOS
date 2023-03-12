@@ -181,11 +181,11 @@ unsafe fn page_fault_handler(
     stack_frame: &InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
-    if x86_64::registers::control::Cr2::read() <= stack_frame.stack_pointer
-        && x86_64::registers::control::Cr2::read()
-            >= stack_frame.stack_pointer - scheduler::MAX_STACK_SIZE
+    let curr = crate::scheduler::get_running_process().as_mut().unwrap();
+    if x86_64::registers::control::Cr2::read().as_u64() <= curr.stack_pointer
+        && x86_64::registers::control::Cr2::read().as_u64()
+            >= curr.stack_pointer - scheduler::MAX_STACK_SIZE
     {
-        let curr = crate::scheduler::get_running_process().as_mut().unwrap();
         let new_stack_page: PhysFrame;
         match crate::memory::page_allocator::allocate() {
             Some(v) => new_stack_page = v,
