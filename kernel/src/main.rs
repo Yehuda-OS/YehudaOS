@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+use alloc::string::ToString;
 use fs_rs::fs;
 
 mod gdt;
@@ -21,6 +22,16 @@ mod pit;
 mod scheduler;
 mod syscalls;
 mod terminal;
+
+static SHARED: crate::mutex::Mutex<u64> = mutex::Mutex::new(0);
+
+extern "C" fn test(_: *mut u64) -> i32 {
+    for _ in 0..1000 {
+        *SHARED.lock() += 1;
+    }
+
+    return 0;
+}
 
 /// Kernel Entry Point
 ///
@@ -48,6 +59,15 @@ pub extern "C" fn _start() -> ! {
         idt::IDT.load();
         syscalls::initialize();
         pit::start(19);
+
+        match scheduler::Process::kernel_task(
+            scheduler::terminator::terminate_from_queue,
+            core::ptr::null_mut(),
+        ) {
+            Ok(v) => scheduler::add_to_the_queue(v),
+            Err(_) => println!("Error: failed to load processes terminator"),
+        }
+        scheduler::load_from_queue();
     }
     println!("Hello world");
 

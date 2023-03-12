@@ -9,6 +9,7 @@ use x86_64::{
 };
 mod kernel_tasks;
 mod loader;
+pub mod terminator;
 
 static mut CURR_PROC: Option<Process> = None;
 static mut PROC_QUEUE: Vec<(Process, u8)> = Vec::new();
