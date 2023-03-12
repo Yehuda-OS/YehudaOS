@@ -23,16 +23,6 @@ mod scheduler;
 mod syscalls;
 mod terminal;
 
-static SHARED: crate::mutex::Mutex<u64> = mutex::Mutex::new(0);
-
-extern "C" fn test(_: *mut u64) -> i32 {
-    for _ in 0..1000 {
-        *SHARED.lock() += 1;
-    }
-
-    return 0;
-}
-
 /// Kernel Entry Point
 ///
 /// `_start` is defined in the linker script as the entry point for the ELF file.
