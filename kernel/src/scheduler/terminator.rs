@@ -8,12 +8,12 @@ pub unsafe fn add_to_queue(p: Process) {
     TERMINATE_PROC_QUEUE.lock().push(p);
 }
 
-pub extern "C" fn terminate_from_queue(_: *mut u64) -> i32 {
+pub extern "C" fn terminate_from_queue(_: *mut u64) -> ! {
     loop {
         if unsafe { TERMINATE_PROC_QUEUE.lock() }.is_empty() {
             continue;
         } else {
-            drop(unsafe { TERMINATE_PROC_QUEUE.lock() }.pop().unwrap());
+            unsafe { TERMINATE_PROC_QUEUE.lock() }.pop();
         }
     }
 }
