@@ -45,6 +45,7 @@ fn main() {
     let cwd;
 
     fs::init();
+
     cwd = fs::get_file_id("/", None).unwrap();
     // Start the main loop
     while !exit {
