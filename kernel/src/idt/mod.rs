@@ -182,9 +182,8 @@ unsafe fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) -> ! {
     let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-    if x86_64::registers::control::Cr2::read().as_u64() <= curr.stack_pointer
-        && x86_64::registers::control::Cr2::read().as_u64()
-            >= curr.stack_pointer - scheduler::MAX_STACK_SIZE
+    if x86_64::registers::control::Cr2::read() <= curr.stack_start
+        && x86_64::registers::control::Cr2::read() >= (curr.stack_start - scheduler::MAX_STACK_SIZE)
     {
         let new_stack_page: PhysFrame;
         match crate::memory::page_allocator::allocate() {

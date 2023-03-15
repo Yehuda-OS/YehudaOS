@@ -185,6 +185,7 @@ impl super::Process {
             instruction_pointer: header.e_entry,
             flags: super::INTERRUPT_FLAG_ON,
             kernel_task: false,
+            stack_start: VirtAddr::new(PROCESS_STACK_POINTER),
         };
 
         for entry in &get_program_table(file_id, &header) {
