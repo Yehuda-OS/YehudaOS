@@ -145,7 +145,7 @@ pub fn read_char() -> Option<char> {
         .map(|ascii| lock.state.modify(ascii) as char)
 }
 
-pub extern "x86-interrupt" fn handler(stack_frame: &super::ExceptionStackFrame) {
+pub extern "x86-interrupt" fn handler(stack_frame: &x86_64::structures::idt::InterruptStackFrame) {
     if let Some(input) = read_char() {
         key_handle(input);
         crate::print!("{}", input);
