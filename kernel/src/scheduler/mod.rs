@@ -11,14 +11,17 @@ use x86_64::{
 mod kernel_tasks;
 mod loader;
 
-static mut CURR_PROC: Option<Process> = None;
-static mut PROC_QUEUE: Queue<Process> = Queue::new();
-
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
 const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const USER_DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
 const INTERRUPT_FLAG_ON: u64 = 0x200;
+const HIGH_PRIORITY_RELOAD: u8 = 2;
+
+static mut CURR_PROC: Option<Process> = None;
+static mut LOW_PRIORITY: Queue<Process> = Queue::new();
+static mut HIGH_PRIORITY: Queue<Process> = Queue::new();
+static mut HIGH_PRIORITY_VALUE: u8 = HIGH_PRIORITY_RELOAD;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -154,7 +157,11 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
 pub fn add_to_the_queue(p: Process) {
     // SAFETY: The shceduler should not be referenced in a multithreaded situation.
     unsafe {
-        PROC_QUEUE.enqueue(p);
+        if p.kernel_task {
+            HIGH_PRIORITY.enqueue(p);
+        } else {
+            LOW_PRIORITY.enqueue(p);
+        }
     }
 }
 
@@ -178,7 +185,20 @@ pub fn switch_current_process() {
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let p = PROC_QUEUE.dequeue().unwrap();
+    // Take high priority processes if the amount of high priority processes that were ran since
+    // the last low priority process is less than the reload value or if there are no low
+    // priority processes waiting.
+    let p = if (HIGH_PRIORITY_VALUE > 0 && !HIGH_PRIORITY.is_empty()) || LOW_PRIORITY.is_empty() {
+        if HIGH_PRIORITY_VALUE > 0 {
+            HIGH_PRIORITY_VALUE -= 1;
+        }
+
+        HIGH_PRIORITY.dequeue().unwrap()
+    } else {
+        HIGH_PRIORITY_VALUE = HIGH_PRIORITY_RELOAD;
+
+        LOW_PRIORITY.dequeue().unwrap()
+    };
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
