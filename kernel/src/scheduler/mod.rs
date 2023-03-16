@@ -1,4 +1,5 @@
 use super::memory;
+use crate::queue::Queue;
 use crate::{io, syscalls};
 use alloc::vec::Vec;
 use core::arch::asm;
@@ -7,11 +8,12 @@ use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
 };
+
 mod kernel_tasks;
 mod loader;
 
 static mut CURR_PROC: Option<Process> = None;
-static mut PROC_QUEUE: Vec<(Process, u8)> = Vec::new();
+static mut PROC_QUEUE: Queue<Process> = Queue::new();
 
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
@@ -151,19 +153,9 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
 /// # Arguments
 /// - `p` - the process
 pub fn add_to_the_queue(p: Process) {
-    let proc: (Process, u8) = if p.kernel_task {
-        (p, 15) // if the procrss is kernel task it gets higher priority
-    } else {
-        (p, 0)
-    };
-
     // SAFETY: The shceduler should not be referenced in a multithreaded situation.
     unsafe {
-        PROC_QUEUE.push(proc);
-        PROC_QUEUE.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-        for i in 0..PROC_QUEUE.len() {
-            PROC_QUEUE[i].1 += 1;
-        }
+        PROC_QUEUE.enqueue(p);
     }
 }
 
@@ -187,12 +179,12 @@ pub fn switch_current_process() {
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let p = PROC_QUEUE.pop().unwrap();
+    let p = PROC_QUEUE.dequeue().unwrap();
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
     }
-    core::ptr::write(&mut CURR_PROC, Some(p.0));
+    core::ptr::write(&mut CURR_PROC, Some(p));
     load_context(CURR_PROC.as_ref().unwrap());
 }
 
