@@ -1,7 +1,6 @@
 use super::memory;
 use crate::queue::Queue;
 use crate::{io, syscalls};
-use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
 use x86_64::{
