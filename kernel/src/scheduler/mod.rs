@@ -5,12 +5,13 @@ use core::arch::asm;
 use core::fmt;
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
-    PhysAddr,
+    PhysAddr, VirtAddr,
 };
 
 mod kernel_tasks;
 mod loader;
 
+pub const MAX_STACK_SIZE: u64 = 1024 * 20; // 20KiB
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
 const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
@@ -110,6 +111,7 @@ pub struct Process {
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
+    pub stack_start: VirtAddr,
 }
 
 impl Drop for Process {

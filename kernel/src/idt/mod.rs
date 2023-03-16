@@ -2,15 +2,17 @@ pub mod keyboard;
 mod macros;
 
 use crate::syscalls::int_0x80_handler as syscall_handler;
-use crate::{interrupt_handler, print, println};
+use crate::{interrupt_handler, print, println, scheduler};
 use bit_field::BitField;
 use core::arch::asm;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
 use x86_64::structures::gdt::SegmentSelector;
+use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::structures::idt::PageFaultErrorCode;
-use x86_64::PrivilegeLevel;
+use x86_64::structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB};
+use x86_64::{PhysAddr, PrivilegeLevel};
 
 const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
@@ -62,16 +64,6 @@ lazy_static! {
 
         idt
     };
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct ExceptionStackFrame {
-    instruction_pointer: u64,
-    code_segment: u64,
-    cpu_flags: u64,
-    stack_pointer: u64,
-    stack_segment: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -190,36 +182,60 @@ impl Idt {
     }
 }
 
-unsafe fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn divide_by_zero_handler(stack_frame: &InterruptStackFrame) -> ! {
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
         &*stack_frame
     });
     loop {}
 }
 
-unsafe fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+unsafe fn breakpoint_handler(stack_frame: &InterruptStackFrame) {
     print!("EXCEPTION: BREAKPOINT");
     loop {}
 }
 
-unsafe fn double_fault_handler(stack_frame: &ExceptionStackFrame) -> ! {
+unsafe fn double_fault_handler(stack_frame: &InterruptStackFrame) -> ! {
     print!("EXCEPTION: double fault occured");
     loop {}
 }
 
 unsafe fn page_fault_handler(
-    stack_frame: &ExceptionStackFrame,
+    stack_frame: &InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) -> ! {
-    println!("============");
-    println!("|Page Fault|");
-    println!("============");
-    println!(
-        "Page fault at address {:#x}",
-        x86_64::registers::control::Cr2::read().as_u64()
-    );
-    println!("Stack Frame: {:#x?}", stack_frame);
-    println!("Error Code: {:#x?}", error_code);
+    let curr = crate::scheduler::get_running_process().as_mut().unwrap();
+    if x86_64::registers::control::Cr2::read() <= curr.stack_start
+        && x86_64::registers::control::Cr2::read() >= (curr.stack_start - scheduler::MAX_STACK_SIZE)
+    {
+        let new_stack_page: PhysFrame;
+        match crate::memory::page_allocator::allocate() {
+            Some(v) => new_stack_page = v,
+            None => {
+                *scheduler::get_running_process() = None;
+                crate::scheduler::load_from_queue();
+            }
+        }
 
-    loop {}
+        if let Err(_) = crate::memory::vmm::map_address(
+            curr.page_table,
+            x86_64::registers::control::Cr2::read(),
+            new_stack_page,
+            PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
+        ) {
+            *scheduler::get_running_process() = None;
+        }
+
+        crate::scheduler::load_from_queue();
+    } else {
+        println!("============");
+        println!("|Page Fault|");
+        println!("============");
+        println!(
+            "Page fault at address {:#x}",
+            x86_64::registers::control::Cr2::read().as_u64()
+        );
+        println!("Stack Frame: {:#x?}", stack_frame);
+        println!("Error Code: {:#x?}", error_code); // the only panic so it will stop after it
+        loop {}
+    }
 }
