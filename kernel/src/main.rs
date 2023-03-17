@@ -18,6 +18,7 @@ mod iostream;
 mod memory;
 mod mutex;
 mod pit;
+mod queue;
 mod scheduler;
 mod syscalls;
 mod terminal;

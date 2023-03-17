@@ -54,6 +54,13 @@ pub unsafe fn load_tables_to_cr3(p4_addr: PhysAddr) {
     );
 }
 
+/// Flush the TLB cache.
+pub fn flush_tlb_cache() {
+    unsafe {
+        load_tables_to_cr3(Cr3::read().0.start_address());
+    }
+}
+
 fn get_last_phys_addr() -> u64 {
     let last_entry = unsafe { get_memmap_entry(get_memmap(), get_memmap().entry_count - 1) };
 
