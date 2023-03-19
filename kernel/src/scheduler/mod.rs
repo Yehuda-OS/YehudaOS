@@ -94,24 +94,16 @@ pub struct Registers {
     pub r15: u64,
 }
 
-#[repr(u8)]
-pub enum ProcessStates {
-    New,
-    Ready,
-    Running,
-    Waiting,
-    Terminate,
-}
-
 #[repr(C)]
 pub struct Process {
     pub registers: Registers,
     pub stack_pointer: u64,
-    pub kernel_task: bool,
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
     pub stack_start: VirtAddr,
+    cwd: usize,
+    kernel_task: bool,
 }
 
 impl Drop for Process {
@@ -136,6 +128,20 @@ impl Drop for Process {
                 ))
             }
         }
+    }
+}
+
+impl Process {
+    pub fn cwd(&self) -> usize {
+        self.cwd
+    }
+
+    pub fn set_cwd(&mut self, value: usize) {
+        self.cwd = value;
+    }
+
+    pub fn kernel_task(&self) -> bool {
+        self.kernel_task
     }
 }
 

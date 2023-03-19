@@ -214,7 +214,10 @@ unsafe fn exec(name: *const i8) -> i64 {
         return -1;
     };
 
-    if let Ok(proc) = scheduler::Process::user_process(id as u64) {
+    if let Ok(proc) = scheduler::Process::new_user_process(
+        id as u64,
+        scheduler::get_running_process().as_ref().unwrap().cwd(),
+    ) {
         scheduler::add_to_the_queue(proc);
     } else {
         return -1;

@@ -175,7 +175,7 @@ impl super::Process {
     /// # Safety
     /// This function is unsafe because it assumes that `file_id` points to a valid
     /// ELF file.
-    pub unsafe fn user_process(file_id: u64) -> Result<Self, SchedulerError> {
+    pub unsafe fn new_user_process(file_id: u64, cwd: usize) -> Result<Self, SchedulerError> {
         let header = get_header(file_id);
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let p = Process {
@@ -186,6 +186,7 @@ impl super::Process {
             flags: super::INTERRUPT_FLAG_ON,
             kernel_task: false,
             stack_start: VirtAddr::new(PROCESS_STACK_POINTER),
+            cwd,
         };
 
         for entry in &get_program_table(file_id, &header) {
