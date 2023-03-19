@@ -101,7 +101,7 @@ pub struct Process {
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
-    pub stack_start: VirtAddr,
+    stack_start: VirtAddr,
     cwd: usize,
     kernel_task: bool,
 }
@@ -132,7 +132,7 @@ impl Drop for Process {
 }
 
 impl Process {
-    pub fn cwd(&self) -> usize {
+    pub const fn cwd(&self) -> usize {
         self.cwd
     }
 
@@ -140,8 +140,12 @@ impl Process {
         self.cwd = value;
     }
 
-    pub fn kernel_task(&self) -> bool {
+    pub const fn kernel_task(&self) -> bool {
         self.kernel_task
+    }
+
+    pub const fn stack_start(&self) -> VirtAddr {
+        self.stack_start
     }
 }
 

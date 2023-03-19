@@ -11,8 +11,8 @@ use x86_64::addr::VirtAddr;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::structures::idt::PageFaultErrorCode;
-use x86_64::structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB};
-use x86_64::{PhysAddr, PrivilegeLevel};
+use x86_64::structures::paging::{PageTableFlags, PhysFrame};
+use x86_64::PrivilegeLevel;
 
 const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
@@ -204,8 +204,9 @@ unsafe fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) -> ! {
     let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-    if x86_64::registers::control::Cr2::read() <= curr.stack_start
-        && x86_64::registers::control::Cr2::read() >= (curr.stack_start - scheduler::MAX_STACK_SIZE)
+    if x86_64::registers::control::Cr2::read() <= curr.stack_start()
+        && x86_64::registers::control::Cr2::read()
+            >= (curr.stack_start() - scheduler::MAX_STACK_SIZE)
     {
         let new_stack_page: PhysFrame;
         match crate::memory::page_allocator::allocate() {
