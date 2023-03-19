@@ -1,3 +1,4 @@
+/// Save the general purpose registers of the process and run the handler.
 #[macro_export]
 macro_rules! interrupt_handler {
     ($handler:ident => $name:ident) => {{
