@@ -10,10 +10,6 @@ pub unsafe fn add_to_queue(p: Process) {
 
 pub extern "C" fn terminate_from_queue(_: *mut u64) -> ! {
     loop {
-        if unsafe { TERMINATE_PROC_QUEUE.lock() }.is_empty() {
-            continue;
-        } else {
-            unsafe { TERMINATE_PROC_QUEUE.lock() }.pop();
-        }
+        unsafe { TERMINATE_PROC_QUEUE.lock() }.pop();
     }
 }
