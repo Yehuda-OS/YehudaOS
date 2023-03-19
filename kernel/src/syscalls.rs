@@ -6,6 +6,7 @@ use core::arch::asm;
 use core::slice;
 use fs_rs::fs::read as fread;
 use fs_rs::fs::{get_file_id, is_dir, FILE_NAME_LEN};
+use x86_64::VirtAddr;
 
 const EFER: u32 = 0xc0000080;
 const STAR: u32 = 0xc0000081;
@@ -150,20 +151,31 @@ pub unsafe fn handler() -> ! {
 ///
 /// # Arguments
 /// - `fd` - the file descriptor
-/// - `_buf` - the buffer to write into
+/// - `user_buffer` - the buffer to write into
 /// - `count` - the count of bytes to rea
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise
-unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> i64 {
-    if fd < 0 {
+unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let buffer;
+    let mut buf;
+
+    if fd < 0 || user_buffer.is_null() || user_buffer as u64 >= memory::HHDM_OFFSET {
+        return -1;
+    }
+    if let Ok(page) =
+        memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(user_buffer as u64))
+    {
+        buf = alloc::string::String::from_raw_parts(
+            (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
+            count,
+            count,
+        );
+    } else {
         return -1;
     }
 
-    if _buf.is_null() {
-        return -1;
-    }
-    let mut buf = alloc::string::String::from_raw_parts(_buf, count, 1024); // capacity of 1 KB
     if fd < 3 && fd >= 0 {
         match fd {
             STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as i64,
@@ -173,7 +185,7 @@ unsafe fn read(fd: i32, _buf: *mut u8, count: usize) -> i64 {
         }
     }
 
-    let buffer = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr(), count) };
+    buffer = slice::from_raw_parts_mut(buf.as_mut_ptr(), count);
     match fread((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize, buffer, 0) {
         Some(b) => {
             if is_dir((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize) {
