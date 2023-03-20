@@ -21,7 +21,7 @@ pub type DirList = Vec<DirListEntry>;
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
 pub const FILE_NAME_LEN: usize = 11;
-const BLOCK_SIZE: usize = 8192;
+const BLOCK_SIZE: usize = 4096;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
 const DISK_PARTS: DiskParts = calc_parts(blkdev::DEVICE_SIZE);
@@ -74,21 +74,12 @@ impl fmt::Display for FsError {
     }
 }
 
-impl DirEntry {
-    const fn new() -> Self {
-        DirEntry {
-            id: 0,
-            name: [0; FILE_NAME_LEN],
-        }
-    }
-}
-
 /// function that returns the root dir (/)
 ///
 /// # Returns
 /// the Inode of the root dir
 fn get_root_dir() -> Inode {
-    let mut ans = Inode::new();
+    let mut ans = Inode::default();
 
     unsafe {
         blkdev::read(
@@ -110,7 +101,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     let mut next_delimiter = path.find('/');
     let mut next_folder;
     let mut inode = get_root_dir();
-    let mut dir_entry = DirEntry::new();
+    let mut dir_entry = DirEntry::default();
     let mut index;
     let mut entry_count;
     let mut found;
@@ -141,7 +132,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
 
         while index < entry_count && !found {
             // UNWRAP: Already checked if the folder exists.
-            dir_entry = unsafe { read_dir(inode.id, index).unwrap() };
+            dir_entry = unsafe { read_dir(inode.id(), index).unwrap() };
             equals = true;
 
             for i in 0..FILE_NAME_LEN {
@@ -183,34 +174,6 @@ fn get_inode_address(id: usize) -> usize {
     DISK_PARTS.root + id * core::mem::size_of::<Inode>()
 }
 
-#[deprecated]
-fn read_file(inode: &Inode) -> Box<&[u8]> {
-    let last_pointer: usize = inode.size() / BLOCK_SIZE;
-    let mut pointer = 0;
-    let mut to_read;
-    let mut bytes_read = 0;
-    let mut buffer = Box::new(vec![0; inode.size()]);
-
-    while bytes_read != inode.size() {
-        to_read = if pointer == last_pointer {
-            inode.size() % BLOCK_SIZE
-        } else {
-            BLOCK_SIZE
-        };
-        unsafe {
-            blkdev::read(
-                inode.addresses[pointer],
-                to_read,
-                (*buffer).as_mut_ptr().add(bytes_read),
-            );
-        };
-        bytes_read += to_read;
-        pointer += 1;
-    }
-
-    unsafe { Box::from(slice::from_raw_parts(buffer.as_ptr(), bytes_read)) }
-}
-
 /// function that read dir
 ///
 /// # Arguments
@@ -226,7 +189,7 @@ pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
         name: [0; FILE_NAME_LEN],
     };
 
-    if !read_inode(file)?.directory {
+    if !read_inode(file)?.is_dir() {
         return None;
     }
     if read(
@@ -265,7 +228,7 @@ fn is_allocated(bitmap_start: usize, i: usize) -> bool {
 /// # Arguments
 /// - `id` - The inode's ID.
 fn read_inode(id: usize) -> Option<Inode> {
-    let mut inode = Inode::new();
+    let mut inode = Inode::default();
 
     if is_allocated(DISK_PARTS.inode_bit_map, id) {
         unsafe {
@@ -289,7 +252,7 @@ fn read_inode(id: usize) -> Option<Inode> {
 fn write_inode(inode: &Inode) {
     unsafe {
         blkdev::write(
-            get_inode_address(inode.id),
+            get_inode_address(inode.id()),
             core::mem::size_of::<Inode>(),
             inode as *const _ as *mut u8,
         )
@@ -367,39 +330,6 @@ fn deallocate(bitmap_start: usize, n: usize) {
     unsafe { blkdev::read(byte_address, 1, &mut byte as *mut u8) };
     byte ^= 1 << offset; // flip the bit to mark as unoccupied
     unsafe { blkdev::write(byte_address, 1, &mut byte as *mut u8) };
-}
-
-#[deprecated]
-fn reallocate_blocks(inode: &Inode, new_size: usize) -> Result<Inode, &'static str> {
-    let required_blocks = new_size / BLOCK_SIZE + (new_size % BLOCK_SIZE != 0) as usize;
-    let blocks_to_allocate;
-    let mut used_blocks = 0;
-    let mut new_addresses = *inode;
-
-    if required_blocks > inode::DIRECT_POINTERS {
-        return Err("too many blocks are required");
-    }
-
-    while new_addresses.addresses[used_blocks as usize] != 0 {
-        used_blocks += 1;
-    }
-
-    blocks_to_allocate = (required_blocks as isize - used_blocks) as isize;
-
-    if blocks_to_allocate > 0 {
-        for _ in 0..blocks_to_allocate {
-            new_addresses.addresses[used_blocks as usize] = allocate_block().unwrap();
-            used_blocks += 1;
-        }
-    } else if blocks_to_allocate < 0 {
-        for _ in 0..(-blocks_to_allocate) {
-            used_blocks -= 1;
-            deallocate_block(new_addresses.addresses[used_blocks as usize]);
-            new_addresses.addresses[used_blocks as usize] = 0;
-        }
-    }
-
-    Ok(new_addresses)
 }
 
 /// allocate a block
@@ -535,46 +465,18 @@ const fn calc_parts(device_size: usize) -> DiskParts {
 /// - `folder` - The folder to add to.
 fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
     let dot = DirEntry {
-        name: { ['.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        id: folder.id,
+        name: ['.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        id: folder.id(),
     };
     let dot_dot = DirEntry {
         name: ['.' as u8, '.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        id: containing_folder.id,
+        id: containing_folder.id(),
     };
 
-    add_file_to_folder(&dot, folder.id).unwrap();
-    *folder = read_inode(folder.id).unwrap();
-    add_file_to_folder(&dot_dot, folder.id).unwrap();
-    *folder = read_inode(folder.id).unwrap();
-}
-
-/// Get the folder that contains a file.
-///
-/// # Arguments
-/// `path` - The path to the file.
-/// `cwd` - The ID of the current working directory.
-///
-/// # Returns
-/// If the function succeeds the inode of the containing folder will be returned.
-/// Otherwise, a `FileNotFound` error will be returned.
-fn get_containing_folder(path: &str, cwd: Option<usize>) -> Result<Inode, FsError> {
-    let last_delimiter = path.rfind('/');
-
-    match last_delimiter {
-        Some(delimiter) => get_inode(
-            &path[0..delimiter + 1],
-            if let Some(cwd) = cwd {
-                read_inode(cwd)
-            } else {
-                None
-            },
-        ),
-        // If there's no '/', the path is relative and the file will be created in the current
-        // working directory.
-        None => read_inode(cwd.ok_or(FsError::FileNotFound)?),
-    }
-    .ok_or(FsError::FileNotFound)
+    add_file_to_folder(&dot, folder.id()).unwrap();
+    *folder = read_inode(folder.id()).unwrap();
+    add_file_to_folder(&dot_dot, folder.id()).unwrap();
+    *folder = read_inode(folder.id()).unwrap();
 }
 
 /// function that checks if an inode is directory
@@ -586,7 +488,7 @@ fn get_containing_folder(path: &str, cwd: Option<usize>) -> Result<Inode, FsErro
 /// `true` if the inode is directory and `false` if not
 pub fn is_dir(id: usize) -> bool {
     if let Some(inode) = read_inode(id) {
-        inode.directory
+        inode.is_dir()
     } else {
         false
     }
@@ -625,7 +527,7 @@ pub fn format() {
         version: 0,
     };
     let bit_maps_size = DISK_PARTS.root - DISK_PARTS.block_bit_map;
-    let mut root = Inode::new();
+    let mut root = Inode::default();
 
     // put the header in place
     header.magic.copy_from_slice(&FS_MAGIC);
@@ -644,9 +546,9 @@ pub fn format() {
     };
 
     // create root directory Inode
-    root.directory = true;
+    root.set_as_dir(true);
     // UNWRAP: No inodes have been allocated yet.
-    root.id = allocate_inode().unwrap();
+    root.set_id(allocate_inode().unwrap());
     unsafe {
         blkdev::write(
             DISK_PARTS.root,
@@ -690,8 +592,8 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
         None => read_inode(cwd.ok_or(FsError::FileNotFound)?),
     }
     .ok_or(FsError::FileNotFound)?;
-    let mut file = Inode::new();
-    let mut file_details = DirEntry::new();
+    let mut file = Inode::default();
+    let mut file_details = DirEntry::default();
 
     if file_name.is_empty() {
         return Err(FsError::FileNotFound);
@@ -700,10 +602,10 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
         return Err(FsError::FileAlreadyExists);
     }
 
-    file.id = allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?;
-    file.directory = directory;
+    file.set_id(allocate_inode().ok_or(FsError::NotEnoughDiskSpace)?);
+    file.set_as_dir(directory);
     write_inode(&file);
-    if file.directory {
+    if file.is_dir() {
         add_special_folders(&dir, &mut file)
     }
 
@@ -720,9 +622,9 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
 
         name
     };
-    file_details.id = file.id;
+    file_details.id = file.id();
 
-    add_file_to_folder(&file_details, dir.id)
+    add_file_to_folder(&file_details, dir.id())
 }
 
 /// function that removes a file
@@ -757,13 +659,13 @@ pub fn remove_file(path_str: &str, cwd: Option<usize>) -> Result<(), FsError> {
     .ok_or(FsError::FileNotFound)?;
     let file = get_inode(file_name, Some(dir)).ok_or(FsError::FileNotFound)?;
 
-    // An empty directory contains 2 directory entries.
-    if file.directory && file.size() != 2 * core::mem::size_of::<DirEntry>() {
+    // An empty directory contains to directory entries.
+    if file.is_dir() && file.size() != 2 * core::mem::size_of::<DirEntry>() {
         Err(FsError::DirNotEmpty)
     } else {
         // `set_len` will not return `MaximumSizeExceeded` because we shrink the size.
-        set_len(file.id, 0)?;
-        remove_file_from_folder(file.id, dir.id)?;
+        set_len(file.id(), 0)?;
+        remove_file_from_folder(file.id(), dir.id())?;
 
         Ok(())
     }
@@ -784,7 +686,7 @@ pub fn get_file_id(path: &str, cwd: Option<usize>) -> Option<usize> {
                 None
             },
         )?
-        .id,
+        .id(),
     )
 }
 
@@ -946,7 +848,7 @@ pub unsafe fn write(file: usize, buffer: &[u8], offset: usize) -> Result<(), FsE
 pub fn get_content(path_str: &String) -> Option<String> {
     let file: Inode = get_inode(path_str, None)?;
     let mut content: Vec<u8> = vec![0; file.size()];
-    unsafe { read(file.id, content.as_mut_slice(), 0) };
+    unsafe { read(file.id(), content.as_mut_slice(), 0) };
 
     let content = String::from_utf8_lossy(&*content.as_slice()).to_string();
     if content.trim().is_empty() {
@@ -972,14 +874,14 @@ pub fn list_dir(path_str: &String) -> DirList {
     };
     let dir = get_inode(path_str, None).unwrap();
     let mut data: Vec<u8> = vec![0; dir.size()];
-    unsafe { read(dir.id, data.as_mut_slice(), 0) };
+    unsafe { read(dir.id(), data.as_mut_slice(), 0) };
     let dir_content = unsafe {
         Box::from(slice::from_raw_parts(
             data.as_ptr() as *const DirEntry,
             data.len() / core::mem::size_of::<DirEntry>(),
         ))
     };
-    let file = Inode::new();
+    let file = Inode::default();
 
     for i in 0..dir_content.len() {
         entry.name = Box::leak(
@@ -995,7 +897,7 @@ pub fn list_dir(path_str: &String) -> DirList {
             )
         };
         entry.file_size = file.size();
-        entry.is_dir = file.directory;
+        entry.is_dir = file.is_dir();
         ans.push(entry.clone());
     }
 
@@ -1021,9 +923,9 @@ pub fn set_content(path_str: &String, content: &mut String) -> Result<(), &'stat
         return Err("Error: could not find the file");
     };
 
-    set_len(file.id, new_size).expect("Error: could not reallocate the block");
+    set_len(file.id(), new_size).expect("Error: could not reallocate the block");
 
-    if let Err(_) = unsafe { write(file.id, str_as_bytes, 0) } {
+    if let Err(_) = unsafe { write(file.id(), str_as_bytes, 0) } {
         return Err("Error: couldn't write to the file");
     }
 

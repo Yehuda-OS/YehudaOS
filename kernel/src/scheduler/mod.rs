@@ -1,24 +1,29 @@
 use super::memory;
+use crate::queue::Queue;
 use crate::{io, syscalls};
-use alloc::vec::Vec;
 use core::arch::asm;
 use core::fmt;
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
-    PhysAddr,
+    PhysAddr, VirtAddr,
 };
+
 mod kernel_tasks;
 mod loader;
 pub mod terminator;
 
-static mut CURR_PROC: Option<Process> = None;
-static mut PROC_QUEUE: Vec<(Process, u8)> = Vec::new();
-
+pub const MAX_STACK_SIZE: u64 = 1024 * 20; // 20KiB
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
 const KERNEL_DATA_SEGMENT: u16 = super::gdt::KERNEL_DATA;
 const USER_CODE_SEGMENT: u16 = super::gdt::USER_CODE | 3;
 const USER_DATA_SEGMENT: u16 = super::gdt::USER_DATA | 3;
 const INTERRUPT_FLAG_ON: u64 = 0x200;
+const HIGH_PRIORITY_RELOAD: u8 = 2;
+
+static mut CURR_PROC: Option<Process> = None;
+static mut LOW_PRIORITY: Queue<Process> = Queue::new();
+static mut HIGH_PRIORITY: Queue<Process> = Queue::new();
+static mut HIGH_PRIORITY_VALUE: u8 = HIGH_PRIORITY_RELOAD;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -107,6 +112,7 @@ pub struct Process {
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
+    pub stack_start: VirtAddr,
 }
 
 impl Drop for Process {
@@ -152,18 +158,12 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
 /// # Arguments
 /// - `p` - the process
 pub fn add_to_the_queue(p: Process) {
-    let proc: (Process, u8) = if p.kernel_task {
-        (p, 15) // if the procrss is kernel task it gets higher priority
-    } else {
-        (p, 0)
-    };
-
     // SAFETY: The shceduler should not be referenced in a multithreaded situation.
     unsafe {
-        PROC_QUEUE.push(proc);
-        PROC_QUEUE.sort_unstable_by(|a, b| a.1.cmp(&b.1));
-        for i in 0..PROC_QUEUE.len() {
-            PROC_QUEUE[i].1 += 1;
+        if p.kernel_task {
+            HIGH_PRIORITY.enqueue(p);
+        } else {
+            LOW_PRIORITY.enqueue(p);
         }
     }
 }
@@ -188,12 +188,25 @@ pub fn switch_current_process() {
 /// # Panics
 /// Panics if the process queue is empty.
 pub unsafe fn load_from_queue() -> ! {
-    let p = PROC_QUEUE.pop().unwrap();
+    // Take high priority processes if the amount of high priority processes that were ran since
+    // the last low priority process is less than the reload value or if there are no low
+    // priority processes waiting.
+    let p = if (HIGH_PRIORITY_VALUE > 0 && !HIGH_PRIORITY.is_empty()) || LOW_PRIORITY.is_empty() {
+        if HIGH_PRIORITY_VALUE > 0 {
+            HIGH_PRIORITY_VALUE -= 1;
+        }
+
+        HIGH_PRIORITY.dequeue().unwrap()
+    } else {
+        HIGH_PRIORITY_VALUE = HIGH_PRIORITY_RELOAD;
+
+        LOW_PRIORITY.dequeue().unwrap()
+    };
 
     if let Some(process) = &CURR_PROC {
         add_to_the_queue(core::ptr::read(process))
     }
-    core::ptr::write(&mut CURR_PROC, Some(p.0));
+    core::ptr::write(&mut CURR_PROC, Some(p));
     load_context(CURR_PROC.as_ref().unwrap());
 }
 

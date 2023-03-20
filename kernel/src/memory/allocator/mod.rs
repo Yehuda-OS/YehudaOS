@@ -3,8 +3,8 @@ use core::{
     ptr::null_mut,
 };
 
-use crate::mutex::Mutex;
 use crate::mutex::MutexGuard;
+use crate::{memory, mutex::Mutex};
 use heap_block::HeapBlock;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
@@ -123,6 +123,7 @@ fn alloc_node(
 
         return None;
     }
+    memory::flush_tlb_cache();
     // Allocation succeeded, add the allocated block to the list.
     allocated = start.as_mut_ptr::<HeapBlock>();
     unsafe {

@@ -1,3 +1,4 @@
+use super::MAX_STACK_SIZE;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     VirtAddr,
@@ -8,7 +9,6 @@ use crate::mutex::Mutex;
 
 use super::SchedulerError;
 
-const MAX_STACK_SIZE: u64 = 1024 * 4 * 20; // 80KiB
 const STACK_START: u64 = 0x4000_0000;
 
 static STACK_BITMAP: Mutex<u64> = Mutex::new(0);
@@ -94,14 +94,16 @@ impl super::Process {
     ) -> Result<Self, SchedulerError> {
         const POINTER_SIZE: u64 = 8;
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
+        let stack = allocate_stack().unwrap();
         let mut p = super::Process {
             registers: super::Registers::default(),
             page_table: memory::get_page_table(),
             // UNWRAP: Assume the maximum amount of threads is not exceeded.
-            stack_pointer: allocate_stack().unwrap(),
+            stack_pointer: stack,
             instruction_pointer: function as u64,
             flags: super::INTERRUPT_FLAG_ON,
             kernel_task: true,
+            stack_start: VirtAddr::new(stack),
         };
 
         memory::vmm::map_address(
