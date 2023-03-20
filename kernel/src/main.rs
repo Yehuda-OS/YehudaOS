@@ -51,14 +51,13 @@ pub extern "C" fn _start() -> ! {
         syscalls::initialize();
         pit::start(19);
 
-        match scheduler::Process::kernel_task(
-            scheduler::terminator::terminate_from_queue,
-            core::ptr::null_mut(),
-        ) {
-            Ok(v) => scheduler::add_to_the_queue(v),
-            Err(_) => println!("Error: failed to load processes terminator"),
-        }
-        scheduler::load_from_queue();
+        scheduler::add_to_the_queue(
+            scheduler::Process::kernel_task(
+                scheduler::terminator::terminate_from_queue,
+                core::ptr::null_mut(),
+            )
+            .expect("Error: failed to load processes terminator"),
+        );
     }
     println!("Hello world");
 
