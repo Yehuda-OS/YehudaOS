@@ -88,8 +88,8 @@ impl super::Process {
     ///
     /// # Returns
     /// A `Process` struct for the task on success or an `OutOfMemory` error on fail.
-    pub fn kernel_task<T, R>(
-        function: extern "C" fn(*mut T) -> R,
+    pub fn kernel_task<T>(
+        function: extern "C" fn(*mut T) -> i32,
         param: *mut T,
     ) -> Result<Self, SchedulerError> {
         const POINTER_SIZE: u64 = 8;
