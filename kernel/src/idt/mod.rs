@@ -222,6 +222,9 @@ unsafe fn page_fault_handler(
             new_stack_page,
             PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
         ) {
+            scheduler::terminator::add_to_queue(
+                core::ptr::read(scheduler::get_running_process()).unwrap(),
+            );
             *scheduler::get_running_process() = None;
         }
 
