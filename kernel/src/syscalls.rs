@@ -2,7 +2,9 @@ use super::io;
 use super::scheduler;
 use crate::iostream::STDIN;
 use crate::memory;
+use core::alloc::Layout;
 use core::arch::asm;
+use core::ptr::null_mut;
 use core::slice;
 use fs_rs::fs::read as fread;
 use fs_rs::fs::{get_file_id, is_dir, FILE_NAME_LEN};
@@ -12,6 +14,7 @@ const EFER: u32 = 0xc0000080;
 const STAR: u32 = 0xc0000081;
 const LSTAR: u32 = 0xc0000082;
 const FMASK: u32 = 0xc0000084;
+const ALIGNMENT: usize = 16;
 pub const KERNEL_GS_BASE: u32 = 0xc0000102;
 
 const STDIN_DESCRIPTOR: i32 = 0;
@@ -25,6 +28,8 @@ mod syscall {
     pub const EXEC: u64 = 0x3b;
     pub const EXIT: u64 = 0x3c;
     pub const READ: u64 = 0;
+    pub const MALLOC: u64 = 0x9;
+    pub const FREE: u64 = 0xb;
 }
 
 pub unsafe fn initialize() {
@@ -72,6 +77,8 @@ unsafe fn handle_syscall(
     match syscall_number {
         syscall::READ => read(arg0 as i32, arg2 as *mut u8, arg2 as usize) as i64,
         syscall::EXEC => exec(arg0 as *const i8),
+        syscall::MALLOC => malloc(arg0 as usize) as i64,
+        syscall::FREE => free(arg0 as *mut u8),
         syscall::EXIT => exit(arg0 as i32),
         _ => -1,
     }
@@ -234,6 +241,44 @@ unsafe fn exec(name: *const i8) -> i64 {
     } else {
         return -1;
     };
+
+    0
+}
+
+/// Allocate memory for a userspace program.
+///
+/// # Arguments
+/// - `size` - The size of the allocation.
+///
+/// # Returns
+/// A pointer to the allocation or null on failure.
+unsafe fn malloc(size: usize) -> *mut u8 {
+    let allocator = scheduler::get_running_process()
+        .as_mut()
+        .unwrap()
+        .allocator();
+    let layout = Layout::from_size_align(size, ALIGNMENT);
+    let mut allocation = null_mut();
+
+    if let Ok(layout) = layout {
+        memory::load_tables_to_cr3(allocator.get_page_table());
+        allocation = allocator.global_alloc(layout);
+        memory::load_tables_to_cr3(memory::PAGE_TABLE);
+    }
+
+    allocation
+}
+
+/// Deallocate an allocation that was allocated with `malloc`.
+///
+/// # Arguments
+/// - `ptr` - The pointer to the allocation that was returned from `malloc`.
+unsafe fn free(ptr: *mut u8) -> i64 {
+    scheduler::get_running_process()
+        .as_mut()
+        .unwrap()
+        .allocator()
+        .global_dealloc(ptr, Layout::from_size_align(0, 1).unwrap());
 
     0
 }
