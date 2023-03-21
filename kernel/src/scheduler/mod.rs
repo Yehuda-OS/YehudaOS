@@ -1,4 +1,5 @@
 use super::memory;
+use crate::memory::allocator::{Allocator, Locked};
 use crate::queue::Queue;
 use crate::{io, syscalls};
 use core::arch::asm;
@@ -104,6 +105,7 @@ pub struct Process {
     stack_start: VirtAddr,
     cwd: usize,
     kernel_task: bool,
+    allocator: Locked<Allocator>,
 }
 
 impl Drop for Process {
@@ -146,6 +148,10 @@ impl Process {
 
     pub const fn stack_start(&self) -> VirtAddr {
         self.stack_start
+    }
+
+    pub const fn allocator(&self) -> &Locked<Allocator> {
+        &self.allocator
     }
 }
 

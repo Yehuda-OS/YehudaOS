@@ -1,10 +1,10 @@
 use super::MAX_STACK_SIZE;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
-    VirtAddr,
+    PhysAddr, VirtAddr,
 };
 
-use crate::memory;
+use crate::memory::{self, allocator};
 use crate::mutex::Mutex;
 
 use super::SchedulerError;
@@ -105,6 +105,7 @@ impl super::Process {
             kernel_task: true,
             stack_start: VirtAddr::new(stack),
             cwd: 0,
+            allocator: allocator::Locked::new(allocator::Allocator::new(0, PhysAddr::zero())),
         };
 
         memory::vmm::map_address(
