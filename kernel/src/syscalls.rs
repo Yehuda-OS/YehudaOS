@@ -25,6 +25,7 @@ mod syscall {
     pub const EXEC: u64 = 0x3b;
     pub const EXIT: u64 = 0x3c;
     pub const READ: u64 = 0;
+    // TODO create_file, delete_file, read, write, ftruncate, read_dir
 }
 
 pub unsafe fn initialize() {
