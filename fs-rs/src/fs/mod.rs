@@ -175,9 +175,9 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
 
         if next_delimiter.is_none() {
             return Some(inode);
-        } /* else if !inode.is_dir() { */
-        //     return None;
-        // }
+        } else if !inode.is_dir() {
+            return None;
+        }
     }
 }
 
