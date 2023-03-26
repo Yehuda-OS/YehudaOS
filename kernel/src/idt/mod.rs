@@ -1,6 +1,7 @@
 pub mod keyboard;
 mod macros;
 
+use crate::pit::pit_handler;
 use crate::syscalls::int_0x80_handler as syscall_handler;
 use crate::{interrupt_handler, print, println, scheduler};
 use bit_field::BitField;
@@ -11,8 +12,8 @@ use x86_64::addr::VirtAddr;
 use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::structures::idt::PageFaultErrorCode;
-use x86_64::structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB};
-use x86_64::{PhysAddr, PrivilegeLevel};
+use x86_64::structures::paging::{PageTableFlags, PhysFrame};
+use x86_64::PrivilegeLevel;
 
 const DIV_0: u8 = 0;
 const BREAKPOINT: u8 = 3;
@@ -47,12 +48,11 @@ lazy_static! {
             PAGE_FAULT,
             interrupt_handler!(page_fault_handler => p_fault) as u64,
         );
-        idt.set_handler(PIT_HANDLER, crate::pit::handler_save_context as u64);
         idt.set_handler_entry(
             PIT_HANDLER,
             *Entry::new(
                 SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
-                crate::pit::handler_save_context as u64,
+                interrupt_handler!(pit_handler => pit_save_context) as u64,
             )
             .set_stack_index(1),
         );
@@ -204,8 +204,9 @@ unsafe fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) -> ! {
     let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-    if x86_64::registers::control::Cr2::read() <= curr.stack_start
-        && x86_64::registers::control::Cr2::read() >= (curr.stack_start - scheduler::MAX_STACK_SIZE)
+    if x86_64::registers::control::Cr2::read() <= curr.stack_start()
+        && x86_64::registers::control::Cr2::read()
+            >= (curr.stack_start() - scheduler::MAX_STACK_SIZE)
     {
         let new_stack_page: PhysFrame;
         match crate::memory::page_allocator::allocate() {

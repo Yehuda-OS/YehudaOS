@@ -88,7 +88,7 @@ impl super::Process {
     ///
     /// # Returns
     /// A `Process` struct for the task on success or an `OutOfMemory` error on fail.
-    pub fn kernel_task<T>(
+    pub fn new_kernel_task<T>(
         function: extern "C" fn(*mut T) -> i32,
         param: *mut T,
     ) -> Result<Self, SchedulerError> {
@@ -104,6 +104,7 @@ impl super::Process {
             flags: super::INTERRUPT_FLAG_ON,
             kernel_task: true,
             stack_start: VirtAddr::new(stack),
+            cwd: 0,
         };
 
         memory::vmm::map_address(

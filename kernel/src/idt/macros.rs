@@ -1,3 +1,4 @@
+/// Save the general purpose registers of the process and run the handler.
 #[macro_export]
 macro_rules! interrupt_handler {
     ($handler:ident => $name:ident) => {{
@@ -7,28 +8,27 @@ macro_rules! interrupt_handler {
             unsafe {
                 asm!(
                     "
-                    push rax
-                    push rcx
-                    push rdx
-                    push rsi
-                    push rdi
-                    push r8
-                    push r9
-                    push r10
-                    push r11
+                    mov gs:0x0, rax
+                    mov gs:0x8, rbx
+                    mov gs:0x10, rcx
+                    mov gs:0x18, rdx
+                    mov gs:0x20, rsi
+                    mov gs:0x28, rdi
+                    mov gs:0x30, rbp
+                    mov gs:0x38, r8
+                    mov gs:0x40, r9
+                    mov gs:0x48, r10
+                    mov gs:0x50, r11
+                    mov gs:0x58, r12
+                    mov gs:0x60, r13
+                    mov gs:0x68, r14
+                    mov gs:0x70, r15
+
+                    // Move the interrupt stack frame struct to `rdi` to send it as a parameter.
                     mov rdi, rsp
-                    add rdi, 9*8
+                    swapgs
                     call {}
-                    pop r11
-                    pop r10
-                    pop r9
-                    pop r8
-                    pop rdi
-                    pop rsi
-                    pop rdx
-                    pop rcx
-                    pop rax
-                    iretq",
+                    ",
                     sym $handler,
                     options(noreturn),
                 );
