@@ -320,7 +320,7 @@ fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
 /// deallocate a block or inode by his index in the bitmap
 ///
 /// # Arguments
-/// - `bitmap_start` - the start og the bitmap
+/// - `bitmap_start` - the start of the bitmap
 /// - `n` - the index of the block
 fn deallocate(bitmap_start: usize, n: usize) {
     let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;

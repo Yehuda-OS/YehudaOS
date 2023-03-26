@@ -45,7 +45,10 @@ pub unsafe fn initialize() {
 }
 
 unsafe fn exit(_status: i32) -> i64 {
-    *scheduler::get_running_process() = None;
+    crate::scheduler::terminator::add_to_queue(core::ptr::read(
+        scheduler::get_running_process().as_mut().unwrap(),
+    ));
+    core::ptr::write(scheduler::get_running_process(), None);
 
     return 0;
 }
