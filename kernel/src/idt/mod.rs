@@ -223,9 +223,8 @@ unsafe fn page_fault_handler(
             PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
         ) {
             scheduler::terminator::add_to_queue(
-                core::ptr::read(scheduler::get_running_process()).unwrap(),
+                core::mem::replace(scheduler::get_running_process(), None).unwrap(),
             );
-            *scheduler::get_running_process() = None;
         }
 
         crate::scheduler::load_from_queue();

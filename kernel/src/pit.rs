@@ -1,10 +1,7 @@
-use core::arch::asm;
-
-use x86_64::structures::idt::InterruptStackFrame;
-
-use crate::{memory, scheduler};
-
 use super::io;
+use crate::{memory, scheduler};
+use core::arch::asm;
+use x86_64::structures::idt::InterruptStackFrame;
 
 const TICKS_PER_SECOND: u32 = 1193182;
 const PIT_COMMAND_PORT: u16 = 0x43;
