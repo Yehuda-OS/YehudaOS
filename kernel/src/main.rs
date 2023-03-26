@@ -52,7 +52,7 @@ pub extern "C" fn _start() -> ! {
         pit::start(19);
 
         scheduler::add_to_the_queue(
-            scheduler::Process::kernel_task(
+            scheduler::Process::new_kernel_task(
                 scheduler::terminator::terminate_from_queue,
                 core::ptr::null_mut(),
             )
