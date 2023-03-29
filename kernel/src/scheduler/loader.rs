@@ -1,9 +1,10 @@
 use super::{Process, SchedulerError};
 use crate::memory;
+use crate::memory::allocator;
 use fs_rs::fs;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, Size4KiB},
-    VirtAddr,
+    PhysAddr, VirtAddr,
 };
 
 /// Unsigned program address
@@ -178,15 +179,20 @@ impl super::Process {
     pub unsafe fn new_user_process(file_id: u64, cwd: usize) -> Result<Self, SchedulerError> {
         let header = get_header(file_id);
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
+        let page_table = super::create_page_table().ok_or(SchedulerError::OutOfMemory)?;
         let p = Process {
             registers: super::Registers::default(),
-            page_table: super::create_page_table().ok_or(SchedulerError::OutOfMemory)?,
             stack_pointer: PROCESS_STACK_POINTER,
+            page_table,
             instruction_pointer: header.e_entry,
             flags: super::INTERRUPT_FLAG_ON,
             kernel_task: false,
             stack_start: VirtAddr::new(PROCESS_STACK_POINTER),
             cwd,
+            allocator: allocator::Locked::new(allocator::Allocator::new(
+                allocator::HEAP_START,
+                page_table,
+            )),
         };
 
         for entry in &get_program_table(file_id, &header) {

@@ -1,10 +1,9 @@
+use crate::mutex::MutexGuard;
+use crate::{memory, mutex::Mutex};
 use core::{
     alloc::{GlobalAlloc, Layout},
     ptr::null_mut,
 };
-
-use crate::mutex::MutexGuard;
-use crate::{memory, mutex::Mutex};
 use heap_block::HeapBlock;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
@@ -297,6 +296,20 @@ unsafe fn print_list(first: *mut HeapBlock) {
     while curr != null_mut() {
         println!("{:p} : {:?}, size: {:#x}", curr, *curr, (*curr).size());
         curr = (*curr).next();
+    }
+}
+
+impl Locked<Allocator> {
+    pub unsafe fn global_alloc(&self, layout: Layout) -> *mut u8 {
+        self.alloc(layout)
+    }
+
+    pub unsafe fn global_dealloc(&self, ptr: *mut u8, layout: Layout) {
+        self.dealloc(ptr, layout);
+    }
+
+    pub fn get_page_table(&self) -> PhysAddr {
+        self.inner.lock().page_table
     }
 }
 
