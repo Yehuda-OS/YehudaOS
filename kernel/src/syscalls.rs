@@ -88,9 +88,19 @@ unsafe fn handle_syscall(
         syscall::MALLOC => malloc(arg0 as usize) as i64,
         syscall::FREE => free(arg0 as *mut u8),
         syscall::EXIT => exit(arg0 as i32),
-        syscall::CREATE_FILE => create_file(arg0 as *mut u8, arg1, arg2 > 0) as i64,
+        syscall::CREATE_FILE => create_file(arg0 as *mut u8, arg2 > 0) as i64,
         _ => -1,
     }
+}
+
+unsafe fn strlen(buffer: *mut u8) -> usize {
+    let i = 0;
+
+    while *buffer.add(i) != 0 {
+        i += 1;
+    }
+
+    i
 }
 
 pub unsafe fn int_0x80_handler() {
@@ -173,7 +183,7 @@ pub unsafe fn handler() -> ! {
 ///
 /// # Returns
 /// The file descriptor of the new file if the operation was successful, -1 otherwise.
-unsafe fn create_file(path: *mut u8, path_len: u64, directory: bool) -> i32 {
+unsafe fn create_file(path: *mut u8, directory: bool) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
@@ -181,19 +191,18 @@ unsafe fn create_file(path: *mut u8, path_len: u64, directory: bool) -> i32 {
         return -1;
     }
     if let Ok(page) = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(path as u64)) {
-        name_str = alloc::string::String::from_raw_parts(
-            (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
-            path_len as usize,
-            path_len as usize,
-        );
+        if let Ok(name) = core::str::from_utf8(core::slice::from_raw_parts(path, strlen(path))) {
+            name_str = name;
+        } else {
+            return -1;
+        }
     } else {
         return -1;
     }
 
-    if fs::create_file(name_str.as_str(), directory, Some(p.cwd())).is_ok() {
+    if fs::create_file(name_str, directory, Some(p.cwd())).is_ok() {
         // UNWRAP: The file creation was successful.
-        fs::get_file_id(name_str.as_str(), Some(p.cwd())).unwrap() as i32
-            + RESERVED_FILE_DESCRIPTORS
+        fs::get_file_id(name_str, Some(p.cwd())).unwrap() as i32 + RESERVED_FILE_DESCRIPTORS
     } else {
         -1
     }
@@ -207,7 +216,7 @@ unsafe fn create_file(path: *mut u8, path_len: u64, directory: bool) -> i32 {
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-unsafe fn remove_file(path: *mut u8, path_len: u64) -> i64 {
+unsafe fn remove_file(path: *mut u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
@@ -215,16 +224,16 @@ unsafe fn remove_file(path: *mut u8, path_len: u64) -> i64 {
         return -1;
     }
     if let Ok(page) = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(path as u64)) {
-        name_str = alloc::string::String::from_raw_parts(
-            (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
-            path_len as usize,
-            path_len as usize,
-        );
+        if let Ok(name) = core::str::from_utf8(core::slice::from_raw_parts(path, strlen(path))) {
+            name_str = name;
+        } else {
+            return -1;
+        }
     } else {
         return -1;
     }
 
-    if fs::remove_file(name_str.as_str(), Some(p.cwd())).is_ok() {
+    if fs::remove_file(name_str, Some(p.cwd())).is_ok() {
         0
     } else {
         -1
