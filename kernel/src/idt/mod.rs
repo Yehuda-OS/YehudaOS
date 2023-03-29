@@ -1,6 +1,7 @@
 pub mod keyboard;
 mod macros;
 
+use crate::pit::pit_handler;
 use crate::syscalls::int_0x80_handler as syscall_handler;
 use crate::{interrupt_handler, print, println, scheduler};
 use bit_field::BitField;
@@ -47,12 +48,11 @@ lazy_static! {
             PAGE_FAULT,
             interrupt_handler!(page_fault_handler => p_fault) as u64,
         );
-        idt.set_handler(PIT_HANDLER, crate::pit::handler_save_context as u64);
         idt.set_handler_entry(
             PIT_HANDLER,
             *Entry::new(
                 SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
-                crate::pit::handler_save_context as u64,
+                interrupt_handler!(pit_handler => pit_save_context) as u64,
             )
             .set_stack_index(1),
         );
@@ -223,7 +223,9 @@ unsafe fn page_fault_handler(
             new_stack_page,
             PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE | PageTableFlags::WRITABLE,
         ) {
-            *scheduler::get_running_process() = None;
+            scheduler::terminator::add_to_queue(
+                core::mem::replace(scheduler::get_running_process(), None).unwrap(),
+            );
         }
 
         crate::scheduler::load_from_queue();

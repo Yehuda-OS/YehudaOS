@@ -92,6 +92,31 @@ fn get_root_dir() -> Inode {
     ans
 }
 
+/// Compare two null-terminated strings represented in a byte array.
+///
+/// # Arguments
+/// - `first` - The first string.
+/// - `second` - The second string.
+///
+/// # Returns
+/// `true` if the strings are equal.
+/// `false` if they are not.
+fn names_equal(first: &[u8], second: &[u8]) -> bool {
+    let mut equals = true;
+
+    for i in 0..first.len() {
+        if first[i] != 0 {
+            if second.len() <= i || second[i] != first[i] {
+                equals = false;
+            }
+        } else if second.len() > i && second[i] != 0 {
+            equals = false;
+        }
+    }
+
+    equals
+}
+
 /// Returns the `Inode` of a file, or `None` if no file was found.
 ///
 /// # Arguments
@@ -105,7 +130,6 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     let mut index;
     let mut entry_count;
     let mut found;
-    let mut equals;
 
     if path == "/" {
         return Some(inode);
@@ -113,6 +137,10 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
     // Check if the path is relative
     if path.chars().nth(0).unwrap_or(' ') != '/' {
         inode = cwd?;
+    }
+    // Remove trailing '/'.
+    if path.chars().nth_back(0).unwrap_or(' ') == '/' {
+        path = &path[0..path.len() - 1];
     }
 
     loop {
@@ -133,18 +161,8 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         while index < entry_count && !found {
             // UNWRAP: Already checked if the folder exists.
             dir_entry = unsafe { read_dir(inode.id(), index).unwrap() };
-            equals = true;
 
-            for i in 0..FILE_NAME_LEN {
-                if dir_entry.name[i] != 0 {
-                    if next_folder.len() <= i || next_folder[i] != dir_entry.name[i] {
-                        equals = false;
-                    }
-                } else if next_folder.len() > i && next_folder[i] != 0 {
-                    equals = false;
-                }
-            }
-            if equals {
+            if names_equal(&dir_entry.name, next_folder) {
                 found = true;
             }
             index += 1;
@@ -156,11 +174,11 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         inode = read_inode(dir_entry.id).unwrap();
 
         if next_delimiter.is_none() {
-            break;
+            return Some(inode);
+        } else if !inode.is_dir() {
+            return None;
         }
     }
-
-    Some(inode)
 }
 
 /// find the Inode address by id
@@ -320,7 +338,7 @@ fn allocate(bitmap_start: usize, bitmap_end: usize) -> Option<usize> {
 /// deallocate a block or inode by his index in the bitmap
 ///
 /// # Arguments
-/// - `bitmap_start` - the start og the bitmap
+/// - `bitmap_start` - the start of the bitmap
 /// - `n` - the index of the block
 fn deallocate(bitmap_start: usize, n: usize) {
     let byte_address: usize = bitmap_start + n / BITS_IN_BYTE;

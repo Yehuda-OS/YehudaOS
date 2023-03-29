@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+use alloc::string::ToString;
 use fs_rs::fs;
 
 mod gdt;
@@ -49,6 +50,14 @@ pub extern "C" fn _start() -> ! {
         idt::IDT.load();
         syscalls::initialize();
         pit::start(19);
+
+        scheduler::add_to_the_queue(
+            scheduler::Process::new_kernel_task(
+                scheduler::terminator::terminate_from_queue,
+                core::ptr::null_mut(),
+            )
+            .expect("Error: failed to load processes terminator"),
+        );
     }
     println!("Hello world");
 

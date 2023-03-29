@@ -11,6 +11,7 @@ use x86_64::{
 
 mod kernel_tasks;
 mod loader;
+pub mod terminator;
 
 pub const MAX_STACK_SIZE: u64 = 1024 * 20; // 20KiB
 const KERNEL_CODE_SEGMENT: u16 = super::gdt::KERNEL_CODE;
