@@ -33,6 +33,7 @@ mod syscall {
     pub const MALLOC: u64 = 0x9;
     pub const FREE: u64 = 0xb;
     pub const CREATE_FILE: u64 = 0x2;
+    pub const REMOVE_FILE: u64 = 0x57;
     // TODO delete_file, read, write, ftruncate, read_dir
 }
 
@@ -197,6 +198,38 @@ unsafe fn create_file(path: *mut u8, path_len: u64, directory: bool) -> i32 {
     }
 }
 
+/// Remove a file from the file system, or remove a directory that must be empty.
+///
+/// # Arguments
+/// - `path` - Path to the file.
+/// - `path_len` - Length of the path.
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise.
+unsafe fn remove_file(path: *mut u8, path_len: u64) -> i64 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let name_str;
+
+    if path.is_null() || path as u64 >= memory::HHDM_OFFSET {
+        return -1;
+    }
+    if let Ok(page) = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(path as u64)) {
+        name_str = alloc::string::String::from_raw_parts(
+            (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
+            path_len as usize,
+            path_len as usize,
+        );
+    } else {
+        return -1;
+    }
+
+    if fs::remove_file(name_str.as_str(), Some(p.cwd())).is_ok() {
+        0
+    } else {
+        -1
+    }
+}
+
 /// implementation for `read` syscall
 ///
 /// # Arguments
@@ -205,7 +238,7 @@ unsafe fn create_file(path: *mut u8, path_len: u64, directory: bool) -> i32 {
 /// - `count` - the count of bytes to rea
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise
+/// 0 if the operation was successful, -1 otherwise.
 unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buffer;
