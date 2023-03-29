@@ -20,7 +20,7 @@ pub const KERNEL_GS_BASE: u32 = 0xc0000102;
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
 const STDERR_DESCRIPTOR: i32 = 2;
-const TO_SUB_FROM_FD_TO_GET_FILE_ID: i32 = 3;
+const RESERVED_FILE_DESCRIPTORS: i32 = 3;
 
 static mut KERNEL_STACK: u64 = 0;
 
@@ -197,9 +197,9 @@ unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
     }
 
     buffer = slice::from_raw_parts_mut(buf.as_mut_ptr(), count);
-    match fread((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize, buffer, 0) {
+    match fread((fd - RESERVED_FILE_DESCRIPTORS) as usize, buffer, 0) {
         Some(b) => {
-            if is_dir((fd - TO_SUB_FROM_FD_TO_GET_FILE_ID) as usize) {
+            if is_dir((fd - RESERVED_FILE_DESCRIPTORS) as usize) {
                 return -1;
             }
             b as i64
