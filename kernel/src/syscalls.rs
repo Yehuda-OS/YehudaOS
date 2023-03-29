@@ -6,6 +6,8 @@ use core::alloc::Layout;
 use core::arch::asm;
 use core::ptr::null_mut;
 use core::slice;
+use core::u8;
+use fs_rs::fs;
 use fs_rs::fs::read as fread;
 use fs_rs::fs::{get_file_id, is_dir, FILE_NAME_LEN};
 use x86_64::VirtAddr;
@@ -30,7 +32,8 @@ mod syscall {
     pub const READ: u64 = 0;
     pub const MALLOC: u64 = 0x9;
     pub const FREE: u64 = 0xb;
-    // TODO create_file, delete_file, read, write, ftruncate, read_dir
+    pub const CREATE_FILE: u64 = 0x2;
+    // TODO delete_file, read, write, ftruncate, read_dir
 }
 
 pub unsafe fn initialize() {
@@ -84,6 +87,7 @@ unsafe fn handle_syscall(
         syscall::MALLOC => malloc(arg0 as usize) as i64,
         syscall::FREE => free(arg0 as *mut u8),
         syscall::EXIT => exit(arg0 as i32),
+        syscall::CREATE_FILE => create_file(arg0 as *mut u8, arg1, arg2 > 0) as i64,
         _ => -1,
     }
 }
@@ -156,6 +160,41 @@ pub unsafe fn handler() -> ! {
     ) as u64;
 
     scheduler::load_from_queue();
+}
+
+/// Create a file in the file system.
+///
+/// # Arguments
+/// - `path` - Path to the file.
+/// - `path_len` - Length of the path.
+/// - `directory` - Whether the new file should be a directory.
+///
+/// # Returns
+/// The file descriptor of the new file if the operation was successful, -1 otherwise.
+unsafe fn create_file(path: *mut u8, path_len: u64, directory: bool) -> i32 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let name_str;
+
+    if path.is_null() || path as u64 >= memory::HHDM_OFFSET {
+        return -1;
+    }
+    if let Ok(page) = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(path as u64)) {
+        name_str = alloc::string::String::from_raw_parts(
+            (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
+            path_len as usize,
+            path_len as usize,
+        );
+    } else {
+        return -1;
+    }
+
+    if fs::create_file(name_str.as_str(), directory, Some(p.cwd())).is_ok() {
+        // UNWRAP: The file creation was successful.
+        fs::get_file_id(name_str.as_str(), Some(p.cwd())).unwrap() as i32
+            + RESERVED_FILE_DESCRIPTORS
+    } else {
+        -1
+    }
 }
 
 /// implementation for `read` syscall
