@@ -34,7 +34,7 @@ mod syscall {
     pub const FREE: u64 = 0xb;
     pub const CREATE_FILE: u64 = 0x2;
     pub const REMOVE_FILE: u64 = 0x57;
-    // TODO delete_file, read, write, ftruncate, read_dir
+    // TODO read, write, ftruncate, read_dir
 }
 
 pub unsafe fn initialize() {
@@ -133,6 +133,7 @@ pub unsafe extern "C" fn handler_save_context() {
         mov gs:120, rsp
         swapgs
         mov rsp, gs:0
+        swapgs
         call handler
     ",
         options(noreturn)

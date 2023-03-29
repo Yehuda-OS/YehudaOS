@@ -26,7 +26,6 @@ macro_rules! interrupt_handler {
 
                     // Move the interrupt stack frame struct to `rdi` to send it as a parameter.
                     mov rdi, rsp
-                    swapgs
                     call {}
                     ",
                     sym $handler,
