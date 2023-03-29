@@ -103,6 +103,23 @@ unsafe fn strlen(buffer: *mut u8) -> usize {
     i
 }
 
+/// Returns a user string from a pointer or `None` if the data is invalid.
+///
+/// # Arguments
+/// `process` - The process that owns the data.
+/// `buffer` - The buffer the process has sent.
+unsafe fn get_user_str(process: &scheduler::Process, buffer: *mut u8) -> Option<&str> {
+    let page;
+
+    if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
+        return None;
+    }
+    page =
+        memory::vmm::virtual_to_physical(process.page_table, VirtAddr::new(buffer as u64)).ok()?;
+
+    core::str::from_utf8(core::slice::from_raw_parts(buffer, strlen(buffer))).ok()
+}
+
 pub unsafe fn int_0x80_handler() {
     let mut registers = scheduler::Registers::default();
 
@@ -187,15 +204,8 @@ unsafe fn create_file(path: *mut u8, directory: bool) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
-    if path.is_null() || path as u64 >= memory::HHDM_OFFSET {
-        return -1;
-    }
-    if let Ok(page) = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(path as u64)) {
-        if let Ok(name) = core::str::from_utf8(core::slice::from_raw_parts(path, strlen(path))) {
-            name_str = name;
-        } else {
-            return -1;
-        }
+    if let Some(name) = get_user_str(p, path) {
+        name_str = name;
     } else {
         return -1;
     }
@@ -220,15 +230,8 @@ unsafe fn remove_file(path: *mut u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
-    if path.is_null() || path as u64 >= memory::HHDM_OFFSET {
-        return -1;
-    }
-    if let Ok(page) = memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(path as u64)) {
-        if let Ok(name) = core::str::from_utf8(core::slice::from_raw_parts(path, strlen(path))) {
-            name_str = name;
-        } else {
-            return -1;
-        }
+    if let Some(name) = get_user_str(p, path) {
+        name_str = name;
     } else {
         return -1;
     }
