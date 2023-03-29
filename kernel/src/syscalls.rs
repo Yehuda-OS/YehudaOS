@@ -30,6 +30,7 @@ mod syscall {
     pub const READ: u64 = 0;
     pub const MALLOC: u64 = 0x9;
     pub const FREE: u64 = 0xb;
+    // TODO create_file, delete_file, read, write, ftruncate, read_dir
 }
 
 pub unsafe fn initialize() {
