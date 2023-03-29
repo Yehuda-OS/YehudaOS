@@ -89,6 +89,7 @@ unsafe fn handle_syscall(
         syscall::FREE => free(arg0 as *mut u8),
         syscall::EXIT => exit(arg0 as i32),
         syscall::CREATE_FILE => create_file(arg0 as *mut u8, arg2 > 0) as i64,
+        syscall::REMOVE_FILE => remove_file(arg0 as *mut u8),
         _ => -1,
     }
 }
