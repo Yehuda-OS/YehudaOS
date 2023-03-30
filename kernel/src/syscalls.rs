@@ -104,12 +104,21 @@ unsafe fn strlen(buffer: *mut u8) -> usize {
     i
 }
 
-/// Returns a user string from a pointer or `None` if the data is invalid.
+/// Get a slice borrow from a user buffer.
 ///
 /// # Arguments
-/// `process` - The process that owns the data.
-/// `buffer` - The buffer the process has sent.
-unsafe fn get_user_str(process: &scheduler::Process, buffer: *mut u8) -> Option<&str> {
+/// - `process` - The user process that sent the buffer.
+/// - `buffer` - Pointer to the data.
+/// - `len` - Length of the data.
+///
+/// # Returns
+/// The user's buffer on success or `None` if the buffer is outside the user's memory or isn't
+/// mapped to a physical address.
+unsafe fn get_user_buffer(
+    process: &scheduler::Process,
+    buffer: *mut u8,
+    len: usize,
+) -> Option<&mut [u8]> {
     let page;
 
     if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
@@ -118,7 +127,19 @@ unsafe fn get_user_str(process: &scheduler::Process, buffer: *mut u8) -> Option<
     page =
         memory::vmm::virtual_to_physical(process.page_table, VirtAddr::new(buffer as u64)).ok()?;
 
-    core::str::from_utf8(core::slice::from_raw_parts(buffer, strlen(buffer))).ok()
+    Some(core::slice::from_raw_parts_mut(
+        (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
+        len,
+    ))
+}
+
+/// Returns a user string from a pointer or `None` if the data is invalid.
+///
+/// # Arguments
+/// `process` - The process that owns the data.
+/// `buffer` - The buffer the process has sent.
+unsafe fn get_user_str(process: &scheduler::Process, buffer: *mut u8) -> Option<&str> {
+    core::str::from_utf8(get_user_buffer(process, buffer, strlen(buffer))?).ok()
 }
 
 pub unsafe fn int_0x80_handler() {
@@ -255,25 +276,15 @@ unsafe fn remove_file(path: *mut u8) -> i64 {
 /// 0 if the operation was successful, -1 otherwise.
 unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
-    let buffer;
-    let mut buf;
+    let buf;
 
-    if fd < 0 || user_buffer.is_null() || user_buffer as u64 >= memory::HHDM_OFFSET {
-        return -1;
-    }
-    if let Ok(page) =
-        memory::vmm::virtual_to_physical(p.page_table, VirtAddr::new(user_buffer as u64))
-    {
-        buf = alloc::string::String::from_raw_parts(
-            (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
-            count,
-            count,
-        );
+    if let Some(buffer) = get_user_buffer(p, user_buffer, count) {
+        buf = buffer;
     } else {
         return -1;
     }
 
-    if fd < 3 && fd >= 0 {
+    if fd < RESERVED_FILE_DESCRIPTORS {
         match fd {
             STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as i64,
             STDOUT_DESCRIPTOR => return 0, // STDOUT still not implemented
@@ -282,8 +293,7 @@ unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
         }
     }
 
-    buffer = slice::from_raw_parts_mut(buf.as_mut_ptr(), count);
-    match fread((fd - RESERVED_FILE_DESCRIPTORS) as usize, buffer, 0) {
+    match fread((fd - RESERVED_FILE_DESCRIPTORS) as usize, buf, 0) {
         Some(b) => {
             if is_dir((fd - RESERVED_FILE_DESCRIPTORS) as usize) {
                 return -1;
