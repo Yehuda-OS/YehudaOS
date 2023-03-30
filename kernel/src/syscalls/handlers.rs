@@ -100,23 +100,20 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
         return -1;
     }
 
-    if fd < RESERVED_FILE_DESCRIPTORS {
-        match fd {
-            STDIN_DESCRIPTOR => STDIN.read(buf),
-            STDOUT_DESCRIPTOR => return 0, // STDOUT still not implemented
-            STDERR_DESCRIPTOR => return 0, // STDERR still not implemented
-            _ => 0,
-        };
-    }
-
-    match fs::read(file_id, buf, offset) {
-        Some(b) => {
+    match fd {
+        STDIN_DESCRIPTOR => STDIN.read(buf) as i64,
+        STDOUT_DESCRIPTOR => 0, // STDOUT still not implemented
+        STDERR_DESCRIPTOR => 0, // STDERR still not implemented
+        _ => {
             if fs::is_dir(file_id) {
-                return -1;
+                -1
+            } else {
+                match fs::read(file_id, buf, offset) {
+                    Some(b) => b as i64,
+                    None => -1,
+                }
             }
-            b as i64
         }
-        None => -1,
     }
 }
 
