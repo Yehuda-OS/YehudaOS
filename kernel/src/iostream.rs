@@ -36,6 +36,33 @@ impl Stdin {
         self.inner.lock()
     }
 
+    /// Read bytes from the standard input.
+    ///
+    /// # Arguments
+    /// - `buf` - The buffer to read into.
+    /// A maximum of `buf.len()` bytes will be read.
+    ///
+    /// # Returns
+    /// The amount of bytes read.
+    pub fn read(&self, buf: &mut [u8]) -> usize {
+        let mut source = self.lock();
+        let source_bytes = source.as_bytes();
+
+        for i in 0..buf.len() {
+            // Check if all bytes were read already.
+            if i < source_bytes.len() {
+                buf[i] = source_bytes[i];
+            } else {
+                *source = String::new();
+
+                return i;
+            }
+        }
+        *source = String::from(&source.as_str()[buf.len()..]);
+
+        buf.len()
+    }
+
     /// function that reads line and returns it
     ///
     /// # Returns
