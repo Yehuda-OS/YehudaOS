@@ -83,7 +83,7 @@ unsafe fn handle_syscall(
     arg5: u64,
 ) -> i64 {
     match syscall_number {
-        syscall::READ => read(arg0 as i32, arg2 as *mut u8, arg2 as usize) as i64,
+        syscall::READ => read(arg0 as i32, arg2 as *mut u8, arg2 as usize, arg3 as usize) as i64,
         syscall::EXEC => exec(arg0 as *const i8),
         syscall::MALLOC => malloc(arg0 as usize) as i64,
         syscall::FREE => free(arg0 as *mut u8),
@@ -94,8 +94,16 @@ unsafe fn handle_syscall(
     }
 }
 
+/// Returns the length of a null-terminated string.
+///
+/// # Arguments
+/// - `buffer` - Pointer to the string's data.
+///
+/// # Safety
+/// Might produce a page fault if the string isn't null-terminated or if the buffer points to
+/// unmapped memory.
 unsafe fn strlen(buffer: *mut u8) -> usize {
-    let i = 0;
+    let mut i = 0;
 
     while *buffer.add(i) != 0 {
         i += 1;
@@ -265,16 +273,17 @@ unsafe fn remove_file(path: *mut u8) -> i64 {
     }
 }
 
-/// implementation for `read` syscall
+/// Read bytes from a file descriptor.
 ///
 /// # Arguments
-/// - `fd` - the file descriptor
-/// - `user_buffer` - the buffer to write into
-/// - `count` - the count of bytes to rea
+/// - `fd` - The file descriptor to read from.
+/// - `user_buffer` - The buffer to write into.
+/// - `count` - The number of bytes to read.
+/// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
+unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
 
@@ -286,14 +295,14 @@ unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize) -> i64 {
 
     if fd < RESERVED_FILE_DESCRIPTORS {
         match fd {
-            STDIN_DESCRIPTOR => return STDIN.read_line(&mut buf) as i64,
+            STDIN_DESCRIPTOR => STDIN.read(buf),
             STDOUT_DESCRIPTOR => return 0, // STDOUT still not implemented
             STDERR_DESCRIPTOR => return 0, // STDERR still not implemented
-            _ => {}
-        }
+            _ => 0,
+        };
     }
 
-    match fread((fd - RESERVED_FILE_DESCRIPTORS) as usize, buf, 0) {
+    match fread((fd - RESERVED_FILE_DESCRIPTORS) as usize, buf, offset) {
         Some(b) => {
             if is_dir((fd - RESERVED_FILE_DESCRIPTORS) as usize) {
                 return -1;
