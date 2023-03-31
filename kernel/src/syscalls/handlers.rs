@@ -147,9 +147,31 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     if fd < 0 {
         return -1;
     }
-    // TODO Finish implementing.
 
-    0
+    match fd {
+        STDIN_DESCRIPTOR => -1, // STDIN still not implemented
+        STDOUT_DESCRIPTOR => {
+            if let Ok(string) = core::str::from_utf8(buf) {
+                crate::println!("{}", string);
+
+                0
+            } else {
+                -1
+            }
+        }
+        STDERR_DESCRIPTOR => -1, // STDERR still not implemented
+        _ => {
+            if fs::is_dir(file_id) {
+                -1
+            } else {
+                if fs::write(file_id, buf, offset).is_ok() {
+                    0
+                } else {
+                    -1
+                }
+            }
+        }
+    }
 }
 
 /// Change the length of a file to a specific length.
