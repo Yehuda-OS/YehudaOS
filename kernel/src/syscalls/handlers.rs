@@ -89,6 +89,7 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 /// - `user_buffer` - The buffer to write into.
 /// - `count` - The number of bytes to read.
 /// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
+///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
@@ -99,6 +100,9 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
     if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
         buf = buffer;
     } else {
+        return -1;
+    }
+    if fd < 0 {
         return -1;
     }
 
@@ -140,16 +144,41 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     } else {
         return -1;
     }
+    if fd < 0 {
+        return -1;
+    }
     // TODO Finish implementing.
 
     0
 }
 
+/// Change the length of a file to a specific length.
+/// If the file has been set to a greater length, reading the extra data will return null bytes
+/// until the data is being written.
+/// If the file has been set to a smaller length, the extra data will be lost.
+///
+/// # Arguments
+/// - `fd` - The file descriptor of the file.
+/// - `length` - The required size.
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn ftruncate(fd: i32, length: u64) -> i64 {
     // TODO Implement.
     0
 }
 
+/// Change the length of a file to a specific length.
+/// If the file has been set to a greater length, reading the extra data will return null bytes
+/// until the data is being written.
+/// If the file has been set to a smaller length, the extra data will be lost.
+///
+/// # Arguments
+/// - `path` - Path to the file.
+/// - `length` - The required size.
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
     // TODO Implement.
     0
@@ -187,7 +216,7 @@ pub unsafe fn exec(pathname: *const u8) -> i64 {
     } else {
         return -1;
     }
-    if let Some(id) = fs::get_file_id(file_name, None) {
+    if let Some(id) = fs::get_file_id(file_name, Some(p.cwd())) {
         file_id = id;
     } else {
         return -1;
