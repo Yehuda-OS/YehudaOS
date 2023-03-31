@@ -108,8 +108,8 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 
     match fd {
         STDIN_DESCRIPTOR => STDIN.read(buf) as i64,
-        STDOUT_DESCRIPTOR => 0, // STDOUT still not implemented
-        STDERR_DESCRIPTOR => 0, // STDERR still not implemented
+        STDOUT_DESCRIPTOR => -1, // STDOUT still not implemented
+        STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
             if fs::is_dir(file_id) {
                 -1
