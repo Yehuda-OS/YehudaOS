@@ -182,8 +182,6 @@ pub unsafe fn handler() -> ! {
     // The `syscall` instruction saves the instruction pointer in `rcx` and the cpu flags in `r11`.
     proc.instruction_pointer = proc.registers.rcx;
     proc.flags = proc.registers.r11;
-    memory::load_tables_to_cr3(memory::get_page_table());
-    crate::println!("A syscall occured");
 
     proc.registers.rax = handle_syscall(
         proc.registers.rax,
