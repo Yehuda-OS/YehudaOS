@@ -58,8 +58,8 @@ pub struct DirListEntry {
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct DirEntry {
-    name: [u8; FILE_NAME_LEN],
-    id: usize,
+    pub name: [u8; FILE_NAME_LEN],
+    pub id: usize,
 }
 
 impl fmt::Display for FsError {
