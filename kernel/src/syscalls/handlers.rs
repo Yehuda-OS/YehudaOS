@@ -120,34 +120,28 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 /// function that execute a process
 ///
 /// # Arguments
-/// - `name` - pointer to i8 (the equivalent to c char) and execute the file that have this name
+/// - `pathname` - Path to the file to execute.
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise
-pub unsafe fn exec(name: *const i8) -> i64 {
-    let mut len: usize = 0;
-    while *(name.add(len)) != 0 {
-        len += 1;
-        if len > fs::FILE_NAME_LEN {
-            return -1;
-        }
-    }
+pub unsafe fn exec(pathname: *const u8) -> i64 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let file_name;
+    let file_id;
 
-    let bytes: &[u8] = core::slice::from_raw_parts(name as *mut u8, len);
-    let file_name = if let Ok(v) = core::str::from_utf8(bytes) {
-        v
+    if let Some(name) = super::get_user_str(p, pathname) {
+        file_name = name;
     } else {
         return -1;
-    };
-
-    let id = if let Some(id) = fs::get_file_id(file_name, None) {
-        id
+    }
+    if let Some(id) = fs::get_file_id(file_name, None) {
+        file_id = id;
     } else {
         return -1;
     };
 
     if let Ok(proc) = scheduler::Process::new_user_process(
-        id as u64,
+        file_id as u64,
         scheduler::get_running_process().as_ref().unwrap().cwd(),
     ) {
         scheduler::add_to_the_queue(proc);
