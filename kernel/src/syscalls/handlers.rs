@@ -1,6 +1,6 @@
 use core::{alloc::Layout, ptr::null_mut};
 
-use crate::{iostream::STDIN, memory, scheduler};
+use crate::{iostream::STDIN, scheduler};
 use fs_rs::fs::{self, DirEntry};
 
 pub const EXEC: u64 = 0x3b;
@@ -247,10 +247,30 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 /// # Returns
 /// A pointer to the directory entry.
 pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
-    let file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-    // TODO Implement.
+    let file_id;
+    let buffer = malloc(core::mem::size_of::<DirEntry>()) as *mut DirEntry;
 
-    null_mut()
+    if buffer.is_null() {
+        return null_mut();
+    }
+
+    if fd >= RESERVED_FILE_DESCRIPTORS {
+        file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+        if fs::is_dir(file_id) {
+            null_mut()
+        } else {
+            if let Some(mut entry) = fs::read_dir(file_id, offset) {
+                entry.id += RESERVED_FILE_DESCRIPTORS as usize;
+                *(buffer) = entry;
+
+                buffer
+            } else {
+                null_mut()
+            }
+        }
+    } else {
+        null_mut()
+    }
 }
 
 /// function that execute a process
