@@ -1,7 +1,7 @@
-use core::alloc::Layout;
+use core::{alloc::Layout, ptr::null_mut};
 
 use crate::{iostream::STDIN, memory, scheduler};
-use fs_rs::fs;
+use fs_rs::fs::{self, DirEntry};
 
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
@@ -11,7 +11,9 @@ pub const FREE: u64 = 0xb;
 pub const CREATE_FILE: u64 = 0x2;
 pub const REMOVE_FILE: u64 = 0x57;
 pub const WRITE: u64 = 0x1;
-// TODO ftruncate, read_dir
+pub const TRUNCATE: u64 = 0x4c;
+pub const FTRUNCATE: u64 = 0x4d;
+pub const READ_DIR: u64 = 0x59;
 
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
@@ -141,6 +143,31 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     // TODO Finish implementing.
 
     0
+}
+
+pub unsafe fn ftruncate(fd: i32, length: u64) -> i64 {
+    // TODO Implement.
+    0
+}
+
+pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
+    // TODO Implement.
+    0
+}
+
+/// Read a directory entry.
+///
+/// # Arguments
+/// - `fd` - The file descriptor of the directory.
+/// - `offset` - The offset **in files** inside the dir to read into.
+///
+/// # Returns
+/// A pointer to the directory entry.
+pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
+    let file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    // TODO Implement.
+
+    null_mut()
 }
 
 /// function that execute a process

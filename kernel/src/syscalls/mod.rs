@@ -64,6 +64,9 @@ unsafe fn handle_syscall(
         handlers::EXIT => handlers::exit(arg0 as i32),
         handlers::CREATE_FILE => handlers::create_file(arg0 as *mut u8, arg2 > 0) as i64,
         handlers::REMOVE_FILE => handlers::remove_file(arg0 as *mut u8),
+        handlers::TRUNCATE => handlers::truncate(arg0 as *const u8, arg1),
+        handlers::FTRUNCATE => handlers::ftruncate(arg0 as i32, arg1),
+        handlers::READ_DIR => handlers::readdir(arg0 as i32, arg1 as usize) as i64,
         _ => -1,
     }
 }
