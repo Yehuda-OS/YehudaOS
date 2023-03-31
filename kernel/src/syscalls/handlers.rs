@@ -95,7 +95,7 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
-    let file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    let file_id;
 
     if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
         buf = buffer;
@@ -111,6 +111,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
         STDOUT_DESCRIPTOR => -1, // STDOUT still not implemented
         STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
+            file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
             if fs::is_dir(file_id) {
                 -1
             } else {
@@ -137,7 +138,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
-    let file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    let file_id;
 
     if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
         buf = buffer;
@@ -161,6 +162,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
         }
         STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
+            file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
             if fs::is_dir(file_id) {
                 -1
             } else {
