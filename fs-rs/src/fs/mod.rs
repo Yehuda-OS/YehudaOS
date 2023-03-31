@@ -200,7 +200,7 @@ fn get_inode_address(id: usize) -> usize {
 ///
 /// # Returns
 /// The directory entry that was read or `None` if the directory doesn't exist or the offset is
-/// invalid.
+/// invalid or `file` is not a directory.
 pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
     let mut buffer = DirEntry {
         id: 0,
