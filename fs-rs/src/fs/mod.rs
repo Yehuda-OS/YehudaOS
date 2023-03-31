@@ -196,11 +196,11 @@ fn get_inode_address(id: usize) -> usize {
 ///
 /// # Arguments
 /// - `file` - the file id
-/// - `buffer` - the buffer to read to
 /// - `offset` - The offset **in files** inside the dir to read into.
 ///
 /// # Returns
-/// The amount of bytes read or `None` if the dir does not exist.
+/// The directory entry that was read or `None` if the directory doesn't exist or the offset is
+/// invalid.
 pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
     let mut buffer = DirEntry {
         id: 0,
