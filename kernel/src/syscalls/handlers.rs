@@ -188,8 +188,26 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn ftruncate(fd: i32, length: u64) -> i64 {
-    // TODO Implement.
-    0
+    let file_id;
+
+    if fd < 0 {
+        return -1;
+    }
+
+    if fd >= RESERVED_FILE_DESCRIPTORS {
+        file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+        if fs::is_dir(file_id) {
+            -1
+        } else {
+            if fs::set_len(fd as usize, length as usize).is_ok() {
+                0
+            } else {
+                -1
+            }
+        }
+    } else {
+        -1
+    }
 }
 
 /// Change the length of a file to a specific length.
@@ -204,8 +222,20 @@ pub unsafe fn ftruncate(fd: i32, length: u64) -> i64 {
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
-    // TODO Implement.
-    0
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let path_str;
+
+    if let Some(string) = super::get_user_str(p, path) {
+        path_str = string;
+    } else {
+        return -1;
+    }
+
+    if let Some(file) = fs::get_file_id(path_str, Some(p.cwd())) {
+        ftruncate(file as i32 + RESERVED_FILE_DESCRIPTORS, length)
+    } else {
+        -1
+    }
 }
 
 /// Read a directory entry.
