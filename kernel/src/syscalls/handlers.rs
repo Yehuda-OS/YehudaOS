@@ -304,9 +304,7 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
-        memory::load_tables_to_cr3(allocator.get_page_table());
         allocation = allocator.global_alloc(layout);
-        memory::load_tables_to_cr3(memory::PAGE_TABLE);
     }
 
     allocation
