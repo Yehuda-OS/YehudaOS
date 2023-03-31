@@ -5,12 +5,13 @@ use fs_rs::fs;
 
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
-pub const READ: u64 = 0;
+pub const READ: u64 = 0x0;
 pub const MALLOC: u64 = 0x9;
 pub const FREE: u64 = 0xb;
 pub const CREATE_FILE: u64 = 0x2;
 pub const REMOVE_FILE: u64 = 0x57;
-// TODO read, write, ftruncate, read_dir
+pub const WRITE: u64 = 0x1;
+// TODO ftruncate, read_dir
 
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
@@ -86,7 +87,6 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 /// - `user_buffer` - The buffer to write into.
 /// - `count` - The number of bytes to read.
 /// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
-///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
@@ -115,6 +115,32 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
             }
         }
     }
+}
+
+/// Write bytes to a file descriptor.
+///
+/// # Arguments
+/// - `fd` - The file descriptor to write to.
+/// - `user_buffer` - A buffer containing the data to be written.
+/// - `offset` - The offset where the data will be written in the file
+/// this is ignored for `stdout`.
+/// If the offset is at the end of the file or the data after it is written overflows the file's
+/// length the file will be extended.
+/// If the offset is beyond the file's size the file will be extended and a "hole" will be
+/// created in the file. Reading from the hole will return null bytes.
+pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let buf;
+    let file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+
+    if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
+        buf = buffer;
+    } else {
+        return -1;
+    }
+    // TODO Finish implementing.
+
+    0
 }
 
 /// function that execute a process
