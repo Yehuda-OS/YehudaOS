@@ -73,7 +73,7 @@ unsafe fn handle_syscall(
 /// # Safety
 /// Might produce a page fault if the string isn't null-terminated or if the buffer points to
 /// unmapped memory.
-unsafe fn strlen(buffer: *mut u8) -> usize {
+unsafe fn strlen(buffer: *const u8) -> usize {
     let mut i = 0;
 
     while *buffer.add(i) != 0 {
@@ -95,7 +95,7 @@ unsafe fn strlen(buffer: *mut u8) -> usize {
 /// mapped to a physical address.
 unsafe fn get_user_buffer(
     process: &scheduler::Process,
-    buffer: *mut u8,
+    buffer: *const u8,
     len: usize,
 ) -> Option<&mut [u8]> {
     let page;
@@ -117,7 +117,7 @@ unsafe fn get_user_buffer(
 /// # Arguments
 /// `process` - The process that owns the data.
 /// `buffer` - The buffer the process has sent.
-unsafe fn get_user_str(process: &scheduler::Process, buffer: *mut u8) -> Option<&str> {
+unsafe fn get_user_str(process: &scheduler::Process, buffer: *const u8) -> Option<&str> {
     core::str::from_utf8(get_user_buffer(process, buffer, strlen(buffer))?).ok()
 }
 
