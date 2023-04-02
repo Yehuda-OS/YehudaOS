@@ -62,7 +62,7 @@ unsafe fn handle_syscall(
         handlers::MALLOC => handlers::malloc(arg0 as usize) as i64,
         handlers::FREE => handlers::free(arg0 as *mut u8),
         handlers::EXIT => handlers::exit(arg0 as i32),
-        handlers::CREATE_FILE => handlers::create_file(arg0 as *mut u8, arg2 > 0) as i64,
+        handlers::CREAT => handlers::creat(arg0 as *mut u8, arg2 > 0) as i64,
         handlers::REMOVE_FILE => handlers::remove_file(arg0 as *mut u8),
         handlers::TRUNCATE => handlers::truncate(arg0 as *const u8, arg1),
         handlers::FTRUNCATE => handlers::ftruncate(arg0 as i32, arg1),

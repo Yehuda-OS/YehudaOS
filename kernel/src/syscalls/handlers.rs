@@ -8,7 +8,7 @@ pub const EXIT: u64 = 0x3c;
 pub const READ: u64 = 0x0;
 pub const MALLOC: u64 = 0x9;
 pub const FREE: u64 = 0xb;
-pub const CREATE_FILE: u64 = 0x2;
+pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
 pub const WRITE: u64 = 0x1;
 pub const TRUNCATE: u64 = 0x4c;
@@ -31,7 +31,7 @@ const ALIGNMENT: usize = 16;
 ///
 /// # Returns
 /// The file descriptor of the new file if the operation was successful, -1 otherwise.
-pub unsafe fn create_file(path: *mut u8, directory: bool) -> i32 {
+pub unsafe fn creat(path: *mut u8, directory: bool) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
