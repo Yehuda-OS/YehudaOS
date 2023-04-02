@@ -504,12 +504,16 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
 ///
 /// # Returns
 /// `true` if the inode is directory and `false` if not
-pub fn is_dir(id: usize) -> bool {
-    if let Some(inode) = read_inode(id) {
-        inode.is_dir()
-    } else {
-        false
-    }
+pub fn is_dir(id: usize) -> Option<bool> {
+    Some(read_inode(id)?.is_dir())
+}
+
+/// Returns a file's size or `None` if the file was not found.
+///
+/// # Arguments
+/// - `id` - The id of the file.
+pub fn get_file_size(id: usize) -> Option<usize> {
+    Some(read_inode(id)?.size())
 }
 
 /// Initialize the file system.
