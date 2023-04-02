@@ -14,6 +14,7 @@ pub const WRITE: u64 = 0x1;
 pub const TRUNCATE: u64 = 0x4c;
 pub const FTRUNCATE: u64 = 0x4d;
 pub const READ_DIR: u64 = 0x59;
+// TODO get file size, is dir, open
 
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
@@ -246,6 +247,8 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 ///
 /// # Returns
 /// A pointer to the directory entry.
+/// The directory entry contains the file's name and the file's id that can be used as a file
+/// descriptor.
 pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
     let file_id;
     let buffer = malloc(core::mem::size_of::<DirEntry>()) as *mut DirEntry;
