@@ -3,18 +3,19 @@ use core::{alloc::Layout, ptr::null_mut};
 use crate::{iostream::STDIN, scheduler};
 use fs_rs::fs::{self, DirEntry};
 
+pub const READ: u64 = 0x0;
+pub const WRITE: u64 = 0x1;
+pub const OPEN: u64 = 0x2;
+pub const STAT: u64 = 0x4;
+pub const MALLOC: u64 = 0x9;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
-pub const READ: u64 = 0x0;
-pub const MALLOC: u64 = 0x9;
 pub const FREE: u64 = 0xb;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
-pub const WRITE: u64 = 0x1;
+pub const READ_DIR: u64 = 0x59;
 pub const TRUNCATE: u64 = 0x4c;
 pub const FTRUNCATE: u64 = 0x4d;
-pub const READ_DIR: u64 = 0x59;
-// TODO get file size, is dir, open
 
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
