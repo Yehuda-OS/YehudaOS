@@ -119,7 +119,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
         STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
             file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-            if fs::is_dir(file_id) {
+            if fs::is_dir(file_id).unwrap_or(true) {
                 -1
             } else {
                 match fs::read(file_id, buf, offset) {
@@ -173,7 +173,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
         STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
             file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-            if fs::is_dir(file_id) {
+            if fs::is_dir(file_id).unwrap_or(true) {
                 -1
             } else {
                 if fs::write(file_id, buf, offset).is_ok() {
@@ -256,7 +256,7 @@ pub unsafe fn ftruncate(fd: i32, length: u64) -> i64 {
 
     if fd >= RESERVED_FILE_DESCRIPTORS {
         file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-        if fs::is_dir(file_id) {
+        if fs::is_dir(file_id).unwrap_or(true) {
             -1
         } else {
             if fs::set_len(fd as usize, length as usize).is_ok() {
@@ -318,7 +318,7 @@ pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
 
     if fd >= RESERVED_FILE_DESCRIPTORS {
         file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-        if fs::is_dir(file_id) {
+        if fs::is_dir(file_id).unwrap_or(true) {
             null_mut()
         } else {
             if let Some(mut entry) = fs::read_dir(file_id, offset) {
