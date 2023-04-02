@@ -104,19 +104,25 @@ unsafe fn get_user_buffer(
     process: &scheduler::Process,
     buffer: *const u8,
     len: usize,
-) -> Option<&mut [u8]> {
-    let page;
-
+) -> Option<&[u8]> {
     if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
-        return None;
+        None
+    } else {
+        Some(core::slice::from_raw_parts(buffer, len))
     }
-    page =
-        memory::vmm::virtual_to_physical(process.page_table, VirtAddr::new(buffer as u64)).ok()?;
+}
 
-    Some(core::slice::from_raw_parts_mut(
-        (page + memory::HHDM_OFFSET).as_u64() as *mut u8,
-        len,
-    ))
+/// Mutable version of `get_user_buffer`.
+unsafe fn get_user_buffer_mut(
+    process: &scheduler::Process,
+    buffer: *mut u8,
+    len: usize,
+) -> Option<&mut [u8]> {
+    if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
+        None
+    } else {
+        Some(core::slice::from_raw_parts_mut(buffer, len))
+    }
 }
 
 /// Returns a user string from a pointer or `None` if the data is invalid.
