@@ -181,6 +181,30 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     }
 }
 
+/// Get a file descriptor for a file.
+///
+/// # Arguments
+/// - `pathname` - Path to the file.
+///
+/// # Returns
+/// The file descriptor for the file on success or -1 otherwise.
+pub unsafe fn open(pathname: *const u8) -> i32 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
+    let path_str;
+
+    if let Some(path) = super::get_user_str(p, pathname) {
+        path_str = path;
+    } else {
+        return -1;
+    }
+
+    if let Some(id) = fs::get_file_id(path_str, Some(p.cwd())) {
+        id as i32 + RESERVED_FILE_DESCRIPTORS
+    } else {
+        -1
+    }
+}
+
 /// Change the length of a file to a specific length.
 /// If the file has been set to a greater length, reading the extra data will return null bytes
 /// until the data is being written.
