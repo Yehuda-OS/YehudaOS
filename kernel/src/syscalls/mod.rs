@@ -126,8 +126,8 @@ unsafe fn get_user_buffer_mut(buffer: *mut u8, len: usize) -> Option<&'static mu
 /// # Arguments
 /// `process` - The process that owns the data.
 /// `buffer` - The buffer the process has sent.
-unsafe fn get_user_str(process: &scheduler::Process, buffer: *const u8) -> Option<&str> {
-    core::str::from_utf8(get_user_buffer(process, buffer, strlen(buffer))?).ok()
+unsafe fn get_user_str(buffer: *const u8) -> Option<&'static str> {
+    core::str::from_utf8(get_user_buffer(buffer, strlen(buffer))?).ok()
 }
 
 pub unsafe fn int_0x80_handler() {
