@@ -23,6 +23,7 @@ const STDERR_DESCRIPTOR: i32 = 2;
 const RESERVED_FILE_DESCRIPTORS: i32 = 3;
 const ALIGNMENT: usize = 16;
 
+#[allow(unused)]
 pub struct Stat {
     size: u64,
     directory: bool,
@@ -100,7 +101,6 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
-    let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
     let file_id;
 
@@ -146,7 +146,6 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
-    let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
     let file_id;
 

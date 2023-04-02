@@ -3,7 +3,6 @@ use super::scheduler;
 use crate::memory;
 use core::arch::asm;
 use core::u8;
-use x86_64::VirtAddr;
 
 mod handlers;
 
@@ -48,8 +47,8 @@ unsafe fn handle_syscall(
     arg1: u64,
     arg2: u64,
     arg3: u64,
-    arg4: u64,
-    arg5: u64,
+    _arg4: u64,
+    _arg5: u64,
 ) -> i64 {
     match syscall_number {
         handlers::READ => {
@@ -64,6 +63,7 @@ unsafe fn handle_syscall(
         handlers::EXIT => handlers::exit(arg0 as i32),
         handlers::CREAT => handlers::creat(arg0 as *mut u8, arg2 > 0) as i64,
         handlers::OPEN => handlers::open(arg0 as *const u8) as i64,
+        handlers::FSTAT => handlers::fstat(arg0 as i32, arg1 as *mut handlers::Stat),
         handlers::REMOVE_FILE => handlers::remove_file(arg0 as *mut u8),
         handlers::TRUNCATE => handlers::truncate(arg0 as *const u8, arg1),
         handlers::FTRUNCATE => handlers::ftruncate(arg0 as i32, arg1),
