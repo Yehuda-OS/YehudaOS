@@ -6,7 +6,7 @@ use fs_rs::fs::{self, DirEntry};
 pub const READ: u64 = 0x0;
 pub const WRITE: u64 = 0x1;
 pub const OPEN: u64 = 0x2;
-pub const STAT: u64 = 0x4;
+pub const FSTAT: u64 = 0x5;
 pub const MALLOC: u64 = 0x9;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
@@ -22,6 +22,11 @@ const STDOUT_DESCRIPTOR: i32 = 1;
 const STDERR_DESCRIPTOR: i32 = 2;
 const RESERVED_FILE_DESCRIPTORS: i32 = 3;
 const ALIGNMENT: usize = 16;
+
+pub struct Stat {
+    size: u64,
+    directory: bool,
+}
 
 /// Create a file in the file system.
 ///
@@ -200,6 +205,32 @@ pub unsafe fn open(pathname: *const u8) -> i32 {
 
     if let Some(id) = fs::get_file_id(path_str, Some(p.cwd())) {
         id as i32 + RESERVED_FILE_DESCRIPTORS
+    } else {
+        -1
+    }
+}
+
+/// Get information about a file.
+///
+/// # Arguments
+/// - `fd` - The file descriptor of that file.
+/// - `statbuf` - A buffer to the `Stat` struct that will contain the information about the file.
+///
+/// # Returns
+/// 0 if the file exists and -1 if it doesn't or if `fd` is negative.
+pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
+    if fd < 0 {
+        return -1;
+    }
+
+    if let Some(size) = fs::get_file_size(fd as usize) {
+        *statbuf = Stat {
+            size: size as u64,
+            // UNWRAP: We already checked that the file exists.
+            directory: fs::is_dir(fd as usize).unwrap(),
+        };
+
+        0
     } else {
         -1
     }
