@@ -99,7 +99,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
     let buf;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer_mut(p, user_buffer, count) {
+    if let Some(buffer) = super::get_user_buffer_mut(user_buffer, count) {
         buf = buffer;
     } else {
         return -1;
@@ -145,7 +145,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     let buf;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
+    if let Some(buffer) = super::get_user_buffer(user_buffer, count) {
         buf = buffer;
     } else {
         return -1;

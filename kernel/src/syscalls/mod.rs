@@ -100,11 +100,11 @@ unsafe fn strlen(buffer: *const u8) -> usize {
 /// # Returns
 /// The user's buffer on success or `None` if the buffer is outside the user's memory or isn't
 /// mapped to a physical address.
-unsafe fn get_user_buffer(
-    process: &scheduler::Process,
-    buffer: *const u8,
-    len: usize,
-) -> Option<&[u8]> {
+///
+/// # Safety
+/// Assumes the process' page tables are loaded and may trigger a page fault if the buffer is
+/// invalid.
+unsafe fn get_user_buffer(buffer: *const u8, len: usize) -> Option<&'static [u8]> {
     if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
         None
     } else {
@@ -113,11 +113,7 @@ unsafe fn get_user_buffer(
 }
 
 /// Mutable version of `get_user_buffer`.
-unsafe fn get_user_buffer_mut(
-    process: &scheduler::Process,
-    buffer: *mut u8,
-    len: usize,
-) -> Option<&mut [u8]> {
+unsafe fn get_user_buffer_mut(buffer: *mut u8, len: usize) -> Option<&'static mut [u8]> {
     if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
         None
     } else {
