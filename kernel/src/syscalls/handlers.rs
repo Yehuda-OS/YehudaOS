@@ -137,6 +137,9 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 /// length the file will be extended.
 /// If the offset is beyond the file's size the file will be extended and a "hole" will be
 /// created in the file. Reading from the hole will return null bytes.
+///
+/// # Returns
+/// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
