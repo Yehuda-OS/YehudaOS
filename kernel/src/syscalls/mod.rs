@@ -131,19 +131,19 @@ unsafe fn get_user_str(buffer: *const u8) -> Option<&'static str> {
 }
 
 pub unsafe fn int_0x80_handler() {
-    let mut registers = scheduler::Registers::default();
+    let proc = scheduler::get_running_process().as_mut().unwrap();
 
-    registers.rax = handle_syscall(
-        registers.rax,
-        registers.rdi,
-        registers.rsi,
-        registers.rdx,
-        registers.r10,
-        registers.r8,
-        registers.r9,
+    proc.registers.rax = handle_syscall(
+        proc.registers.rax,
+        proc.registers.rdi,
+        proc.registers.rsi,
+        proc.registers.rdx,
+        proc.registers.r10,
+        proc.registers.r8,
+        proc.registers.r9,
     ) as u64;
 
-    loop {}
+    scheduler::load_from_queue();
 }
 
 /// Saves all the registers of the process, restores `rsp` and then calls the handler.
