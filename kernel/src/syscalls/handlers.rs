@@ -11,6 +11,7 @@ pub const MALLOC: u64 = 0x9;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
 pub const FREE: u64 = 0xb;
+pub const FCHDIR: u64 = 0x51;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
 pub const READ_DIR: u64 = 0x59;
@@ -27,6 +28,31 @@ const ALIGNMENT: usize = 16;
 pub struct Stat {
     size: u64,
     directory: bool,
+}
+
+/// Change the current working directory.
+///
+/// # Arguments
+/// - `fd` - File descriptor to the new working directory.
+///
+/// # Returns
+/// 0 if the operation was successful or -1 if `fd` does not exist or if `fd` is not a directory.
+pub unsafe fn fchdir(fd: i32) -> i64 {
+    let p = scheduler::get_running_process().as_mut().unwrap();
+    let file_id;
+
+    if fd < RESERVED_FILE_DESCRIPTORS {
+        return -1;
+    }
+    file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+
+    if fs::is_dir(file_id).unwrap_or(false) {
+        p.set_cwd(file_id);
+
+        0
+    } else {
+        -1
+    }
 }
 
 /// Create a file in the file system.
