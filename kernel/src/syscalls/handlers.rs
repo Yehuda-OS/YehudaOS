@@ -42,7 +42,7 @@ pub unsafe fn creat(path: *mut u8, directory: bool) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
-    if let Some(name) = super::get_user_str(path) {
+    if let Some(name) = super::get_user_str(p, path) {
         name_str = name;
     } else {
         return -1;
@@ -77,7 +77,7 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
-    if let Some(name) = super::get_user_str(path) {
+    if let Some(name) = super::get_user_str(p, path) {
         name_str = name;
     } else {
         return -1;
@@ -101,10 +101,11 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer_mut(user_buffer, count) {
+    if let Some(buffer) = super::get_user_buffer_mut(p, user_buffer, count) {
         buf = buffer;
     } else {
         return -1;
@@ -146,10 +147,11 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
+    let p = scheduler::get_running_process().as_ref().unwrap();
     let buf;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer(user_buffer, count) {
+    if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
         buf = buffer;
     } else {
         return -1;
@@ -196,7 +198,7 @@ pub unsafe fn open(pathname: *const u8) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let path_str;
 
-    if let Some(path) = super::get_user_str(pathname) {
+    if let Some(path) = super::get_user_str(p, pathname) {
         path_str = path;
     } else {
         return -1;
@@ -284,7 +286,7 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let path_str;
 
-    if let Some(string) = super::get_user_str(path) {
+    if let Some(string) = super::get_user_str(p, path) {
         path_str = string;
     } else {
         return -1;
@@ -346,7 +348,7 @@ pub unsafe fn exec(pathname: *const u8) -> i64 {
     let file_name;
     let file_id;
 
-    if let Some(name) = super::get_user_str(pathname) {
+    if let Some(name) = super::get_user_str(p, pathname) {
         file_name = name;
     } else {
         return -1;

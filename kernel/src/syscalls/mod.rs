@@ -1,3 +1,5 @@
+use x86_64::VirtAddr;
+
 use super::io;
 use super::scheduler;
 use crate::memory;
@@ -102,23 +104,39 @@ unsafe fn strlen(buffer: *const u8) -> usize {
 /// mapped to a physical address.
 ///
 /// # Safety
-/// Assumes the process' page tables are loaded and may trigger a page fault if the buffer is
-/// invalid.
-unsafe fn get_user_buffer(buffer: *const u8, len: usize) -> Option<&'static [u8]> {
+/// Assumes the buffer is valid and actually of length `len`.
+unsafe fn get_user_buffer(
+    process: &scheduler::Process,
+    buffer: *const u8,
+    len: usize,
+) -> Option<&[u8]> {
+    let page;
+
     if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
         None
     } else {
-        Some(core::slice::from_raw_parts(buffer, len))
+        page = memory::vmm::virtual_to_physical(process.page_table, VirtAddr::new(buffer as u64))
+            .ok()?;
+
+        Some(core::slice::from_raw_parts(
+            (page + memory::HHDM_OFFSET).as_u64() as *const u8,
+            len,
+        ))
     }
 }
 
 /// Mutable version of `get_user_buffer`.
-unsafe fn get_user_buffer_mut(buffer: *mut u8, len: usize) -> Option<&'static mut [u8]> {
-    if buffer.is_null() || buffer as u64 >= memory::HHDM_OFFSET {
-        None
-    } else {
-        Some(core::slice::from_raw_parts_mut(buffer, len))
-    }
+unsafe fn get_user_buffer_mut(
+    process: &scheduler::Process,
+    buffer: *mut u8,
+    len: usize,
+) -> Option<&mut [u8]> {
+    let buf = get_user_buffer(process, buffer, len)?;
+
+    Some(core::slice::from_raw_parts_mut(
+        buf.as_ptr() as *mut u8,
+        buf.len(),
+    ))
 }
 
 /// Returns a user string from a pointer or `None` if the data is invalid.
@@ -126,8 +144,8 @@ unsafe fn get_user_buffer_mut(buffer: *mut u8, len: usize) -> Option<&'static mu
 /// # Arguments
 /// `process` - The process that owns the data.
 /// `buffer` - The buffer the process has sent.
-unsafe fn get_user_str(buffer: *const u8) -> Option<&'static str> {
-    core::str::from_utf8(get_user_buffer(buffer, strlen(buffer))?).ok()
+unsafe fn get_user_str(process: &scheduler::Process, buffer: *const u8) -> Option<&str> {
+    core::str::from_utf8(get_user_buffer(process, buffer, strlen(buffer))?).ok()
 }
 
 pub unsafe fn int_0x80_handler() {
