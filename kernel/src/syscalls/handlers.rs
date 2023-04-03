@@ -1,6 +1,6 @@
 use core::{alloc::Layout, ptr::null_mut};
 
-use crate::{iostream::STDIN, scheduler};
+use crate::{iostream::STDIN, memory, scheduler};
 use fs_rs::fs::{self, DirEntry};
 
 pub const READ: u64 = 0x0;
@@ -164,6 +164,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
         STDIN_DESCRIPTOR => -1, // STDIN still not implemented
         STDOUT_DESCRIPTOR => {
             if let Ok(string) = core::str::from_utf8(buf) {
+                memory::load_tables_to_cr3(memory::get_page_table());
                 crate::println!("{}", string);
 
                 0
