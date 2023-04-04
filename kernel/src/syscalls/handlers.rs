@@ -375,6 +375,7 @@ pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
 /// 0 if the operation was successful, -1 otherwise
 pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
+    let args = super::get_args(argv);
     let file_name;
     let file_id;
 

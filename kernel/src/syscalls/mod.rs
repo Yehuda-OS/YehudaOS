@@ -93,6 +93,16 @@ unsafe fn strlen(buffer: *const u8) -> usize {
     i
 }
 
+unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
+    let mut len = 0;
+
+    while !(*argv).is_null() {
+        len += 1;
+    }
+
+    core::slice::from_raw_parts(argv, len)
+}
+
 /// Get a slice borrow from a user buffer.
 ///
 /// # Arguments
