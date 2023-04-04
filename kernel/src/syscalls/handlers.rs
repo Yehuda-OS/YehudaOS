@@ -363,14 +363,17 @@ pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
     }
 }
 
-/// function that execute a process
+/// Create a new process.
 ///
 /// # Arguments
 /// - `pathname` - Path to the file to execute.
+/// - `argv` - An array of commandline arguments.
+/// The first argument must be the filename to execute and the array must be terminated by a null
+/// pointer.
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise
-pub unsafe fn exec(pathname: *const u8) -> i64 {
+pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let file_name;
     let file_id;
