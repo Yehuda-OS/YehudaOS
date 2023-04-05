@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::{alloc::Layout, mem::size_of};
 
 use super::{Process, SchedulerError};
 use crate::memory;
@@ -194,25 +194,41 @@ unsafe fn alloc(p: &super::Process, size: usize) -> Option<*mut u8> {
     }
 }
 
-fn write_args(p: &super::Process, argv: &Vec<&str>) -> Result<(), SchedulerError> {
+/// Write the commandline arguments to the process' heap.
+///
+/// # Arguments
+/// - `p` - The process.
+/// - `argv` - The arguments.
+///
+/// # Returns
+/// A pointer to the `argv` array in the process' heap or an `OutOfMemory` error if the allocation
+/// fails.
+fn write_args(p: &super::Process, argv: &Vec<&str>) -> Result<*const *const u8, SchedulerError> {
     let cr3 = Cr3::read().0.start_address();
+    let pointers_arr;
+    let mut allocation;
 
     // SAFETY: The higher half should be the same for every page table.
-    unsafe { memory::load_tables_to_cr3(p.page_table) }
-    for arg in argv {
-        // SAFETY: We loaded the process' page tables
-        if let Some(allocation) = unsafe { alloc(p, arg.len()) } {
-            // SAFETY: `arg` is an str so it should be checked from before, and `allocation` was
-            // returned from our allocator so it should be valid.
-            unsafe { core::ptr::copy(arg.as_ptr(), allocation, arg.len()) }
-        } else {
-            return Err(SchedulerError::OutOfMemory);
+    unsafe {
+        memory::load_tables_to_cr3(p.page_table);
+        pointers_arr = alloc(p, argv.len() * size_of::<u64>()).ok_or(SchedulerError::OutOfMemory)?
+            as *mut *const u8;
+    }
+    for (i, arg) in argv.iter().enumerate() {
+        // SAFETY: We loaded the process' page table and `arg` is an str so it should be
+        // checked from before, and `allocation` was returned from
+        // our allocator so it should be valid.
+        unsafe {
+            allocation = alloc(p, arg.len()).ok_or(SchedulerError::OutOfMemory)?;
+
+            core::ptr::copy(arg.as_ptr(), allocation, arg.len());
+            *pointers_arr.add(i) = allocation;
         }
     }
     // SAFETY: Load back the old page tables.
     unsafe { memory::load_tables_to_cr3(cr3) }
 
-    Ok(())
+    Ok(pointers_arr)
 }
 
 impl super::Process {
