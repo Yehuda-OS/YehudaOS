@@ -253,7 +253,7 @@ impl super::Process {
         let header = get_header(file_id);
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let page_table = super::create_page_table().ok_or(SchedulerError::OutOfMemory)?;
-        let p = Process {
+        let mut p = Process {
             registers: super::Registers::default(),
             stack_pointer: PROCESS_STACK_POINTER,
             page_table,
@@ -267,6 +267,9 @@ impl super::Process {
                 page_table,
             )),
         };
+
+        p.registers.rdi = argv.len() as u64;
+        p.registers.rsi = write_args(&p, argv)? as u64;
 
         for entry in &get_program_table(file_id, &header) {
             if entry.p_type == PT_LOAD {
