@@ -1,6 +1,11 @@
 use core::{alloc::Layout, ptr::null_mut};
 
-use crate::{iostream::STDIN, memory, scheduler};
+use crate::{
+    iostream::STDIN,
+    memory::{self, allocator},
+    scheduler,
+};
+use alloc::vec::Vec;
 use fs_rs::fs::{self, DirEntry};
 
 pub const READ: u64 = 0x0;
@@ -22,7 +27,6 @@ const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
 const STDERR_DESCRIPTOR: i32 = 2;
 const RESERVED_FILE_DESCRIPTORS: i32 = 3;
-const ALIGNMENT: usize = 16;
 
 #[allow(unused)]
 pub struct Stat {
@@ -414,7 +418,7 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
         .as_mut()
         .unwrap()
         .allocator();
-    let layout = Layout::from_size_align(size, ALIGNMENT);
+    let layout = Layout::from_size_align(size, allocator::DEFAULT_ALIGNMENT);
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
