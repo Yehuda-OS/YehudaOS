@@ -1,8 +1,12 @@
+use core::alloc::Layout;
+
 use super::{Process, SchedulerError};
 use crate::memory;
 use crate::memory::allocator;
+use alloc::vec::Vec;
 use fs_rs::fs;
 use x86_64::{
+    registers::control::Cr3,
     structures::paging::{PageSize, PageTableFlags, Size4KiB},
     VirtAddr,
 };
@@ -161,6 +165,32 @@ unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
         }
 
         to_write -= Size4KiB::SIZE;
+    }
+}
+
+/// Allocate memory in a process' heap.
+///
+/// # Arguments
+/// - `p` - The process.
+/// - `size` - The allocation size.
+///
+/// # Safety
+/// Assumes the process' page tables are loaded.
+///
+/// # Returns
+/// Returnes the allocation or `None` if the allocation failed.
+unsafe fn alloc(p: &super::Process, size: usize) -> Option<*mut u8> {
+    let layout = Layout::from_size_align(size, allocator::DEFAULT_ALIGNMENT);
+    let mut allocation = core::ptr::null_mut();
+
+    if let Ok(layout) = layout {
+        allocation = p.allocator.global_alloc(layout);
+    }
+
+    if allocation.is_null() {
+        None
+    } else {
+        Some(allocation)
     }
 }
 
