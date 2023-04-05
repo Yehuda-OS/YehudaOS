@@ -199,6 +199,8 @@ impl super::Process {
     ///
     /// # Arguments
     /// - `file_id` - The ELF file to load.
+    /// - `cwd` - The current working directory for the new process.
+    /// - `argv` - The commandline arguments for the process.
     ///
     /// # Returns
     /// The function returns a newly created `Process` struct or an `OutOfMemory` error.
@@ -206,7 +208,11 @@ impl super::Process {
     /// # Safety
     /// This function is unsafe because it assumes that `file_id` points to a valid
     /// ELF file.
-    pub unsafe fn new_user_process(file_id: u64, cwd: usize) -> Result<Self, SchedulerError> {
+    pub unsafe fn new_user_process(
+        file_id: u64,
+        cwd: usize,
+        argv: &Vec<&str>,
+    ) -> Result<Self, SchedulerError> {
         let header = get_header(file_id);
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let page_table = super::create_page_table().ok_or(SchedulerError::OutOfMemory)?;

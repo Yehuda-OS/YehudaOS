@@ -380,6 +380,7 @@ pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
 pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let args = super::get_args(argv);
+    let mut args_str = Vec::new();
     let file_name;
     let file_id;
 
@@ -394,9 +395,17 @@ pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
         return -1;
     };
 
+    for arg in args {
+        if let Some(arg) = super::get_user_str(p, *arg) {
+            args_str.push(arg);
+        } else {
+            return -1;
+        }
+    }
     if let Ok(proc) = scheduler::Process::new_user_process(
         file_id as u64,
         scheduler::get_running_process().as_ref().unwrap().cwd(),
+        &args_str,
     ) {
         scheduler::add_to_the_queue(proc);
     } else {
