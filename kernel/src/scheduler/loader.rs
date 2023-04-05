@@ -194,6 +194,27 @@ unsafe fn alloc(p: &super::Process, size: usize) -> Option<*mut u8> {
     }
 }
 
+fn write_args(p: &super::Process, argv: &Vec<&str>) -> Result<(), SchedulerError> {
+    let cr3 = Cr3::read().0.start_address();
+
+    // SAFETY: The higher half should be the same for every page table.
+    unsafe { memory::load_tables_to_cr3(p.page_table) }
+    for arg in argv {
+        // SAFETY: We loaded the process' page tables
+        if let Some(allocation) = unsafe { alloc(p, arg.len()) } {
+            // SAFETY: `arg` is an str so it should be checked from before, and `allocation` was
+            // returned from our allocator so it should be valid.
+            unsafe { core::ptr::copy(arg.as_ptr(), allocation, arg.len()) }
+        } else {
+            return Err(SchedulerError::OutOfMemory);
+        }
+    }
+    // SAFETY: Load back the old page tables.
+    unsafe { memory::load_tables_to_cr3(cr3) }
+
+    Ok(())
+}
+
 impl super::Process {
     /// Load a process' virtual address space.
     ///
