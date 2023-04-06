@@ -3,4 +3,5 @@
 *.iso
 target/
 limine/
+# fleet configuration files
 .fleet/
