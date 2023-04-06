@@ -4,7 +4,7 @@ use crate::memory::allocator;
 use fs_rs::fs;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, Size4KiB},
-    PhysAddr, VirtAddr,
+    VirtAddr,
 };
 
 /// Unsigned program address
@@ -190,7 +190,7 @@ impl super::Process {
             stack_start: VirtAddr::new(PROCESS_STACK_POINTER),
             cwd,
             allocator: allocator::Locked::new(allocator::Allocator::new(
-                allocator::HEAP_START,
+                allocator::USER_HEAP_START,
                 page_table,
             )),
         };
