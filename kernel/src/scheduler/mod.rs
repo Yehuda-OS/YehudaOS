@@ -260,11 +260,12 @@ pub unsafe fn load_context(p: &Process) -> ! {
 
     memory::load_tables_to_cr3(p.page_table);
     // Write the address of the process to later use it in the syscall handler.
+    asm!("swapgs");
     io::wrmsr(syscalls::KERNEL_GS_BASE, p_address);
+    asm!("swapgs");
     // Move the user data segment selector to the segment registers and push
     // the future `ss`, `rsp`, `rflags`, `cs` and `rip` that will later be popped by `iretq`.
     asm!("
-    swapgs
     mov ds, {0:x}
     mov es, {0:x}
     mov fs, {0:x}

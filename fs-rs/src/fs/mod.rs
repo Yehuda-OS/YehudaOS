@@ -58,8 +58,8 @@ pub struct DirListEntry {
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct DirEntry {
-    name: [u8; FILE_NAME_LEN],
-    id: usize,
+    pub name: [u8; FILE_NAME_LEN],
+    pub id: usize,
 }
 
 impl fmt::Display for FsError {
@@ -196,11 +196,11 @@ fn get_inode_address(id: usize) -> usize {
 ///
 /// # Arguments
 /// - `file` - the file id
-/// - `buffer` - the buffer to read to
 /// - `offset` - The offset **in files** inside the dir to read into.
 ///
 /// # Returns
-/// The amount of bytes read or `None` if the dir does not exist.
+/// The directory entry that was read or `None` if the directory doesn't exist or the offset is
+/// invalid or `file` is not a directory.
 pub unsafe fn read_dir(file: usize, offset: usize) -> Option<DirEntry> {
     let mut buffer = DirEntry {
         id: 0,
@@ -504,12 +504,16 @@ fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
 ///
 /// # Returns
 /// `true` if the inode is directory and `false` if not
-pub fn is_dir(id: usize) -> bool {
-    if let Some(inode) = read_inode(id) {
-        inode.is_dir()
-    } else {
-        false
-    }
+pub fn is_dir(id: usize) -> Option<bool> {
+    Some(read_inode(id)?.is_dir())
+}
+
+/// Returns a file's size or `None` if the file was not found.
+///
+/// # Arguments
+/// - `id` - The id of the file.
+pub fn get_file_size(id: usize) -> Option<usize> {
+    Some(read_inode(id)?.size())
 }
 
 /// Initialize the file system.

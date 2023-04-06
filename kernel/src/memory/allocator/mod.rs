@@ -12,13 +12,14 @@ use x86_64::{
 
 mod heap_block;
 
-pub const HEAP_START: u64 = 0x_4444_4444_0000;
+const KERNEL_HEAP_START: u64 = 0xffff_faaa_0000_0000;
+pub const USER_HEAP_START: u64 = 0x4444_4444_0000;
 
 const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
 #[global_allocator]
 pub static mut ALLOCATOR: Locked<Allocator> =
-    Locked::<Allocator>::new(Allocator::new(HEAP_START, PhysAddr::zero()));
+    Locked::<Allocator>::new(Allocator::new(KERNEL_HEAP_START, PhysAddr::zero()));
 
 pub struct Allocator {
     heap_start: u64,
