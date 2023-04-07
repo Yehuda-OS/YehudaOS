@@ -30,7 +30,6 @@ pub unsafe fn initialize() {
     io::wrmsr(FMASK, !0);
     // Write the kernel's stack to the gs register.
     io::wrmsr(KERNEL_GS_BASE, &KERNEL_STACK as *const _ as u64);
-    asm!("swapgs");
 }
 
 /// Handle the syscall (Perform the action that the process has requested).
