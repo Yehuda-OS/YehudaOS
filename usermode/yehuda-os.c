@@ -130,10 +130,8 @@ void exit(int status)
 {
     syscall(EXIT, (size_t)status, 0, 0, 0, 0, 0);
     // `syscall` will never return when the `EXIT` code is passed.
-    // Therefore we put this while loop to suppress any warnings.
-    while (1)
-    {
-    }
+    // Therefore we tell the compiler that any code after it is unreachable.
+    __builtin_unreachable();
 }
 
 /**
