@@ -24,7 +24,7 @@ int write(int fd, const void* buf, size_t count, size_t offset);
 
 int open(const char* pathname);
 
-int fstat(int fd, Stat* statbuf);
+int fstat(int fd, struct Stat* statbuf);
 
 void* malloc(size_t size);
 
@@ -40,7 +40,7 @@ int creat(const char* path, bool_t directory);
 
 int remove_file(const char* path);
 
-int readdir(int fd, size_t offset, DirEntry* dirp);
+int readdir(int fd, size_t offset, struct DirEntry* dirp);
 
 int truncate(const char* path, size_t length);
 
