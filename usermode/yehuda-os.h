@@ -2,6 +2,8 @@
 #define TRUE 1
 #define FALSE 0
 #define FILE_NAME_LEN 11
+#define stdin 0
+#define stdout 1
 
 typedef unsigned long size_t;
 typedef unsigned char bool_t;
