@@ -82,13 +82,17 @@ pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
     }
 }
 
+/// Terminate the process.
+///
+/// # Arguments
+/// - `status` - The exit code of the process.
 pub unsafe fn exit(_status: i32) -> i64 {
     crate::scheduler::terminator::add_to_queue(core::ptr::read(
         scheduler::get_running_process().as_mut().unwrap(),
     ));
     core::ptr::write(scheduler::get_running_process(), None);
 
-    return 0;
+    0
 }
 
 /// Remove a file from the file system, or remove a directory that must be empty.
@@ -163,7 +167,7 @@ pub unsafe fn read(fd: i32, buf: *mut u8, count: usize, offset: usize) -> i64 {
 /// # Arguments
 /// - `fd` - The file descriptor to write to.
 /// - `buf` - A buffer containing the data to be written.
-/// - `offset` - The offset where the data will be written in the file
+/// - `offset` - The offset where the data will be written in the file,
 /// this is ignored for `stdout`.
 /// If the offset is at the end of the file or the data after it is written overflows the file's
 /// length the file will be extended.
@@ -330,7 +334,7 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 ///
 /// # Arguments
 /// - `fd` - The file descriptor of the directory.
-/// - `offset` - The offset **in files** inside the dir to read into.
+/// - `offset` - The offset **in files** inside the directory to read from.
 /// - `dirp` - A buffer to write the data into.
 ///
 /// # Returns
@@ -359,13 +363,13 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
     }
 }
 
-/// function that execute a process
+/// Execute a program in a new process.
 ///
 /// # Arguments
-/// - `pathname` - Path to the file to execute.
+/// - `pathname` - Path to the file to execute, must be a valid ELF file.
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise
+/// 0 if the operation was successful, -1 otherwise.
 pub unsafe fn exec(pathname: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let file_name;
