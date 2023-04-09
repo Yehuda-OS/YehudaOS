@@ -8,9 +8,9 @@ pub const WRITE: u64 = 0x1;
 pub const OPEN: u64 = 0x2;
 pub const FSTAT: u64 = 0x5;
 pub const MALLOC: u64 = 0x9;
+pub const FREE: u64 = 0xb;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
-pub const FREE: u64 = 0xb;
 pub const FCHDIR: u64 = 0x51;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
@@ -64,7 +64,7 @@ pub unsafe fn fchdir(fd: i32) -> i64 {
 ///
 /// # Returns
 /// The file descriptor of the new file if the operation was successful, -1 otherwise.
-pub unsafe fn creat(path: *mut u8, directory: bool) -> i32 {
+pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
