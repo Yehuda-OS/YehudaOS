@@ -5,7 +5,7 @@ use super::scheduler;
 use crate::memory;
 use core::arch::asm;
 use core::u8;
-use std::fs::DirEntry;
+use fs_rs::fs::DirEntry;
 
 mod handlers;
 

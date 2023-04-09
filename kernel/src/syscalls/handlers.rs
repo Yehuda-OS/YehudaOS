@@ -1,4 +1,4 @@
-use core::{alloc::Layout, ptr::null_mut};
+use core::alloc::Layout;
 
 use crate::{iostream::STDIN, memory, scheduler};
 use fs_rs::fs::{self, DirEntry};
