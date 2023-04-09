@@ -331,35 +331,31 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 /// # Arguments
 /// - `fd` - The file descriptor of the directory.
 /// - `offset` - The offset **in files** inside the dir to read into.
+/// - `dirp` - A buffer to write the data into.
 ///
 /// # Returns
 /// A pointer to the directory entry.
 /// The directory entry contains the file's name and the file's id that can be used as a file
 /// descriptor.
-pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
+pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
     let file_id;
-    let buffer = malloc(core::mem::size_of::<DirEntry>()) as *mut DirEntry;
-
-    if buffer.is_null() {
-        return null_mut();
-    }
 
     if fd >= RESERVED_FILE_DESCRIPTORS {
         file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
         if fs::is_dir(file_id).unwrap_or(true) {
-            null_mut()
+            -1
         } else {
             if let Some(mut entry) = fs::read_dir(file_id, offset) {
                 entry.id += RESERVED_FILE_DESCRIPTORS as usize;
-                *(buffer) = entry;
+                *(dirp) = entry;
 
-                buffer
+                0
             } else {
-                null_mut()
+                -1
             }
         }
     } else {
-        null_mut()
+        -1
     }
 }
 

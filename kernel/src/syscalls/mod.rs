@@ -5,6 +5,7 @@ use super::scheduler;
 use crate::memory;
 use core::arch::asm;
 use core::u8;
+use std::fs::DirEntry;
 
 mod handlers;
 
@@ -70,7 +71,7 @@ unsafe fn handle_syscall(
         handlers::REMOVE_FILE => handlers::remove_file(arg0 as *mut u8),
         handlers::TRUNCATE => handlers::truncate(arg0 as *const u8, arg1),
         handlers::FTRUNCATE => handlers::ftruncate(arg0 as i32, arg1),
-        handlers::READ_DIR => handlers::readdir(arg0 as i32, arg1 as usize) as i64,
+        handlers::READ_DIR => handlers::readdir(arg0 as i32, arg1 as usize, arg2 as *mut DirEntry),
         _ => -1,
     }
 }
