@@ -120,19 +120,19 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 ///
 /// # Arguments
 /// - `fd` - The file descriptor to read from.
-/// - `user_buffer` - The buffer to write into.
+/// - `buf` - The buffer to write into.
 /// - `count` - The number of bytes to read.
 /// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
+pub unsafe fn read(fd: i32, buf: *mut u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
-    let buf;
+    let buffer;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer_mut(p, user_buffer, count) {
-        buf = buffer;
+    if let Some(buf) = super::get_user_buffer_mut(p, buf, count) {
+        buffer = buf;
     } else {
         return -1;
     }
@@ -141,7 +141,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
     }
 
     match fd {
-        STDIN_DESCRIPTOR => STDIN.read(buf) as i64,
+        STDIN_DESCRIPTOR => STDIN.read(buffer) as i64,
         STDOUT_DESCRIPTOR => -1, // STDOUT still not implemented
         STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
@@ -149,7 +149,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
             if fs::is_dir(file_id).unwrap_or(true) {
                 -1
             } else {
-                match fs::read(file_id, buf, offset) {
+                match fs::read(file_id, buffer, offset) {
                     Some(b) => b as i64,
                     None => -1,
                 }
@@ -162,7 +162,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 ///
 /// # Arguments
 /// - `fd` - The file descriptor to write to.
-/// - `user_buffer` - A buffer containing the data to be written.
+/// - `buf` - A buffer containing the data to be written.
 /// - `offset` - The offset where the data will be written in the file
 /// this is ignored for `stdout`.
 /// If the offset is at the end of the file or the data after it is written overflows the file's
@@ -172,13 +172,13 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
+pub unsafe fn write(fd: i32, buf: *const u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
-    let buf;
+    let buffer;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
-        buf = buffer;
+    if let Some(buf) = super::get_user_buffer(p, buf, count) {
+        buffer = buf;
     } else {
         return -1;
     }
@@ -189,7 +189,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     match fd {
         STDIN_DESCRIPTOR => -1, // STDIN still not implemented
         STDOUT_DESCRIPTOR => {
-            if let Ok(string) = core::str::from_utf8(buf) {
+            if let Ok(string) = core::str::from_utf8(buffer) {
                 memory::load_tables_to_cr3(memory::get_page_table());
                 crate::println!("{}", string);
 
@@ -204,7 +204,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
             if fs::is_dir(file_id).unwrap_or(true) {
                 -1
             } else {
-                if fs::write(file_id, buf, offset).is_ok() {
+                if fs::write(file_id, buffer, offset).is_ok() {
                     0
                 } else {
                     -1
