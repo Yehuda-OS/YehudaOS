@@ -269,8 +269,29 @@ pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
     }
 }
 
-pub unsafe fn waitpid(pid: u64, wstatus: *mut i32) -> i64 {
-    0
+/// Awaits the calling process for a specific process.
+///
+/// # Arguments
+/// - `pid` - The process ID of the process to wait for.
+/// Must be a positive number.
+/// - `wstatus` - A buffer to write the process' exit code into.
+pub unsafe fn waitpid(pid: i64, wstatus: *mut i32) -> i64 {
+    let p;
+
+    if pid < 0 {
+        return -1;
+    }
+
+    // Write to `wstatus` to avoid any errors with it later.
+    *wstatus = 0;
+    if scheduler::search_process(pid) {
+        p = core::mem::replace(scheduler::get_running_process(), None).unwrap();
+        scheduler::WAITING_QUEUE.insert(pid, (p, wstatus));
+
+        0
+    } else {
+        -1
+    }
 }
 
 /// Change the length of a file to a specific length.
