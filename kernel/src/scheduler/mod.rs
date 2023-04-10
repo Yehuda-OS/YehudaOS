@@ -1,7 +1,6 @@
 use super::memory;
 use crate::memory::allocator::{Allocator, Locked};
 use crate::mutex::Mutex;
-use crate::queue::Queue;
 use crate::{io, syscalls};
 use alloc::collections::{BTreeMap, LinkedList};
 use core::arch::asm;
