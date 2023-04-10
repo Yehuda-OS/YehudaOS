@@ -102,7 +102,7 @@ impl super::Process {
             stack_pointer: stack,
             instruction_pointer: function as u64,
             flags: super::INTERRUPT_FLAG_ON,
-            pid: super::allocate_pid(),
+            pid: -1,
             kernel_task: true,
             stack_start: VirtAddr::new(stack),
             cwd: 0,
