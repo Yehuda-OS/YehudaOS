@@ -7,6 +7,7 @@ pub const READ: u64 = 0x0;
 pub const WRITE: u64 = 0x1;
 pub const OPEN: u64 = 0x2;
 pub const FSTAT: u64 = 0x5;
+pub const WAITPID: u64 = 0x7;
 pub const MALLOC: u64 = 0x9;
 pub const FREE: u64 = 0xb;
 pub const EXEC: u64 = 0x3b;
@@ -266,6 +267,10 @@ pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
     } else {
         -1
     }
+}
+
+pub unsafe fn waitpid(pid: u64, wstatus: *mut i32) -> i64 {
+    0
 }
 
 /// Change the length of a file to a specific length.
