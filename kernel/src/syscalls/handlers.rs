@@ -87,11 +87,14 @@ pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
 ///
 /// # Arguments
 /// - `status` - The exit code of the process.
-pub unsafe fn exit(_status: i32) -> i64 {
-    crate::scheduler::terminator::add_to_queue(core::ptr::read(
-        scheduler::get_running_process().as_mut().unwrap(),
-    ));
-    core::ptr::write(scheduler::get_running_process(), None);
+pub unsafe fn exit(status: i32) -> i64 {
+    let p = core::mem::replace(scheduler::get_running_process(), None).unwrap();
+
+    if let Some(parent) = scheduler::WAITING_QUEUE.remove(&p.pid()) {
+        scheduler::add_to_the_queue(parent.0);
+        *parent.1 = status;
+    }
+    scheduler::terminator::add_to_queue(p);
 
     0
 }
