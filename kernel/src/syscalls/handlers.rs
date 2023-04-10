@@ -394,7 +394,7 @@ pub unsafe fn exec(pathname: *const u8) -> i64 {
         new_pid = proc.pid();
         scheduler::add_to_the_queue(proc);
 
-        new_pid as i64
+        new_pid
     } else {
         -1
     }

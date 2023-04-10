@@ -104,7 +104,7 @@ pub struct Process {
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
-    pid: u64,
+    pid: i64,
     stack_start: VirtAddr,
     cwd: usize,
     kernel_task: bool,
@@ -153,7 +153,7 @@ impl Process {
         self.stack_start
     }
 
-    pub const fn pid(&self) -> u64 {
+    pub const fn pid(&self) -> i64 {
         self.pid
     }
 
@@ -163,9 +163,9 @@ impl Process {
 }
 
 /// Returns a new process ID.
-/// Assumes that no more than 2 ^ 64 processes will ever be created.
-fn allocate_pid() -> u64 {
-    static PID_COUNTER: Mutex<u64> = Mutex::new(0);
+/// Assumes that no more than 2 ^ 63 processes will ever be created.
+fn allocate_pid() -> i64 {
+    static PID_COUNTER: Mutex<i64> = Mutex::new(0);
     let mut counter = PID_COUNTER.lock();
     let pid = *counter;
 
