@@ -272,12 +272,15 @@ pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
     }
 }
 
-/// Awaits the calling process for a specific process.
+/// Awaits the calling process until a specific process terminates.
 ///
 /// # Arguments
 /// - `pid` - The process ID of the process to wait for.
-/// Must be a positive number.
+/// Must be a non-negative number.
 /// - `wstatus` - A buffer to write the process' exit code into.
+///
+/// # Returns
+/// 0 on sucess or -1 if the process does not exist or `pid` is negative.
 pub unsafe fn waitpid(pid: i64, wstatus: *mut i32) -> i64 {
     let p;
 

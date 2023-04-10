@@ -6,6 +6,7 @@
 #define stdout 1
 
 typedef unsigned long size_t;
+typedef long pid_t;
 typedef unsigned char bool_t;
 
 struct Stat
@@ -47,3 +48,5 @@ int readdir(int fd, size_t offset, struct DirEntry* dirp);
 int truncate(const char* path, size_t length);
 
 int ftruncate(int fd, size_t length);
+
+int waitpid(pid_t pid, int* wstatus);

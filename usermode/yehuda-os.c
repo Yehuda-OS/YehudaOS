@@ -4,6 +4,7 @@ const size_t READ        = 0x0;
 const size_t WRITE       = 0x1;
 const size_t OPEN        = 0x2;
 const size_t FSTAT       = 0x5;
+const size_t WAITPID     = 0x7;
 const size_t MALLOC      = 0x9;
 const size_t FREE        = 0xb;
 const size_t EXEC        = 0x3b;
@@ -85,6 +86,20 @@ int open(const char* pathname)
 int fstat(int fd, struct Stat* statbuf)
 {
     return syscall(FSTAT, fd, (size_t)statbuf, 0, 0, 0, 0);
+}
+
+/**
+ * Awaits the calling process until a specific process terminates.
+ *
+ * `pid`: The process ID of the process to wait for.
+ *        Must be a non-negative number.
+ * `wstatus`: A buffer to write the process' exit code into.
+ *
+ * returns: 0 on sucess or -1 if the process does not exist or `pid` is negative.
+ */
+int waitpid(pid_t pid, int* wstatus)
+{
+    return syscall(WAITPID, pid, (size_t)wstatus, 0, 0, 0, 0);
 }
 
 /**
