@@ -1,5 +1,6 @@
 use super::memory;
 use crate::memory::allocator::{Allocator, Locked};
+use crate::mutex::Mutex;
 use crate::queue::Queue;
 use crate::{io, syscalls};
 use core::arch::asm;
@@ -103,6 +104,7 @@ pub struct Process {
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
+    pid: u64,
     stack_start: VirtAddr,
     cwd: usize,
     kernel_task: bool,
@@ -151,9 +153,25 @@ impl Process {
         self.stack_start
     }
 
+    pub const fn pid(&self) -> u64 {
+        self.pid
+    }
+
     pub const fn allocator(&self) -> &Locked<Allocator> {
         &self.allocator
     }
+}
+
+/// Returns a new process ID.
+/// Assumes that no more than 2 ^ 64 processes will ever be created.
+fn allocate_pid() -> u64 {
+    static PID_COUNTER: Mutex<u64> = Mutex::new(0);
+    let mut counter = PID_COUNTER.lock();
+    let pid = *counter;
+
+    *counter += 1;
+
+    pid
 }
 
 /// Get the `rsp0` field from the TSS.
