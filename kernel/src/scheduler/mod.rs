@@ -3,7 +3,7 @@ use crate::memory::allocator::{Allocator, Locked};
 use crate::mutex::Mutex;
 use crate::queue::Queue;
 use crate::{io, syscalls};
-use alloc::collections::LinkedList;
+use alloc::collections::{BTreeMap, LinkedList};
 use core::arch::asm;
 use core::fmt;
 use x86_64::{
@@ -27,6 +27,7 @@ static mut CURR_PROC: Option<Process> = None;
 static mut LOW_PRIORITY: LinkedList<Process> = LinkedList::new();
 static mut HIGH_PRIORITY: LinkedList<Process> = LinkedList::new();
 static mut HIGH_PRIORITY_VALUE: u8 = HIGH_PRIORITY_RELOAD;
+pub static mut WAITING_QUEUE: BTreeMap<i64, (Process, *mut i32)> = BTreeMap::new();
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -202,10 +203,15 @@ pub unsafe fn search_process(pid: i64) -> bool {
     let queues = [&mut LOW_PRIORITY, &mut HIGH_PRIORITY];
 
     for queue in queues {
-        for (i, element) in queue.iter().enumerate() {
+        for element in queue {
             if element.pid() == pid {
                 return true;
             }
+        }
+    }
+    for element in WAITING_QUEUE.values() {
+        if element.0.pid() == pid {
+            return true;
         }
     }
 
