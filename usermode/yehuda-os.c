@@ -114,7 +114,7 @@ void free(void* ptr)
  *
  * `pathname`: Path to the file to execute, must be a valid ELF file.
  *
- * returns: 0 if the operation was successful, -1 otherwise.
+ * returns: The process ID of the new process if the operation was successful, -1 otherwise.
  */
 int exec(const char* pathname)
 {

@@ -369,11 +369,12 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
 /// - `pathname` - Path to the file to execute, must be a valid ELF file.
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise.
+/// The process ID of the new process if the operation was successful, -1 otherwise.
 pub unsafe fn exec(pathname: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let file_name;
     let file_id;
+    let new_pid;
 
     if let Some(name) = super::get_user_str(p, pathname) {
         file_name = name;
@@ -390,12 +391,13 @@ pub unsafe fn exec(pathname: *const u8) -> i64 {
         file_id as u64,
         scheduler::get_running_process().as_ref().unwrap().cwd(),
     ) {
+        new_pid = proc.pid();
         scheduler::add_to_the_queue(proc);
-    } else {
-        return -1;
-    };
 
-    0
+        new_pid as i64
+    } else {
+        -1
+    }
 }
 
 /// Allocate memory for a userspace program.
