@@ -194,22 +194,22 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
 /// - `pid` - The process ID of the process to search.
 ///
 /// # Returns
-/// The process or `None` if it does not exist.
+/// `true` if the process was found and `false` if it wasn't.
 ///
 /// # Safety
 /// Should not be used in a multi-threaded situation.
-pub unsafe fn search_process(pid: i64) -> Option<Process> {
+pub unsafe fn search_process(pid: i64) -> bool {
     let queues = [&mut LOW_PRIORITY, &mut HIGH_PRIORITY];
 
     for queue in queues {
         for (i, element) in queue.iter().enumerate() {
             if element.pid() == pid {
-                return Some(queue.remove(i));
+                return true;
             }
         }
     }
 
-    None
+    false
 }
 
 /// function that push process into the process queue
