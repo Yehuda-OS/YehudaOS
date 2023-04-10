@@ -188,6 +188,30 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
     &mut CURR_PROC
 }
 
+/// Searches for a process in the different queues.
+///
+/// # Arguments
+/// - `pid` - The process ID of the process to search.
+///
+/// # Returns
+/// The process or `None` if it does not exist.
+///
+/// # Safety
+/// Should not be used in a multi-threaded situation.
+pub unsafe fn search_process(pid: i64) -> Option<Process> {
+    let queues = [&mut LOW_PRIORITY, &mut HIGH_PRIORITY];
+
+    for queue in queues {
+        for (i, element) in queue.iter().enumerate() {
+            if element.pid() == pid {
+                return Some(queue.remove(i));
+            }
+        }
+    }
+
+    None
+}
+
 /// function that push process into the process queue
 ///
 /// # Arguments

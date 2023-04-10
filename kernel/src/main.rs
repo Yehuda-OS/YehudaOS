@@ -6,6 +6,7 @@
 #![feature(const_mut_refs)]
 #![feature(naked_functions)]
 #![feature(asm_sym)]
+#![feature(linked_list_remove)]
 
 extern crate alloc;
 
