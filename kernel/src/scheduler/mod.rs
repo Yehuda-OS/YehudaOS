@@ -3,6 +3,7 @@ use crate::memory::allocator::{Allocator, Locked};
 use crate::mutex::Mutex;
 use crate::queue::Queue;
 use crate::{io, syscalls};
+use alloc::collections::LinkedList;
 use core::arch::asm;
 use core::fmt;
 use x86_64::{
@@ -23,8 +24,8 @@ const INTERRUPT_FLAG_ON: u64 = 0x200;
 const HIGH_PRIORITY_RELOAD: u8 = 2;
 
 static mut CURR_PROC: Option<Process> = None;
-static mut LOW_PRIORITY: Queue<Process> = Queue::new();
-static mut HIGH_PRIORITY: Queue<Process> = Queue::new();
+static mut LOW_PRIORITY: LinkedList<Process> = LinkedList::new();
+static mut HIGH_PRIORITY: LinkedList<Process> = LinkedList::new();
 static mut HIGH_PRIORITY_VALUE: u8 = HIGH_PRIORITY_RELOAD;
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
@@ -195,9 +196,9 @@ pub fn add_to_the_queue(p: Process) {
     // SAFETY: The shceduler should not be referenced in a multithreaded situation.
     unsafe {
         if p.kernel_task {
-            HIGH_PRIORITY.enqueue(p);
+            HIGH_PRIORITY.push_back(p);
         } else {
-            LOW_PRIORITY.enqueue(p);
+            LOW_PRIORITY.push_back(p);
         }
     }
 }
@@ -230,11 +231,11 @@ pub unsafe fn load_from_queue() -> ! {
             HIGH_PRIORITY_VALUE -= 1;
         }
 
-        HIGH_PRIORITY.dequeue().unwrap()
+        HIGH_PRIORITY.pop_front().unwrap()
     } else {
         HIGH_PRIORITY_VALUE = HIGH_PRIORITY_RELOAD;
 
-        LOW_PRIORITY.dequeue().unwrap()
+        LOW_PRIORITY.pop_front().unwrap()
     };
 
     if let Some(process) = &CURR_PROC {
