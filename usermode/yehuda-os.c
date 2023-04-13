@@ -95,7 +95,11 @@ int fstat(int fd, struct Stat* statbuf)
  *        Must be a non-negative number.
  * `wstatus`: A buffer to write the process' exit code into.
  *
- * returns: 0 on sucess or -1 if the process does not exist or `pid` is negative.
+ * returns: 0 on sucess or -1 on error.
+ *          Possible errors:
+ *          - `pid` is negative.
+ *          - The process specified by `pid` does not exist.
+ *          - The process specified by `pid` has already finished its execution.
  */
 int waitpid(pid_t pid, int* wstatus)
 {
@@ -137,7 +141,7 @@ int exec(const char* pathname)
 }
 
 /**
- * Terminate the process.
+ * Terminate the calling process.
  *
  * `status`: The exit code of the process.
  */

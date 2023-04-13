@@ -87,7 +87,7 @@ pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
     }
 }
 
-/// Terminate the process.
+/// Terminate the calling process.
 ///
 /// # Arguments
 /// - `status` - The exit code of the process.
@@ -284,7 +284,11 @@ pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
 /// - `wstatus` - A buffer to write the process' exit code into.
 ///
 /// # Returns
-/// 0 on sucess or -1 if the process does not exist or `pid` is negative.
+/// 0 on sucess or -1 on error.
+/// Possible errors:
+/// - `pid` is negative.
+/// - The process specified by `pid` does not exist.
+/// - The process specified by `pid` has already finished its execution.
 pub unsafe fn waitpid(pid: i64, wstatus: *mut i32) -> i64 {
     let p;
 
