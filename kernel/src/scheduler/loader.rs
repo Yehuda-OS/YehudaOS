@@ -1,8 +1,12 @@
+use core::{alloc::Layout, mem::size_of};
+
 use super::{Process, SchedulerError};
 use crate::memory;
 use crate::memory::allocator;
+use alloc::vec::Vec;
 use fs_rs::fs;
 use x86_64::{
+    registers::control::Cr3,
     structures::paging::{PageSize, PageTableFlags, Size4KiB},
     VirtAddr,
 };
@@ -164,11 +168,76 @@ unsafe fn write_segment(file_id: u64, p: &Process, segment: &ElfPhdr) {
     }
 }
 
+/// Allocate memory in a process' heap.
+///
+/// # Arguments
+/// - `p` - The process.
+/// - `size` - The allocation size.
+///
+/// # Safety
+/// Assumes the process' page tables are loaded.
+///
+/// # Returns
+/// Returnes the allocation or `None` if the allocation failed.
+unsafe fn alloc(p: &super::Process, size: usize) -> Option<*mut u8> {
+    let layout = Layout::from_size_align(size, allocator::DEFAULT_ALIGNMENT);
+    let mut allocation = core::ptr::null_mut();
+
+    if let Ok(layout) = layout {
+        allocation = p.allocator.global_alloc(layout);
+    }
+
+    if allocation.is_null() {
+        None
+    } else {
+        Some(allocation)
+    }
+}
+
+/// Write the commandline arguments to the process' heap.
+///
+/// # Arguments
+/// - `p` - The process.
+/// - `argv` - The arguments.
+///
+/// # Returns
+/// A pointer to the `argv` array in the process' heap or an `OutOfMemory` error if the allocation
+/// fails.
+fn write_args(p: &super::Process, argv: &Vec<&str>) -> Result<*const *const u8, SchedulerError> {
+    let cr3 = Cr3::read().0.start_address();
+    let pointers_arr;
+    let mut allocation;
+
+    // SAFETY: The higher half should be the same for every page table.
+    unsafe {
+        memory::load_tables_to_cr3(p.page_table);
+        pointers_arr = alloc(p, argv.len() * size_of::<u64>()).ok_or(SchedulerError::OutOfMemory)?
+            as *mut *const u8;
+    }
+    for (i, arg) in argv.iter().enumerate() {
+        // SAFETY: We loaded the process' page table and `arg` is an str so it should be
+        // checked from before, and `allocation` was returned from
+        // our allocator so it should be valid.
+        unsafe {
+            allocation = alloc(p, arg.len()).ok_or(SchedulerError::OutOfMemory)?;
+
+            core::ptr::copy(arg.as_ptr(), allocation, arg.len());
+            *pointers_arr.add(i) = allocation;
+        }
+    }
+    // SAFETY: Load back the old page tables.
+    unsafe { memory::load_tables_to_cr3(cr3) }
+
+    Ok(pointers_arr)
+}
+
 impl super::Process {
     /// Load a process' virtual address space.
     ///
     /// # Arguments
     /// - `file_id` - The ELF file to load.
+    /// - `cwd` - The current working directory for the new process.
+    /// - `argv` - The commandline arguments for the process.
     ///
     /// # Returns
     /// The function returns a newly created `Process` struct or an `OutOfMemory` error.
@@ -176,11 +245,15 @@ impl super::Process {
     /// # Safety
     /// This function is unsafe because it assumes that `file_id` points to a valid
     /// ELF file.
-    pub unsafe fn new_user_process(file_id: u64, cwd: usize) -> Result<Self, SchedulerError> {
+    pub unsafe fn new_user_process(
+        file_id: u64,
+        cwd: usize,
+        argv: &Vec<&str>,
+    ) -> Result<Self, SchedulerError> {
         let header = get_header(file_id);
         let stack_page = memory::page_allocator::allocate().ok_or(SchedulerError::OutOfMemory)?;
         let page_table = super::create_page_table().ok_or(SchedulerError::OutOfMemory)?;
-        let p = Process {
+        let mut p = Process {
             registers: super::Registers::default(),
             stack_pointer: PROCESS_STACK_POINTER,
             page_table,
@@ -194,6 +267,9 @@ impl super::Process {
                 page_table,
             )),
         };
+
+        p.registers.rdi = argv.len() as u64;
+        p.registers.rsi = write_args(&p, argv)? as u64;
 
         for entry in &get_program_table(file_id, &header) {
             if entry.p_type == PT_LOAD {

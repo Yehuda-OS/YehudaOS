@@ -9,7 +9,6 @@
 
 extern crate alloc;
 
-use alloc::string::ToString;
 use fs_rs::fs;
 
 mod gdt;

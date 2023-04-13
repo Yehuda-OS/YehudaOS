@@ -14,6 +14,7 @@ mod heap_block;
 
 const KERNEL_HEAP_START: u64 = 0xffff_faaa_0000_0000;
 pub const USER_HEAP_START: u64 = 0x4444_4444_0000;
+pub const DEFAULT_ALIGNMENT: usize = 16;
 
 const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 

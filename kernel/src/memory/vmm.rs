@@ -1,7 +1,6 @@
 use core::fmt;
 
 use x86_64::{
-    registers,
     structures::paging::{
         page_table::PageTableEntry, PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB,
         Size4KiB,
