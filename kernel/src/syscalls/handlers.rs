@@ -94,10 +94,7 @@ pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
 pub unsafe fn exit(status: i32) -> i64 {
     let p = core::mem::replace(scheduler::get_running_process(), None).unwrap();
 
-    if let Some(parent) = scheduler::WAITING_QUEUE.remove(&p.pid()) {
-        scheduler::add_to_the_queue(parent.0);
-        *parent.1 = status;
-    }
+    scheduler::stop_waiting_for(&p, status);
     scheduler::terminator::add_to_queue(p);
 
     0
@@ -300,7 +297,7 @@ pub unsafe fn waitpid(pid: i64, wstatus: *mut i32) -> i64 {
     *wstatus = 0;
     if scheduler::search_process(pid) {
         p = core::mem::replace(scheduler::get_running_process(), None).unwrap();
-        scheduler::WAITING_QUEUE.insert(pid, (p, wstatus));
+        scheduler::wait_for(pid, p, wstatus);
 
         0
     } else {

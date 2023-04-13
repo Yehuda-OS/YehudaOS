@@ -26,7 +26,7 @@ static mut CURR_PROC: Option<Process> = None;
 static mut LOW_PRIORITY: LinkedList<Process> = LinkedList::new();
 static mut HIGH_PRIORITY: LinkedList<Process> = LinkedList::new();
 static mut HIGH_PRIORITY_VALUE: u8 = HIGH_PRIORITY_RELOAD;
-pub static mut WAITING_QUEUE: BTreeMap<i64, (Process, *mut i32)> = BTreeMap::new();
+static mut WAITING_QUEUE: BTreeMap<i64, (Process, *mut i32)> = BTreeMap::new();
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -215,6 +215,38 @@ pub unsafe fn search_process(pid: i64) -> bool {
     }
 
     false
+}
+
+/// Add a process to the waiting processes.
+/// The waiting processes are processes who are waiting for a child process to terminate.
+/// A process will not continue its execution as long as it is in the waiting processes.
+///
+/// # Arguments
+/// - `pid` - The process ID of the process to wait for.
+/// The function assumes the process exist.
+/// - `parent` - The process who's waiting.
+/// - `wstatus` - A buffer for the future child process' exit code.
+///
+/// # Safety
+/// - `wstatus` must be valid for writes.
+/// - Should not be used in a multi-threaded situation.
+pub unsafe fn wait_for(pid: i64, parent: Process, wstatus: *mut i32) {
+    WAITING_QUEUE.insert(pid, (parent, wstatus));
+}
+
+/// Notify a waiting parent of the termination of its child, if it exists.
+///
+/// # Arguments
+/// - `p` - The child process that has finished.
+/// - `status` - The exit code of the child process.
+///
+/// # Safety
+/// Should not be used in a multi-threaded situation.
+pub unsafe fn stop_waiting_for(p: &Process, status: i32) {
+    if let Some(parent) = WAITING_QUEUE.remove(&p.pid()) {
+        add_to_the_queue(parent.0);
+        *parent.1 = status;
+    }
 }
 
 /// function that push process into the process queue
