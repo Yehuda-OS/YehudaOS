@@ -1,6 +1,11 @@
 use core::alloc::Layout;
 
-use crate::{iostream::STDIN, memory, scheduler};
+use crate::{
+    iostream::STDIN,
+    memory::{self, allocator},
+    scheduler,
+};
+use alloc::vec::Vec;
 use fs_rs::fs::{self, DirEntry};
 
 pub const READ: u64 = 0x0;
@@ -23,7 +28,6 @@ const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;
 const STDERR_DESCRIPTOR: i32 = 2;
 const RESERVED_FILE_DESCRIPTORS: i32 = 3;
-const ALIGNMENT: usize = 16;
 
 #[allow(unused)]
 pub struct Stat {
@@ -402,8 +406,10 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
 ///
 /// # Returns
 /// The process ID of the new process if the operation was successful, -1 otherwise.
-pub unsafe fn exec(pathname: *const u8) -> i64 {
+pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
+    let args = super::get_args(argv);
+    let mut args_str = Vec::new();
     let file_name;
     let file_id;
     let new_pid;
@@ -419,9 +425,17 @@ pub unsafe fn exec(pathname: *const u8) -> i64 {
         return -1;
     };
 
+    for arg in args {
+        if let Some(arg) = super::get_user_str(p, *arg) {
+            args_str.push(arg);
+        } else {
+            return -1;
+        }
+    }
     if let Ok(proc) = scheduler::Process::new_user_process(
         file_id as u64,
         scheduler::get_running_process().as_ref().unwrap().cwd(),
+        &args_str,
     ) {
         new_pid = proc.pid();
         scheduler::add_to_the_queue(proc);
@@ -444,7 +458,7 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
         .as_mut()
         .unwrap()
         .allocator();
-    let layout = Layout::from_size_align(size, ALIGNMENT);
+    let layout = Layout::from_size_align(size, allocator::DEFAULT_ALIGNMENT);
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {

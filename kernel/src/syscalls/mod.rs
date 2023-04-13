@@ -59,7 +59,7 @@ unsafe fn handle_syscall(
         handlers::WRITE => {
             handlers::write(arg0 as i32, arg2 as *const u8, arg2 as usize, arg3 as usize)
         }
-        handlers::EXEC => handlers::exec(arg0 as *const u8),
+        handlers::EXEC => handlers::exec(arg0 as *const u8, arg1 as *const *const u8),
         handlers::MALLOC => handlers::malloc(arg0 as usize) as i64,
         handlers::FREE => handlers::free(arg0 as *mut u8),
         handlers::EXIT => handlers::exit(arg0 as i32),
@@ -92,6 +92,16 @@ unsafe fn strlen(buffer: *const u8) -> usize {
     }
 
     i
+}
+
+unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
+    let mut len = 0;
+
+    while !(*argv).is_null() {
+        len += 1;
+    }
+
+    core::slice::from_raw_parts(argv, len)
 }
 
 /// Get a slice borrow from a user buffer.
