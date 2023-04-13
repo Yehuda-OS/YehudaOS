@@ -1,4 +1,4 @@
-use core::{alloc::Layout, ptr::null_mut};
+use core::alloc::Layout;
 
 use crate::{
     iostream::STDIN,
@@ -13,9 +13,9 @@ pub const WRITE: u64 = 0x1;
 pub const OPEN: u64 = 0x2;
 pub const FSTAT: u64 = 0x5;
 pub const MALLOC: u64 = 0x9;
+pub const FREE: u64 = 0xb;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
-pub const FREE: u64 = 0xb;
 pub const FCHDIR: u64 = 0x51;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
@@ -68,7 +68,7 @@ pub unsafe fn fchdir(fd: i32) -> i64 {
 ///
 /// # Returns
 /// The file descriptor of the new file if the operation was successful, -1 otherwise.
-pub unsafe fn creat(path: *mut u8, directory: bool) -> i32 {
+pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let name_str;
 
@@ -86,13 +86,17 @@ pub unsafe fn creat(path: *mut u8, directory: bool) -> i32 {
     }
 }
 
+/// Terminate the process.
+///
+/// # Arguments
+/// - `status` - The exit code of the process.
 pub unsafe fn exit(_status: i32) -> i64 {
     crate::scheduler::terminator::add_to_queue(core::ptr::read(
         scheduler::get_running_process().as_mut().unwrap(),
     ));
     core::ptr::write(scheduler::get_running_process(), None);
 
-    return 0;
+    0
 }
 
 /// Remove a file from the file system, or remove a directory that must be empty.
@@ -124,19 +128,19 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 ///
 /// # Arguments
 /// - `fd` - The file descriptor to read from.
-/// - `user_buffer` - The buffer to write into.
+/// - `buf` - The buffer to write into.
 /// - `count` - The number of bytes to read.
 /// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -> i64 {
+pub unsafe fn read(fd: i32, buf: *mut u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
-    let buf;
+    let buffer;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer_mut(p, user_buffer, count) {
-        buf = buffer;
+    if let Some(buf) = super::get_user_buffer_mut(p, buf, count) {
+        buffer = buf;
     } else {
         return -1;
     }
@@ -145,7 +149,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
     }
 
     match fd {
-        STDIN_DESCRIPTOR => STDIN.read(buf) as i64,
+        STDIN_DESCRIPTOR => STDIN.read(buffer) as i64,
         STDOUT_DESCRIPTOR => -1, // STDOUT still not implemented
         STDERR_DESCRIPTOR => -1, // STDERR still not implemented
         _ => {
@@ -153,7 +157,7 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
             if fs::is_dir(file_id).unwrap_or(true) {
                 -1
             } else {
-                match fs::read(file_id, buf, offset) {
+                match fs::read(file_id, buffer, offset) {
                     Some(b) => b as i64,
                     None => -1,
                 }
@@ -166,8 +170,8 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 ///
 /// # Arguments
 /// - `fd` - The file descriptor to write to.
-/// - `user_buffer` - A buffer containing the data to be written.
-/// - `offset` - The offset where the data will be written in the file
+/// - `buf` - A buffer containing the data to be written.
+/// - `offset` - The offset where the data will be written in the file,
 /// this is ignored for `stdout`.
 /// If the offset is at the end of the file or the data after it is written overflows the file's
 /// length the file will be extended.
@@ -176,13 +180,13 @@ pub unsafe fn read(fd: i32, user_buffer: *mut u8, count: usize, offset: usize) -
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize) -> i64 {
+pub unsafe fn write(fd: i32, buf: *const u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
-    let buf;
+    let buffer;
     let file_id;
 
-    if let Some(buffer) = super::get_user_buffer(p, user_buffer, count) {
-        buf = buffer;
+    if let Some(buf) = super::get_user_buffer(p, buf, count) {
+        buffer = buf;
     } else {
         return -1;
     }
@@ -193,7 +197,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
     match fd {
         STDIN_DESCRIPTOR => -1, // STDIN still not implemented
         STDOUT_DESCRIPTOR => {
-            if let Ok(string) = core::str::from_utf8(buf) {
+            if let Ok(string) = core::str::from_utf8(buffer) {
                 memory::load_tables_to_cr3(memory::get_page_table());
                 crate::println!("{}", string);
 
@@ -208,7 +212,7 @@ pub unsafe fn write(fd: i32, user_buffer: *const u8, count: usize, offset: usize
             if fs::is_dir(file_id).unwrap_or(true) {
                 -1
             } else {
-                if fs::write(file_id, buf, offset).is_ok() {
+                if fs::write(file_id, buffer, offset).is_ok() {
                     0
                 } else {
                     -1
@@ -334,50 +338,43 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 ///
 /// # Arguments
 /// - `fd` - The file descriptor of the directory.
-/// - `offset` - The offset **in files** inside the dir to read into.
+/// - `offset` - The offset **in files** inside the directory to read from.
+/// - `dirp` - A buffer to write the data into.
 ///
 /// # Returns
 /// A pointer to the directory entry.
 /// The directory entry contains the file's name and the file's id that can be used as a file
 /// descriptor.
-pub unsafe fn readdir(fd: i32, offset: usize) -> *mut DirEntry {
+pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
     let file_id;
-    let buffer = malloc(core::mem::size_of::<DirEntry>()) as *mut DirEntry;
-
-    if buffer.is_null() {
-        return null_mut();
-    }
 
     if fd >= RESERVED_FILE_DESCRIPTORS {
         file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
         if fs::is_dir(file_id).unwrap_or(true) {
-            null_mut()
+            -1
         } else {
             if let Some(mut entry) = fs::read_dir(file_id, offset) {
                 entry.id += RESERVED_FILE_DESCRIPTORS as usize;
-                *(buffer) = entry;
+                *(dirp) = entry;
 
-                buffer
+                0
             } else {
-                null_mut()
+                -1
             }
         }
     } else {
-        null_mut()
+        -1
     }
 }
 
-/// Create a new process.
+/// Execute a program in a new process.
 ///
 /// # Arguments
-/// - `pathname` - Path to the file to execute.
-/// - `argv` - An array of commandline arguments.
-/// The first argument must be the filename to execute and the array must be terminated by a null
-/// pointer.
+/// - `pathname` - Path to the file to execute, must be a valid ELF file.
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise
-pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
+/// 0 if the operation was successful, -1 otherwise.
+pub unsafe fn exec(pathname: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let args = super::get_args(argv);
     let mut args_str = Vec::new();
