@@ -1,3 +1,6 @@
+#ifndef YEHUDAOS_SYS
+#define YEHUDAOS_SYS
+
 #define NULL ((void*)0)
 #define FALSE 0
 #define TRUE !FALSE
@@ -55,3 +58,5 @@ int truncate(const char* path, size_t length);
 int ftruncate(int fd, size_t length);
 
 int waitpid(pid_t pid, int* wstatus);
+
+#endif // YEHUDAOS_SYS
