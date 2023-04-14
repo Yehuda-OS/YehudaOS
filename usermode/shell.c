@@ -3,7 +3,9 @@
 const char* EXECUTABLE_PATH_START[] = { "./", "../", "/" };
 
 /**
- * Reads a line from the console and returns it.
+ * Reads a line from the console.
+ *
+ * returns: The line that was read or `NULL` on failure.
  */
 char* get_command()
 {
@@ -25,7 +27,8 @@ char* get_command()
             }
         }
 
-        if ((bytes_read = read(stdin, buffer + current, 1, 0)) == -1)
+        bytes_read = read(stdin, buffer + current, 1, 0);
+        if (bytes_read == -1)
         {
             free(buffer);
 
@@ -35,8 +38,8 @@ char* get_command()
         {
             current += bytes_read;
         }
-    } while (buffer[current] != '\n');
-    buffer[current] = 0;
+    } while (buffer[current - bytes_read] != '\n');
+    buffer[current - bytes_read] = 0;
 
     return buffer;
 }
