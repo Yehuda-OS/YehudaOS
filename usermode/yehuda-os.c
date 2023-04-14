@@ -41,9 +41,9 @@ syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg
  * `count`: The number of bytes to read.
  * `offset`: The offset in the file to start reading from, ignored for `stdin`.
  *
- * returns: 0 if the operation was successful, -1 otherwise.
+ * returns: The amount of bytes read or -1 on failure.
  */
-int read(int fd, void* buf, size_t count, size_t offset)
+ssize_t read(int fd, void* buf, size_t count, size_t offset)
 {
     return syscall(READ, fd, (size_t)buf, count, offset, 0, 0);
 }

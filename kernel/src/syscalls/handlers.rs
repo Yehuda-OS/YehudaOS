@@ -136,7 +136,7 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 /// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise.
+/// The amount of bytes read or -1 on failure.
 pub unsafe fn read(fd: i32, buf: *mut u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buffer;
