@@ -301,24 +301,6 @@ unsafe fn print_list(first: *mut HeapBlock) {
     }
 }
 
-impl Locked<Allocator> {
-    pub unsafe fn global_alloc(&self, layout: Layout) -> *mut u8 {
-        self.alloc(layout)
-    }
-
-    pub unsafe fn global_dealloc(&self, ptr: *mut u8, layout: Layout) {
-        self.dealloc(ptr, layout);
-    }
-
-    pub unsafe fn global_realloc(&self, ptr: *mut u8, new_size: usize) -> *mut u8 {
-        self.realloc(ptr, Layout::from_size_align(0, 1).unwrap(), new_size)
-    }
-
-    pub fn get_page_table(&self) -> PhysAddr {
-        self.inner.lock().page_table
-    }
-}
-
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         let mut allocator = self.lock();

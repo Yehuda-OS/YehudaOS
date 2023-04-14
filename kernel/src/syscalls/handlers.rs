@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::alloc::{GlobalAlloc, Layout};
 
 use crate::{
     iostream::STDIN,
@@ -463,7 +463,7 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
-        allocation = allocator.global_alloc(layout);
+        allocation = allocator.alloc(layout);
     }
 
     allocation
@@ -478,7 +478,7 @@ pub unsafe fn free(ptr: *mut u8) -> i64 {
         .as_mut()
         .unwrap()
         .allocator()
-        .global_dealloc(ptr, Layout::from_size_align(0, 1).unwrap());
+        .dealloc(ptr, Layout::from_size_align(0, 1).unwrap());
 
     0
 }

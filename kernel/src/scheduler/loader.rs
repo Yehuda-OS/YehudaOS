@@ -1,4 +1,7 @@
-use core::{alloc::Layout, mem::size_of};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    mem::size_of,
+};
 
 use super::{Process, SchedulerError};
 use crate::memory;
@@ -184,7 +187,7 @@ unsafe fn alloc(p: &super::Process, size: usize) -> Option<*mut u8> {
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
-        allocation = p.allocator.global_alloc(layout);
+        allocation = p.allocator.alloc(layout);
     }
 
     if allocation.is_null() {
