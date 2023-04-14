@@ -1,18 +1,35 @@
 #include "yehuda-os.h"
 
-const char* executable_path_start[] = { "./", "../", "/" };
+const char* EXECUTABLE_PATH_START[] = { "./", "../", "/" };
 
+/**
+ * Reads a line from the console and returns it.
+ */
+char* get_command()
+{
+
+}
+
+/**
+ * Splits `command` into words separated by spaces and returns an array of them.
+ */
+char** parse_command(char* command)
+{
+    return NULL;
+}
+
+/**
+ * Handles a builtin command.
+ */
 void handle_builtin()
 {
 }
 
+/**
+ * Handles a command that executes a file.
+ */
 void handle_executable()
 {
-}
-
-char** parse_command(char* command)
-{
-    return NULL;
 }
 
 int main()
