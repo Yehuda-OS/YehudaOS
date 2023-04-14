@@ -310,6 +310,10 @@ impl Locked<Allocator> {
         self.dealloc(ptr, layout);
     }
 
+    pub unsafe fn global_realloc(&self, ptr: *mut u8, new_size: usize) -> *mut u8 {
+        self.realloc(ptr, Layout::from_size_align(0, 1).unwrap(), new_size)
+    }
+
     pub fn get_page_table(&self) -> PhysAddr {
         self.inner.lock().page_table
     }
