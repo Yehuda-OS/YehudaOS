@@ -339,10 +339,15 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        let mut allocator = self.lock();
-        let block = HeapBlock::get_ptr_block(_ptr);
+        let mut allocator;
+        let block;
 
-        // use dealloc_node function
+        if _ptr.is_null() {
+            return;
+        }
+
+        allocator = self.lock();
+        block = HeapBlock::get_ptr_block(_ptr);
         dealloc_node(&mut allocator, block);
     }
 }
