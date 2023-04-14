@@ -31,7 +31,11 @@ int fstat(int fd, struct Stat* statbuf);
 
 void* malloc(size_t size);
 
+void* calloc(size_t nitems, size_t size);
+
 void free(void* ptr);
+
+void* realloc(void* ptr, size_t size);
 
 int exec(const char* pathname);
 

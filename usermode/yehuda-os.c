@@ -6,7 +6,9 @@ const size_t OPEN        = 0x2;
 const size_t FSTAT       = 0x5;
 const size_t WAITPID     = 0x7;
 const size_t MALLOC      = 0x9;
+const size_t CALLOC      = 0xa;
 const size_t FREE        = 0xb;
+const size_t REALLOC     = 0xc;
 const size_t EXEC        = 0x3b;
 const size_t EXIT        = 0x3c;
 const size_t FCHDIR      = 0x51;
@@ -119,6 +121,17 @@ void* malloc(size_t size)
 }
 
 /**
+ * Behaves like `malloc`, but sets the memory to 0.
+ *
+ * `nitems`: The number of elements to be allocated.
+ * `size`: The size of each element.
+ */
+void* calloc(size_t nitems, size_t size)
+{
+    return (void*)syscall(CALLOC, nitems, size, 0, 0, 0, 0);
+}
+
+/**
  * Deallocate an allocation that was allocated with `malloc`.
  *
  * `ptr`: The pointer to the allocation that was returned from `malloc`.
@@ -126,6 +139,19 @@ void* malloc(size_t size)
 void free(void* ptr)
 {
     syscall(FREE, (size_t)ptr, 0, 0, 0, 0, 0);
+}
+
+/**
+ * Grow or shrink a block that was allocated with `malloc`.
+ * Copies the data from the original block to the new block.
+ *
+ * `size`: The new required size of the block.
+ *
+ * returns: A pointer to a new allocation or null on failure.
+ */
+void* realloc(void* ptr, size_t size)
+{
+    return (void*)syscall(REALLOC, (size_t)ptr, size, 0, 0, 0, 0);
 }
 
 /**
