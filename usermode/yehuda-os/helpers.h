@@ -6,4 +6,6 @@ size_t strlen(const char* s);
 
 char* strcpy(char* destination, const char* source);
 
+char* strncpy(char* dest, const char* src, size_t n);
+
 #endif
