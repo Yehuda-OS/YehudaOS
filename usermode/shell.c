@@ -1,3 +1,4 @@
+#include "yehuda-os/helpers.h"
 #include "yehuda-os/sys.h"
 
 const char* EXECUTABLE_PATH_START[] = { "./", "../", "/" };
@@ -39,17 +40,105 @@ char* get_command()
             current += bytes_read;
         }
     } while (buffer[current - bytes_read] != '\n');
-    buffer[current - bytes_read] = 0;
+    buffer[current - bytes_read] = '\0';
 
     return buffer;
 }
 
 /**
- * Splits `command` into words separated by spaces and returns an array of them.
+ * Returns the amoutn of words in `str`.
  */
-char** parse_command(char* command)
+size_t count_words(const char* str)
 {
-    return NULL;
+    size_t count   = 0;
+    bool_t in_word = FALSE;
+
+    while (*str)
+    {
+        if (*str == ' ')
+        {
+            in_word = FALSE;
+        }
+        else if (!in_word)
+        {
+            in_word = TRUE;
+            count++;
+        }
+        str++;
+    }
+
+    return count;
+}
+
+/**
+ * Splits `command` into words separated by spaces.
+ *
+ * returns: An array of the words that are in the command,
+ * terminated by a NULL pointer or `NULL` on failure.
+ */
+char** parse_command(const char* command)
+{
+    const char* start   = NULL;
+    size_t word_len     = 0;
+    const char* current = command;
+    char** words        = calloc(count_words(command) + 1, sizeof(char*));
+    bool_t in_word      = FALSE;
+    size_t count        = 0;
+
+    if (!words)
+    {
+        return NULL;
+    }
+
+    while (*current)
+    {
+        if (*current == ' ')
+        {
+            if (in_word)
+            {
+                words[count] = malloc((word_len + 1) * sizeof(char));
+                if (!words[count])
+                {
+                    free_array((void**)words, count);
+                    free(words);
+
+                    return NULL;
+                }
+                strncpy(words[count], start, word_len);
+                words[count][word_len] = '\0';
+
+                count++;
+                word_len = 0;
+                in_word  = FALSE;
+            }
+        }
+        else
+        {
+            if (!in_word)
+            {
+                in_word = TRUE;
+                start   = current;
+            }
+            word_len++;
+        }
+        current++;
+    }
+
+    if (word_len > 0)
+    {
+        words[count] = malloc((word_len + 1) * sizeof(char));
+        if (!words[count])
+        {
+            free_array((void**)words, count);
+            free(words);
+
+            return NULL;
+        }
+        strncpy(words[count], start, word_len);
+        words[count][word_len] = '\0';
+    }
+
+    return words;
 }
 
 /**
