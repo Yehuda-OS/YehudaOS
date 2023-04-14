@@ -7,7 +7,38 @@ const char* EXECUTABLE_PATH_START[] = { "./", "../", "/" };
  */
 char* get_command()
 {
+    ssize_t bytes_read = 0;
+    size_t current     = 0;
+    size_t len         = 1;
+    char* buffer       = NULL;
 
+    do
+    {
+        if (current == len - 1)
+        {
+            len *= 2;
+            buffer = realloc(buffer, len);
+
+            if (!buffer)
+            {
+                return NULL;
+            }
+        }
+
+        if ((bytes_read = read(stdin, buffer + current, 1, 0)) == -1)
+        {
+            free(buffer);
+
+            return NULL;
+        }
+        else
+        {
+            current += bytes_read;
+        }
+    } while (buffer[current] != '\n');
+    buffer[current] = 0;
+
+    return buffer;
 }
 
 /**
