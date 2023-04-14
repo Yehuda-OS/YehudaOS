@@ -472,12 +472,16 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
 }
 
 /// Behaves like `malloc`, but sets the memory to 0.
-pub unsafe fn calloc(size: usize) -> *mut u8 {
+///
+/// # Arguments
+/// - `nitems` - The number of elements to be allocated.
+/// - `size` - The size of each element.
+pub unsafe fn calloc(nitems: usize, size: usize) -> *mut u8 {
     let allocator = scheduler::get_running_process()
         .as_mut()
         .unwrap()
         .allocator();
-    let layout = Layout::from_size_align(size, allocator::DEFAULT_ALIGNMENT);
+    let layout = Layout::from_size_align(nitems * size, allocator::DEFAULT_ALIGNMENT);
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
