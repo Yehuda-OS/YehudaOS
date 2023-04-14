@@ -14,7 +14,9 @@ pub const OPEN: u64 = 0x2;
 pub const FSTAT: u64 = 0x5;
 pub const WAITPID: u64 = 0x7;
 pub const MALLOC: u64 = 0x9;
+pub const CALLOC: u64 = 0xa;
 pub const FREE: u64 = 0xb;
+pub const REALLOC: u64 = 0xc;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
 pub const FCHDIR: u64 = 0x51;
@@ -469,6 +471,22 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
     allocation
 }
 
+/// Behaves like `malloc`, but sets the memory to 0.
+pub unsafe fn calloc(size: usize) -> *mut u8 {
+    let allocator = scheduler::get_running_process()
+        .as_mut()
+        .unwrap()
+        .allocator();
+    let layout = Layout::from_size_align(size, allocator::DEFAULT_ALIGNMENT);
+    let mut allocation = core::ptr::null_mut();
+
+    if let Ok(layout) = layout {
+        allocation = allocator.alloc_zeroed(layout);
+    }
+
+    allocation
+}
+
 /// Deallocate an allocation that was allocated with `malloc`.
 ///
 /// # Arguments
@@ -481,4 +499,20 @@ pub unsafe fn free(ptr: *mut u8) -> i64 {
         .dealloc(ptr, Layout::from_size_align(0, 1).unwrap());
 
     0
+}
+
+/// Grow or shrink a block that was allocated with `malloc`.
+/// Copies the data from the original block to the new block.
+///
+/// # Arguments
+/// `size` - The new required size of the block.
+///
+/// # Returns
+/// A pointer to a new allocation or null on failure.
+pub unsafe fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
+    scheduler::get_running_process()
+        .as_mut()
+        .unwrap()
+        .allocator()
+        .realloc(ptr, Layout::from_size_align_unchecked(0, 1), size)
 }

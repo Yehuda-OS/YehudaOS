@@ -61,7 +61,9 @@ unsafe fn handle_syscall(
         }
         handlers::EXEC => handlers::exec(arg0 as *const u8, arg1 as *const *const u8),
         handlers::MALLOC => handlers::malloc(arg0 as usize) as i64,
+        handlers::CALLOC => handlers::calloc(arg0 as usize) as i64,
         handlers::FREE => handlers::free(arg0 as *mut u8),
+        handlers::REALLOC => handlers::realloc(arg0 as *mut u8, arg1 as usize) as i64,
         handlers::EXIT => handlers::exit(arg0 as i32),
         handlers::FCHDIR => handlers::fchdir(arg0 as i32),
         handlers::CREAT => handlers::creat(arg0 as *mut u8, arg2 > 0) as i64,
