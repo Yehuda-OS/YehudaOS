@@ -46,7 +46,7 @@ char* get_command()
 }
 
 /**
- * Returns the amoutn of words in `str`.
+ * Returns the amount of words in `str`.
  */
 size_t count_words(const char* str)
 {
