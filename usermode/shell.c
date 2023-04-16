@@ -36,6 +36,7 @@ size_t count_words(const char* str)
  *
  * returns: An array of the words that are in the command,
  *          terminated by a NULL pointer or `NULL` on an allocation failure.
+ *          All the elements in the array and the array itself must be freed by the user.
  */
 char** parse_command(const char* command)
 {
@@ -215,13 +216,16 @@ bool_t handle_command()
     {
         handle_builtin((char* const*)command_args);
     }
+
     current = command_args;
     while (*current != NULL)
     {
         free(*current);
+        *current = NULL;
         current++;
     }
     free(command_args);
+    command_args = NULL;
 
     return TRUE;
 }
