@@ -4,48 +4,6 @@
 const char* EXECUTABLE_PATH_START[] = { "./", "../", "/" };
 
 /**
- * Reads a line from the console.
- *
- * returns: The line that was read or `NULL` on failure.
- */
-char* get_command()
-{
-    ssize_t bytes_read = 0;
-    size_t current     = 0;
-    size_t len         = 1;
-    char* buffer       = NULL;
-
-    do
-    {
-        if (current == len - 1)
-        {
-            len *= 2;
-            buffer = realloc(buffer, len);
-
-            if (!buffer)
-            {
-                return NULL;
-            }
-        }
-
-        bytes_read = read(stdin, buffer + current, 1, 0);
-        if (bytes_read == -1)
-        {
-            free(buffer);
-
-            return NULL;
-        }
-        else
-        {
-            current += bytes_read;
-        }
-    } while (buffer[current - bytes_read] != '\n');
-    buffer[current - bytes_read] = '\0';
-
-    return buffer;
-}
-
-/**
  * Returns the amount of words in `str`.
  */
 size_t count_words(const char* str)
@@ -170,6 +128,7 @@ __attribute__((force_align_arg_pointer)) void _start()
         "mov %eax, %edi;"
         "mov $0x3c, %rax;"
         "syscall");
-    // tell the compiler to make sure side effects are done before the asm statement
+    // tell the compiler to make sure side effects are done before the asm
+    // statement
     __builtin_unreachable();
 }
