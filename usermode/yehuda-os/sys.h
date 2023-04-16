@@ -33,7 +33,7 @@ void free(void* ptr);
 
 void* realloc(void* ptr, size_t size);
 
-int exec(const char* pathname);
+int exec(const char* pathname, char* const argv[]);
 
 void exit(int status);
 

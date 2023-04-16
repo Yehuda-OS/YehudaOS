@@ -406,6 +406,7 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
 ///
 /// # Arguments
 /// - `pathname` - Path to the file to execute, must be a valid ELF file.
+/// - `argv` - The commandline arguments.
 ///
 /// # Returns
 /// The process ID of the new process if the operation was successful, -1 otherwise.

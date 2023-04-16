@@ -158,10 +158,11 @@ void* realloc(void* ptr, size_t size)
  * Execute a program in a new process.
  *
  * `pathname`: Path to the file to execute, must be a valid ELF file.
+ * `argv`: The commandline arguments.
  *
  * returns: The process ID of the new process if the operation was successful, -1 otherwise.
  */
-int exec(const char* pathname)
+int exec(const char* pathname, char* const argv[])
 {
     return syscall(EXEC, (size_t)pathname, 0, 0, 0, 0, 0);
 }
