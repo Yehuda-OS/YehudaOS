@@ -150,8 +150,32 @@ void handle_executable()
 {
 }
 
+/**
+ * Gets a command from the user and handles it.
+ *
+ * returns: `TRUE` on success and `FALSE` on failure.
+ *          Failures can occur when processing the command or reading it.
+ */
+bool_t handle_command()
+{
+}
+
 int main()
 {
+    const char ERR_MESSAGE[] =
+    "Error: Reading the command or processing it has failed.\n";
+    char* command       = NULL;
+    char** command_args = NULL;
+
+    while (TRUE)
+    {
+        if (!handle_command())
+        {
+            // Write the error message without the null terminator.
+            write(STDOUT, ERR_MESSAGE, sizeof(ERR_MESSAGE) - 1, 0);
+        }
+    }
+
     return 0;
 }
 
