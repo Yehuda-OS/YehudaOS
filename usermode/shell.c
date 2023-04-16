@@ -138,15 +138,19 @@ bool_t is_executable(const char* command)
 
 /**
  * Handles a builtin command.
+ *
+ * `argv`: The command that was entered, split into words.
  */
-void handle_builtin()
+void handle_builtin(char* const argv[])
 {
 }
 
 /**
  * Handles a command that executes a file.
+ *
+ * `argv`: The command that was entered, split into words.
  */
-void handle_executable()
+void handle_executable(char* const argv[])
 {
 }
 
@@ -177,11 +181,11 @@ bool_t handle_command()
     command = NULL;
     if (is_executable(command_args[0]))
     {
-        handle_executable();
+        handle_executable((char* const*)command_args);
     }
     else
     {
-        handle_builtin();
+        handle_builtin((char* const*)command_args);
     }
     current = command_args;
     while (*current != NULL)
