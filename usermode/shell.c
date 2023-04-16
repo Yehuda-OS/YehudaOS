@@ -33,7 +33,7 @@ size_t count_words(const char* str)
  * Splits `command` into words separated by spaces.
  *
  * returns: An array of the words that are in the command,
- * terminated by a NULL pointer or `NULL` on failure.
+ *          terminated by a NULL pointer or `NULL` on an allocation failure.
  */
 char** parse_command(const char* command)
 {
@@ -153,17 +153,50 @@ void handle_executable()
 /**
  * Gets a command from the user and handles it.
  *
- * returns: `TRUE` on success and `FALSE` on failure.
+ * returns: `TRUE` on success and `FALSE` on an allocation failure.
  *          Failures can occur when processing the command or reading it.
  */
 bool_t handle_command()
 {
+    char* command       = getline();
+    char** command_args = NULL;
+    char** current      = NULL;
+
+    if (!command)
+    {
+        free(command);
+
+        return FALSE;
+    }
+    else if (!(command_args = parse_command(command)))
+    {
+        return FALSE;
+    }
+
+    free(command);
+    command = NULL;
+    if (is_executable(command_args[0]))
+    {
+        handle_executable();
+    }
+    else
+    {
+        handle_builtin();
+    }
+    current = command_args;
+    while (*current)
+    {
+        free(*current);
+    }
+    free(command_args);
+
+    return TRUE;
 }
 
 int main()
 {
     const char ERR_MESSAGE[] =
-    "Error: Reading the command or processing it has failed.\n";
+    "YehudaSH: Error: Allocating memory has failed.\n";
     char* command       = NULL;
     char** command_args = NULL;
 

@@ -64,7 +64,7 @@ void free_array(void** arr, size_t size)
 /**
  * Reads a line from the console.
  *
- * returns: The line that was read or `NULL` on failure.
+ * returns: The line that was read or `NULL` on an allocation failure.
  *          The returned buffer must be freed by the caller.
  */
 char* getline()
