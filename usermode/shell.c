@@ -1,6 +1,8 @@
 #include "yehuda-os/helpers.h"
 #include "yehuda-os/sys.h"
 
+#define MAX_INT_STRLEN 11
+
 const char* EXECUTABLE_PATH_START[] = { "./", "../", "/", NULL };
 const char* BUILTINS[]              = { "cd" };
 
@@ -152,6 +154,32 @@ void handle_builtin(char* const argv[])
  */
 void handle_executable(char* const argv[])
 {
+    int exitcode                         = 0;
+    pid_t pid                            = exec(argv[0], argv);
+    char exitcode_buffer[MAX_INT_STRLEN] = { 0 };
+
+    if (pid == -1)
+    {
+        print_str("YehudaSH: Error: execution of ");
+        print_str(argv[0]);
+        print_str("has failed\n");
+
+        return;
+    }
+
+    if (waitpid(pid, &exitcode) == -1)
+    {
+        print_str("Failed to retrieve the exit code of ");
+        print_str(argv[0]);
+    }
+    else
+    {
+        int_to_string(exitcode, exitcode_buffer);
+        print_str(argv[0]);
+        print_str(" has exited with exit code ");
+        print_str(exitcode_buffer);
+    }
+    print_str("\n");
 }
 
 /**
@@ -200,6 +228,7 @@ bool_t handle_command()
 
 int main()
 {
+    const char ECHO[] = "[YehudaSH] ";
     const char ERR_MESSAGE[] =
     "YehudaSH: Error: Allocating memory has failed.\n";
     char* command       = NULL;
@@ -207,10 +236,12 @@ int main()
 
     while (TRUE)
     {
+        write(STDOUT, ECHO, sizeof(ECHO) - 1, 0);
         if (!handle_command())
         {
             // Write the error message without the null terminator.
             write(STDOUT, ERR_MESSAGE, sizeof(ERR_MESSAGE) - 1, 0);
+            write(STDOUT, "\n", 1, 0);
         }
     }
 
