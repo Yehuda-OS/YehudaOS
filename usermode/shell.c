@@ -228,20 +228,12 @@ bool_t handle_command()
 
 int main()
 {
-    const char ECHO[] = "[YehudaSH] ";
-    const char ERR_MESSAGE[] =
-    "YehudaSH: Error: Allocating memory has failed.\n";
-    char* command       = NULL;
-    char** command_args = NULL;
-
     while (TRUE)
     {
-        write(STDOUT, ECHO, sizeof(ECHO) - 1, 0);
+        print_str("[YehudaSH] ");
         if (!handle_command())
         {
-            // Write the error message without the null terminator.
-            write(STDOUT, ERR_MESSAGE, sizeof(ERR_MESSAGE) - 1, 0);
-            write(STDOUT, "\n", 1, 0);
+            print_str("YehudaSH: Error: Allocating memory has failed.\n");
         }
     }
 
