@@ -187,6 +187,7 @@ bool_t handle_command()
     while (*current)
     {
         free(*current);
+        current++;
     }
     free(command_args);
 
