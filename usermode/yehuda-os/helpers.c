@@ -87,7 +87,7 @@ char* getline()
             }
         }
 
-        bytes_read = read(stdin, buffer + current, 1, 0);
+        bytes_read = read(STDIN, buffer + current, 1, 0);
         if (bytes_read == -1)
         {
             free(buffer);

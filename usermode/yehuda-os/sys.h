@@ -1,17 +1,9 @@
 #ifndef YEHUDAOS_SYS
 #define YEHUDAOS_SYS
 
-#define NULL ((void*)0)
-#define FALSE 0
-#define TRUE !FALSE
-#define FILE_NAME_LEN 11
-#define stdin 0
-#define stdout 1
+#include "defines.h"
 
-typedef unsigned long size_t;
-typedef long ssize_t;
 typedef long pid_t;
-typedef unsigned char bool_t;
 
 struct Stat
 {
