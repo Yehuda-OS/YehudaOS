@@ -202,7 +202,7 @@ pub unsafe fn write(fd: i32, buf: *const u8, count: usize, offset: usize) -> i64
         STDOUT_DESCRIPTOR => {
             if let Ok(string) = core::str::from_utf8(buffer) {
                 memory::load_tables_to_cr3(memory::get_page_table());
-                crate::println!("{}", string);
+                crate::print!("{}", string);
 
                 0
             } else {
