@@ -12,4 +12,8 @@ void free_array(void** arr, size_t size);
 
 char* getline();
 
+void print_str(const char* str);
+
+void int_to_string(int num, char* str);
+
 #endif // YEHUDAOS_HELPERS

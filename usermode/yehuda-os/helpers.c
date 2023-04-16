@@ -1,4 +1,5 @@
 #include "helpers.h"
+#include "sys.h"
 
 size_t strlen(const char* s)
 {
@@ -102,4 +103,55 @@ char* getline()
     buffer[current - bytes_read] = '\0';
 
     return buffer;
+}
+
+/**
+ * Print a string `str` to the screen.
+ */
+void print_str(const char* str)
+{
+    write(STDOUT, str, strlen(str), 0);
+}
+
+/**
+ * Convert an integer to a string.
+ *
+ * `num`: The number to convert.
+ * `buffer`: The string to put the result into.
+ *           Must be at least 11 bytes long.
+ */
+void int_to_string(int num, char* buffer)
+{
+    int i        = 0;
+    int num_copy = 0;
+
+    if (num == 0)
+    {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+
+        return;
+    }
+
+    if (num < 0)
+    {
+        buffer[0] = '-';
+        num       = -num;
+        i         = 1;
+    }
+
+    num_copy = num;
+    while (num_copy > 0)
+    {
+        num_copy /= 10;
+        i++;
+    }
+
+    buffer[i] = '\0';
+    while (num > 0)
+    {
+        i--;
+        buffer[i] = '0' + (num % 10);
+        num /= 10;
+    }
 }
