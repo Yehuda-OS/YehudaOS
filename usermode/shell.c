@@ -12,7 +12,7 @@ size_t count_words(const char* str)
     size_t count   = 0;
     bool_t in_word = FALSE;
 
-    while (*str)
+    while (*str != '\0')
     {
         if (*str == ' ')
         {
@@ -44,19 +44,19 @@ char** parse_command(const char* command)
     bool_t in_word      = FALSE;
     size_t count        = 0;
 
-    if (!words)
+    if (words == NULL)
     {
         return NULL;
     }
 
-    while (*current)
+    while (*current != '\0')
     {
         if (*current == ' ')
         {
             if (in_word)
             {
                 words[count] = malloc((word_len + 1) * sizeof(char));
-                if (!words[count])
+                if (words[count] == NULL)
                 {
                     free_array((void**)words, count);
                     free(words);
@@ -86,7 +86,7 @@ char** parse_command(const char* command)
     if (word_len > 0)
     {
         words[count] = malloc((word_len + 1) * sizeof(char));
-        if (!words[count])
+        if (words[count] == NULL)
         {
             free_array((void**)words, count);
             free(words);
@@ -112,14 +112,14 @@ bool_t is_executable(const char* command)
     const char* path_start_index = NULL;
     const char* command_index    = NULL;
 
-    while (*current_str)
+    while (*current_str != NULL)
     {
         executable       = TRUE;
         path_start_index = *current_str;
         command_index    = command;
-        while (*command_index && executable)
+        while (*command_index != '\0' && executable)
         {
-            if (!*path_start_index)
+            if (*path_start_index == '\0')
             {
                 return TRUE;
             }
@@ -162,13 +162,13 @@ bool_t handle_command()
     char** command_args = NULL;
     char** current      = NULL;
 
-    if (!command)
+    if (command == NULL)
     {
         free(command);
 
         return FALSE;
     }
-    else if (!(command_args = parse_command(command)))
+    else if ((command_args = parse_command(command)) == NULL)
     {
         return FALSE;
     }
@@ -184,7 +184,7 @@ bool_t handle_command()
         handle_builtin();
     }
     current = command_args;
-    while (*current)
+    while (*current != NULL)
     {
         free(*current);
         current++;

@@ -22,7 +22,7 @@ char* strcpy(char* destination, const char* source)
         return NULL;
     }
 
-    while (*source)
+    while (*source != '\0')
     {
         *destination = *source;
         destination++;
@@ -81,7 +81,7 @@ char* getline()
             len *= 2;
             buffer = realloc(buffer, len);
 
-            if (!buffer)
+            if (buffer == NULL)
             {
                 return NULL;
             }
