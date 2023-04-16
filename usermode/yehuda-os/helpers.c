@@ -67,7 +67,7 @@ void free_array(void** arr, size_t size)
  * returns: The line that was read or `NULL` on failure.
  *          The returned buffer must be freed by the caller.
  */
-char* get_command()
+char* getline()
 {
     ssize_t bytes_read = 0;
     size_t current     = 0;

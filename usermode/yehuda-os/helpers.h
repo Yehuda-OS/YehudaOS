@@ -10,6 +10,6 @@ char* strncpy(char* dest, const char* src, size_t n);
 
 void free_array(void** arr, size_t size);
 
-char* get_command();
+char* getline();
 
 #endif
