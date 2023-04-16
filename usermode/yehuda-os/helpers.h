@@ -12,4 +12,4 @@ void free_array(void** arr, size_t size);
 
 char* getline();
 
-#endif
+#endif // YEHUDAOS_HELPERS

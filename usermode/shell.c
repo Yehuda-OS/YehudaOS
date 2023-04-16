@@ -107,14 +107,12 @@ char** parse_command(const char* command)
  */
 bool_t is_executable(const char* command)
 {
-    bool_t executable            = FALSE;
     const char** current_str     = EXECUTABLE_PATH_START;
     const char* path_start_index = NULL;
     const char* command_index    = NULL;
 
     while (*current_str)
     {
-        executable       = FALSE;
         path_start_index = *current_str;
         command_index    = command;
         while (*command_index)
@@ -127,6 +125,8 @@ bool_t is_executable(const char* command)
             {
                 break;
             }
+            command_index++;
+            path_start_index++;
         }
         current_str++;
     }
