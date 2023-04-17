@@ -1,22 +1,23 @@
 #include "sys.h"
 
-const size_t READ        = 0x0;
-const size_t WRITE       = 0x1;
-const size_t OPEN        = 0x2;
-const size_t FSTAT       = 0x5;
-const size_t WAITPID     = 0x7;
-const size_t MALLOC      = 0x9;
-const size_t CALLOC      = 0xa;
-const size_t FREE        = 0xb;
-const size_t REALLOC     = 0xc;
-const size_t EXEC        = 0x3b;
-const size_t EXIT        = 0x3c;
-const size_t CHDIR       = 0x50;
-const size_t CREAT       = 0x55;
-const size_t REMOVE_FILE = 0x57;
-const size_t READ_DIR    = 0x59;
-const size_t TRUNCATE    = 0x4c;
-const size_t FTRUNCATE   = 0x4d;
+const size_t READ                 = 0x0;
+const size_t WRITE                = 0x1;
+const size_t OPEN                 = 0x2;
+const size_t FSTAT                = 0x5;
+const size_t WAITPID              = 0x7;
+const size_t MALLOC               = 0x9;
+const size_t CALLOC               = 0xa;
+const size_t FREE                 = 0xb;
+const size_t REALLOC              = 0xc;
+const size_t EXEC                 = 0x3b;
+const size_t EXIT                 = 0x3c;
+const size_t GET_CURRENT_DIR_NAME = 0x4f;
+const size_t CHDIR                = 0x50;
+const size_t CREAT                = 0x55;
+const size_t REMOVE_FILE          = 0x57;
+const size_t READ_DIR             = 0x59;
+const size_t TRUNCATE             = 0x4c;
+const size_t FTRUNCATE            = 0x4d;
 
 size_t
 syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
@@ -178,6 +179,19 @@ void exit(int status)
     // `syscall` will never return when the `EXIT` code is passed.
     // Therefore we tell the compiler that any code after it is unreachable.
     __builtin_unreachable();
+}
+
+/**
+ * Get the current working directory.
+ *
+ * returns: On success, a string containing the current working directory
+ *          that has been allocated with `malloc` will be returned.
+ *          It is the user's responsibility to free the buffer with `free`.
+ *          On failure, `NULL` is returned.
+ */
+char* get_current_dir_name()
+{
+    return (char*)syscall(GET_CURRENT_DIR_NAME, 0, 0, 0, 0, 0, 0);
 }
 
 /**

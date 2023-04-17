@@ -37,6 +37,8 @@ int exec(const char* pathname, char* const argv[]);
 
 void exit(int status);
 
+char* get_current_dir_name();
+
 int chdir(const char* path);
 
 int creat(const char* path, bool_t directory);

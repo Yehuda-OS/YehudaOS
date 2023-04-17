@@ -19,6 +19,7 @@ pub const FREE: u64 = 0xb;
 pub const REALLOC: u64 = 0xc;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
+pub const GET_CURRENT_DIR_NAME: u64 = 0x4f;
 pub const CHDIR: u64 = 0x50;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
@@ -35,6 +36,27 @@ const RESERVED_FILE_DESCRIPTORS: i32 = 3;
 pub struct Stat {
     size: u64,
     directory: bool,
+}
+
+/// Get the current working directory.
+///
+/// # Returns
+/// On success, a string containing the current working directory
+/// that has been allocated with `malloc` will be returned.
+/// It is the user's responsibility to free the buffer with `free`.
+/// On failure, null is returned.
+pub unsafe fn get_current_dir_name() -> *mut u8 {
+    let path = scheduler::get_running_process()
+        .as_ref()
+        .unwrap()
+        .cwd_path();
+    let buffer = malloc(path.len());
+
+    if !buffer.is_null() {
+        core::ptr::copy_nonoverlapping(path.as_ptr(), buffer, path.len());
+    }
+
+    buffer
 }
 
 /// Change the current working directory.
