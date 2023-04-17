@@ -96,6 +96,13 @@ unsafe fn strlen(buffer: *const u8) -> usize {
     i
 }
 
+/// Get the arguments array from a raw pointer.
+///
+/// # Arguments
+/// - `argv` - The pointer to the arguments array.
+///
+/// # Safety
+/// Assumes that `argv` points to a null-terminated array.
 unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
     let mut len = 0;
 
