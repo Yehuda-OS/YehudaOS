@@ -1,3 +1,4 @@
+use alloc::string::String;
 use x86_64::VirtAddr;
 
 use super::io;
@@ -111,6 +112,18 @@ unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
     }
 
     core::slice::from_raw_parts(argv, len)
+}
+
+/// Get the absolute path to a file from a relative path.
+///
+/// # Arguments
+/// - `cwd` - The current working directory the path is relative to.
+/// - `path` - A relative path to a file.
+///
+/// # Returns
+/// The absolute path to the file that `path` refers to.
+fn get_absolute_path(cwd: &str, path: &str) -> String {
+    String::new()
 }
 
 /// Get a slice borrow from a user buffer.
