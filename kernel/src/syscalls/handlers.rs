@@ -50,10 +50,12 @@ pub unsafe fn get_current_dir_name() -> *mut u8 {
         .as_ref()
         .unwrap()
         .cwd_path();
-    let buffer = malloc(path.len());
+    let buffer = malloc(path.len() + 1);
 
     if !buffer.is_null() {
         core::ptr::copy_nonoverlapping(path.as_ptr(), buffer, path.len());
+        // Add null terminator.
+        *buffer.add(path.len()) = 0;
     }
 
     buffer
