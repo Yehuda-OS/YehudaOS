@@ -19,7 +19,7 @@ pub const FREE: u64 = 0xb;
 pub const REALLOC: u64 = 0xc;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
-pub const FCHDIR: u64 = 0x51;
+pub const CHDIR: u64 = 0x50;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
 pub const READ_DIR: u64 = 0x59;
@@ -44,17 +44,24 @@ pub struct Stat {
 ///
 /// # Returns
 /// 0 if the operation was successful or -1 if `fd` does not exist or if `fd` is not a directory.
-pub unsafe fn fchdir(fd: i32) -> i64 {
+pub unsafe fn chdir(path: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_mut().unwrap();
     let file_id;
+    let path_str;
 
-    if fd < RESERVED_FILE_DESCRIPTORS {
+    if let Some(path) = super::get_user_str(p, path) {
+        path_str = path;
+    } else {
         return -1;
     }
-    file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    if let Some(id) = fs::get_file_id(path_str, Some(p.cwd())) {
+        file_id = id;
+    } else {
+        return -1;
+    }
 
     if fs::is_dir(file_id).unwrap_or(false) {
-        p.set_cwd(file_id);
+        p.set_cwd(super::get_absolute_path(p.cwd_path(), path_str).as_str());
 
         0
     } else {
@@ -438,7 +445,10 @@ pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     }
     if let Ok(proc) = scheduler::Process::new_user_process(
         file_id as u64,
-        scheduler::get_running_process().as_ref().unwrap().cwd(),
+        scheduler::get_running_process()
+            .as_ref()
+            .unwrap()
+            .cwd_path(),
         &args_str,
     ) {
         new_pid = proc.pid();
