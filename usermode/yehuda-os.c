@@ -4,6 +4,7 @@ const size_t READ        = 0x0;
 const size_t WRITE       = 0x1;
 const size_t OPEN        = 0x2;
 const size_t FSTAT       = 0x5;
+const size_t WAITPID     = 0x7;
 const size_t MALLOC      = 0x9;
 const size_t FREE        = 0xb;
 const size_t EXEC        = 0x3b;
@@ -88,6 +89,24 @@ int fstat(int fd, struct Stat* statbuf)
 }
 
 /**
+ * Awaits the calling process until a specific process terminates.
+ *
+ * `pid`: The process ID of the process to wait for.
+ *        Must be a non-negative number.
+ * `wstatus`: A buffer to write the process' exit code into.
+ *
+ * returns: 0 on sucess or -1 on error.
+ *          Possible errors:
+ *          - `pid` is negative.
+ *          - The process specified by `pid` does not exist.
+ *          - The process specified by `pid` has already finished its execution.
+ */
+int waitpid(pid_t pid, int* wstatus)
+{
+    return syscall(WAITPID, pid, (size_t)wstatus, 0, 0, 0, 0);
+}
+
+/**
  * Allocate memory for a userspace program.
  *
  * `size`: The size of the allocation.
@@ -114,7 +133,7 @@ void free(void* ptr)
  *
  * `pathname`: Path to the file to execute, must be a valid ELF file.
  *
- * returns: 0 if the operation was successful, -1 otherwise.
+ * returns: The process ID of the new process if the operation was successful, -1 otherwise.
  */
 int exec(const char* pathname)
 {
@@ -122,7 +141,7 @@ int exec(const char* pathname)
 }
 
 /**
- * Terminate the process.
+ * Terminate the calling process.
  *
  * `status`: The exit code of the process.
  */

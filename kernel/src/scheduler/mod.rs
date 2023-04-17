@@ -1,7 +1,8 @@
 use super::memory;
 use crate::memory::allocator::{Allocator, Locked};
-use crate::queue::Queue;
+use crate::mutex::Mutex;
 use crate::{io, syscalls};
+use alloc::collections::{BTreeMap, LinkedList};
 use core::arch::asm;
 use core::fmt;
 use x86_64::{
@@ -22,9 +23,10 @@ const INTERRUPT_FLAG_ON: u64 = 0x200;
 const HIGH_PRIORITY_RELOAD: u8 = 2;
 
 static mut CURR_PROC: Option<Process> = None;
-static mut LOW_PRIORITY: Queue<Process> = Queue::new();
-static mut HIGH_PRIORITY: Queue<Process> = Queue::new();
+static mut LOW_PRIORITY: LinkedList<Process> = LinkedList::new();
+static mut HIGH_PRIORITY: LinkedList<Process> = LinkedList::new();
 static mut HIGH_PRIORITY_VALUE: u8 = HIGH_PRIORITY_RELOAD;
+static mut WAITING_QUEUE: BTreeMap<i64, (Process, *mut i32)> = BTreeMap::new();
 
 static mut TSS_ENTRY: TaskStateSegment = TaskStateSegment {
     reserved0: 0,
@@ -103,6 +105,7 @@ pub struct Process {
     pub page_table: PhysAddr,
     pub instruction_pointer: u64,
     pub flags: u64,
+    pid: i64,
     stack_start: VirtAddr,
     cwd: usize,
     kernel_task: bool,
@@ -151,9 +154,25 @@ impl Process {
         self.stack_start
     }
 
+    pub const fn pid(&self) -> i64 {
+        self.pid
+    }
+
     pub const fn allocator(&self) -> &Locked<Allocator> {
         &self.allocator
     }
+}
+
+/// Returns a new process ID.
+/// Assumes that no more than 2 ^ 63 processes will ever be created.
+fn allocate_pid() -> i64 {
+    static PID_COUNTER: Mutex<i64> = Mutex::new(0);
+    let mut counter = PID_COUNTER.lock();
+    let pid = *counter;
+
+    *counter += 1;
+
+    pid
 }
 
 /// Get the `rsp0` field from the TSS.
@@ -169,6 +188,67 @@ pub unsafe fn get_running_process() -> &'static mut Option<Process> {
     &mut CURR_PROC
 }
 
+/// Searches for a process in the different queues.
+///
+/// # Arguments
+/// - `pid` - The process ID of the process to search.
+///
+/// # Returns
+/// `true` if the process was found and `false` if it wasn't.
+///
+/// # Safety
+/// Should not be used in a multi-threaded situation.
+pub unsafe fn search_process(pid: i64) -> bool {
+    let queues = [&mut LOW_PRIORITY, &mut HIGH_PRIORITY];
+
+    for queue in queues {
+        for element in queue {
+            if element.pid() == pid {
+                return true;
+            }
+        }
+    }
+    for element in WAITING_QUEUE.values() {
+        if element.0.pid() == pid {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Add a process to the waiting processes.
+/// The waiting processes are processes who are waiting for a child process to terminate.
+/// A process will not continue its execution as long as it is in the waiting processes.
+///
+/// # Arguments
+/// - `pid` - The process ID of the process to wait for.
+/// The function assumes the process exist.
+/// - `parent` - The process who's waiting.
+/// - `wstatus` - A buffer for the future child process' exit code.
+///
+/// # Safety
+/// - `wstatus` must be valid for writes.
+/// - Should not be used in a multi-threaded situation.
+pub unsafe fn wait_for(pid: i64, parent: Process, wstatus: *mut i32) {
+    WAITING_QUEUE.insert(pid, (parent, wstatus));
+}
+
+/// Notify a waiting parent of the termination of its child, if it exists.
+///
+/// # Arguments
+/// - `p` - The child process that has finished.
+/// - `status` - The exit code of the child process.
+///
+/// # Safety
+/// Should not be used in a multi-threaded situation.
+pub unsafe fn stop_waiting_for(p: &Process, status: i32) {
+    if let Some(parent) = WAITING_QUEUE.remove(&p.pid()) {
+        add_to_the_queue(parent.0);
+        *parent.1 = status;
+    }
+}
+
 /// function that push process into the process queue
 ///
 /// # Arguments
@@ -177,9 +257,9 @@ pub fn add_to_the_queue(p: Process) {
     // SAFETY: The shceduler should not be referenced in a multithreaded situation.
     unsafe {
         if p.kernel_task {
-            HIGH_PRIORITY.enqueue(p);
+            HIGH_PRIORITY.push_back(p);
         } else {
-            LOW_PRIORITY.enqueue(p);
+            LOW_PRIORITY.push_back(p);
         }
     }
 }
@@ -212,11 +292,11 @@ pub unsafe fn load_from_queue() -> ! {
             HIGH_PRIORITY_VALUE -= 1;
         }
 
-        HIGH_PRIORITY.dequeue().unwrap()
+        HIGH_PRIORITY.pop_front().unwrap()
     } else {
         HIGH_PRIORITY_VALUE = HIGH_PRIORITY_RELOAD;
 
-        LOW_PRIORITY.dequeue().unwrap()
+        LOW_PRIORITY.pop_front().unwrap()
     };
 
     if let Some(process) = &CURR_PROC {

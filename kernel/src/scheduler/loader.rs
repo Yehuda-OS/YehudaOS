@@ -259,6 +259,7 @@ impl super::Process {
             page_table,
             instruction_pointer: header.e_entry,
             flags: super::INTERRUPT_FLAG_ON,
+            pid: super::allocate_pid(),
             kernel_task: false,
             stack_start: VirtAddr::new(PROCESS_STACK_POINTER),
             cwd,

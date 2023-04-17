@@ -12,6 +12,7 @@ pub const READ: u64 = 0x0;
 pub const WRITE: u64 = 0x1;
 pub const OPEN: u64 = 0x2;
 pub const FSTAT: u64 = 0x5;
+pub const WAITPID: u64 = 0x7;
 pub const MALLOC: u64 = 0x9;
 pub const FREE: u64 = 0xb;
 pub const EXEC: u64 = 0x3b;
@@ -86,15 +87,15 @@ pub unsafe fn creat(path: *const u8, directory: bool) -> i32 {
     }
 }
 
-/// Terminate the process.
+/// Terminate the calling process.
 ///
 /// # Arguments
 /// - `status` - The exit code of the process.
-pub unsafe fn exit(_status: i32) -> i64 {
-    crate::scheduler::terminator::add_to_queue(core::ptr::read(
-        scheduler::get_running_process().as_mut().unwrap(),
-    ));
-    core::ptr::write(scheduler::get_running_process(), None);
+pub unsafe fn exit(status: i32) -> i64 {
+    let p = core::mem::replace(scheduler::get_running_process(), None).unwrap();
+
+    scheduler::stop_waiting_for(&p, status);
+    scheduler::terminator::add_to_queue(p);
 
     0
 }
@@ -272,6 +273,38 @@ pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
     }
 }
 
+/// Awaits the calling process until a specific process terminates.
+///
+/// # Arguments
+/// - `pid` - The process ID of the process to wait for.
+/// Must be a non-negative number.
+/// - `wstatus` - A buffer to write the process' exit code into.
+///
+/// # Returns
+/// 0 on sucess or -1 on error.
+/// Possible errors:
+/// - `pid` is negative.
+/// - The process specified by `pid` does not exist.
+/// - The process specified by `pid` has already finished its execution.
+pub unsafe fn waitpid(pid: i64, wstatus: *mut i32) -> i64 {
+    let p;
+
+    if pid < 0 {
+        return -1;
+    }
+
+    // Write to `wstatus` to avoid any errors with it later.
+    *wstatus = 0;
+    if scheduler::search_process(pid) {
+        p = core::mem::replace(scheduler::get_running_process(), None).unwrap();
+        scheduler::wait_for(pid, p, wstatus);
+
+        0
+    } else {
+        -1
+    }
+}
+
 /// Change the length of a file to a specific length.
 /// If the file has been set to a greater length, reading the extra data will return null bytes
 /// until the data is being written.
@@ -373,13 +406,14 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
 /// - `pathname` - Path to the file to execute, must be a valid ELF file.
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise.
+/// The process ID of the new process if the operation was successful, -1 otherwise.
 pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let args = super::get_args(argv);
     let mut args_str = Vec::new();
     let file_name;
     let file_id;
+    let new_pid;
 
     if let Some(name) = super::get_user_str(p, pathname) {
         file_name = name;
@@ -404,12 +438,13 @@ pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
         scheduler::get_running_process().as_ref().unwrap().cwd(),
         &args_str,
     ) {
+        new_pid = proc.pid();
         scheduler::add_to_the_queue(proc);
-    } else {
-        return -1;
-    };
 
-    0
+        new_pid
+    } else {
+        -1
+    }
 }
 
 /// Allocate memory for a userspace program.
