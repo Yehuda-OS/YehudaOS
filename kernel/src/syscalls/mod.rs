@@ -56,10 +56,10 @@ unsafe fn handle_syscall(
 ) -> i64 {
     match syscall_number {
         handlers::READ => {
-            handlers::read(arg0 as i32, arg2 as *mut u8, arg2 as usize, arg3 as usize)
+            handlers::read(arg0 as i32, arg1 as *mut u8, arg2 as usize, arg3 as usize)
         }
         handlers::WRITE => {
-            handlers::write(arg0 as i32, arg2 as *const u8, arg2 as usize, arg3 as usize)
+            handlers::write(arg0 as i32, arg1 as *const u8, arg2 as usize, arg3 as usize)
         }
         handlers::EXEC => handlers::exec(arg0 as *const u8, arg1 as *const *const u8),
         handlers::MALLOC => handlers::malloc(arg0 as usize) as i64,
@@ -171,7 +171,7 @@ unsafe fn get_user_buffer(
             .ok()?;
 
         Some(core::slice::from_raw_parts(
-            (page + memory::HHDM_OFFSET).as_u64() as *const u8,
+            (page.as_u64() + memory::HHDM_OFFSET) as *const u8,
             len,
         ))
     }
