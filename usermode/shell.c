@@ -145,6 +145,25 @@ bool_t is_executable(const char* command)
  */
 void handle_builtin(char* const argv[])
 {
+    if (strcmp(argv[0], "cd") == 0)
+    {
+        if (argv[1] == NULL)
+        {
+            print_str("YehudaSH: cd: No target parameter");
+        }
+        else if (chdir(argv[1]) == -1)
+        {
+            print_str("YehudaSH: cd: ");
+            print_str(argv[1]);
+            print_str(": No such file or directory");
+        }
+    }
+    else
+    {
+        print_str("YehudaSH: ");
+        print_str(argv[0]);
+        print_str(": command not found");
+    }
 }
 
 /**
