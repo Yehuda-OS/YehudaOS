@@ -37,7 +37,7 @@ int exec(const char* pathname, char* const argv[]);
 
 void exit(int status);
 
-int fchdir(int fd);
+int chdir(const char* path);
 
 int creat(const char* path, bool_t directory);
 

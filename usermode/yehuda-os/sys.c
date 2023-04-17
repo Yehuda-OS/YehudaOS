@@ -11,7 +11,7 @@ const size_t FREE        = 0xb;
 const size_t REALLOC     = 0xc;
 const size_t EXEC        = 0x3b;
 const size_t EXIT        = 0x3c;
-const size_t FCHDIR      = 0x51;
+const size_t CHDIR       = 0x50;
 const size_t CREAT       = 0x55;
 const size_t REMOVE_FILE = 0x57;
 const size_t READ_DIR    = 0x59;
@@ -188,9 +188,9 @@ void exit(int status)
  * returns: 0 if the operation was successful or -1 if `fd` does not exist of
  *          if `fd` is not a directory.
  */
-int fchdir(int fd)
+int chdir(const char* path)
 {
-    return syscall(FCHDIR, fd, 0, 0, 0, 0, 0);
+    return syscall(CHDIR, (size_t)path, 0, 0, 0, 0, 0);
 }
 
 /**
