@@ -5,7 +5,7 @@ use crate::{
     memory::{self, allocator},
     scheduler,
 };
-use alloc::vec::Vec;
+use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use fs_rs::fs::{self, DirEntry};
 
 pub const READ: u64 = 0x0;
@@ -74,6 +74,8 @@ pub unsafe fn chdir(path: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_mut().unwrap();
     let file_id;
     let path_str;
+    let combined_path;
+    let absolute_path;
 
     if let Some(path) = super::get_user_str(p, path) {
         path_str = path;
@@ -86,8 +88,18 @@ pub unsafe fn chdir(path: *const u8) -> i64 {
         return -1;
     }
 
+    combined_path = if p.cwd_path().ends_with('/') {
+        p.cwd_path().to_string() + path_str
+    } else {
+        p.cwd_path().to_string() + "/" + path_str
+    };
     if fs::is_dir(file_id).unwrap_or(false) {
-        p.set_cwd(super::get_absolute_path(p.cwd_path(), path_str).as_str());
+        absolute_path = if path_str.starts_with('/') {
+            path_str.to_string()
+        } else {
+            super::get_absolute_path(&combined_path)
+        };
+        p.set_cwd(&absolute_path);
 
         0
     } else {

@@ -146,7 +146,7 @@ impl Process {
     }
 
     pub fn cwd_path(&self) -> &str {
-        self.cwd_path.as_str()
+        &self.cwd_path
     }
 
     /// Set the current working directory of the process to `value`.

@@ -1,4 +1,5 @@
 use alloc::string::String;
+use alloc::vec::Vec;
 use x86_64::VirtAddr;
 
 use super::io;
@@ -118,13 +119,29 @@ unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
 /// Get the absolute path to a file from a relative path.
 ///
 /// # Arguments
-/// - `cwd` - The current working directory the path is relative to.
-/// - `path` - A relative path to a file.
+/// - `path` - A path to a file.
 ///
 /// # Returns
 /// The absolute path to the file that `path` refers to.
-fn get_absolute_path(cwd: &str, path: &str) -> String {
-    String::new()
+fn get_absolute_path(path: &str) -> String {
+    let components = path.split('/');
+    let mut stack = Vec::new();
+    let mut result = String::new();
+
+    for component in components {
+        match component {
+            "." => continue,
+            ".." => {
+                stack.pop();
+            }
+            _ => {
+                stack.push(component);
+            }
+        }
+    }
+    result.push_str(&stack.join("/"));
+
+    result
 }
 
 /// Get a slice borrow from a user buffer.
