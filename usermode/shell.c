@@ -4,7 +4,6 @@
 #define MAX_INT_STRLEN 11
 
 const char* EXECUTABLE_PATH_START[] = { "./", "../", "/", NULL };
-const char* BUILTINS[]              = { "cd" };
 
 /**
  * Returns the amount of words in `str`.
@@ -161,7 +160,7 @@ void handle_executable(char* const argv[])
 
     if (pid == -1)
     {
-        print_str("YehudaSH: Error: execution of ");
+        print_str("YehudaSH: execution of ");
         print_str(argv[0]);
         print_str("has failed\n");
 
@@ -191,10 +190,23 @@ void handle_executable(char* const argv[])
  */
 bool_t handle_command()
 {
-    char* command       = getline();
+    char* command       = NULL;
     char** command_args = NULL;
     char** current      = NULL;
+    char* dir           = get_current_dir_name();
 
+    if (dir == NULL)
+    {
+        return FALSE;
+    }
+
+    print_str("[YehudaSH] ");
+    print_str(dir);
+    print_str(" $ ");
+    free(dir);
+    dir = NULL;
+
+    command = getline();
     if (command == NULL)
     {
         free(command);
@@ -234,10 +246,9 @@ int main()
 {
     while (TRUE)
     {
-        print_str("[YehudaSH] ");
         if (!handle_command())
         {
-            print_str("YehudaSH: Error: Allocating memory has failed.\n");
+            print_str("YehudaSH: Allocating memory has failed.\n");
         }
     }
 
