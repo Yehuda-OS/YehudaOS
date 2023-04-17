@@ -18,11 +18,6 @@ char* strcpy(char* destination, const char* source)
 {
     char* ptr = destination;
 
-    if (destination == NULL)
-    {
-        return NULL;
-    }
-
     while (*source != '\0')
     {
         *destination = *source;
@@ -48,6 +43,22 @@ char* strncpy(char* dest, const char* src, size_t n)
     }
 
     return dest;
+}
+
+int strcmp(const char* str1, const char* str2)
+{
+    int i = 0;
+
+    while (str1[i] == str2[i])
+    {
+        if (str1[i] == '\0')
+        {
+            return 0;
+        }
+        i++;
+    }
+
+    return str1[i] > str2[i] ? 1 : -1;
 }
 
 /**

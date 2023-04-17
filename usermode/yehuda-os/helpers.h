@@ -8,6 +8,8 @@ char* strcpy(char* destination, const char* source);
 
 char* strncpy(char* dest, const char* src, size_t n);
 
+int strcmp(const char* str1, const char* str2);
+
 void free_array(void** arr, size_t size);
 
 char* getline();
