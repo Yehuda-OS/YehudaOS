@@ -20,20 +20,22 @@ const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
 #[global_allocator]
 pub static mut ALLOCATOR: Locked<Allocator> =
-    Locked::<Allocator>::new(Allocator::new(KERNEL_HEAP_START, PhysAddr::zero()));
+    Locked::<Allocator>::new(Allocator::new(KERNEL_HEAP_START, PhysAddr::zero(), false));
 
 pub struct Allocator {
     heap_start: u64,
     pages: u64,
     page_table: PhysAddr,
+    usermode_allocator: bool,
 }
 
 impl Allocator {
-    pub const fn new(heap_start: u64, page_table: PhysAddr) -> Self {
+    pub const fn new(heap_start: u64, page_table: PhysAddr, usermode_allocator: bool) -> Self {
         Allocator {
             heap_start,
             pages: 0,
             page_table,
+            usermode_allocator,
         }
     }
 
@@ -73,7 +75,13 @@ fn alloc_node(
     let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
     let mut current_size = 0;
     let adjustment = get_adjustment(start.as_mut_ptr(), align);
-    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let flags = PageTableFlags::PRESENT
+        | PageTableFlags::WRITABLE
+        | if allocator.usermode_allocator {
+            PageTableFlags::USER_ACCESSIBLE
+        } else {
+            PageTableFlags::empty()
+        };
     let allocated;
     let required_pages = if (size + adjustment) % Size4KiB::SIZE == 0 {
         (size + adjustment) / Size4KiB::SIZE

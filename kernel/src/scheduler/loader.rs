@@ -273,6 +273,7 @@ impl super::Process {
             allocator: allocator::Locked::new(allocator::Allocator::new(
                 allocator::USER_HEAP_START,
                 page_table,
+                true,
             )),
         };
 

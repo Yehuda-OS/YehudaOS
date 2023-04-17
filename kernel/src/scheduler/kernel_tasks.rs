@@ -108,7 +108,11 @@ impl super::Process {
             stack_start: VirtAddr::new(stack),
             cwd_path: String::from("/"),
             cwd: 0,
-            allocator: allocator::Locked::new(allocator::Allocator::new(0, PhysAddr::zero())),
+            allocator: allocator::Locked::new(allocator::Allocator::new(
+                0,
+                PhysAddr::zero(),
+                false,
+            )),
         };
 
         memory::vmm::map_address(
