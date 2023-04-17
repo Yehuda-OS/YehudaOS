@@ -197,10 +197,13 @@ char* get_current_dir_name()
 /**
  * Change the current working directory.
  *
- * `fd`: File descriptor to the new working directory.
+ * `path`: Path to the new working directory.
  *
- * returns: 0 if the operation was successful or -1 if `fd` does not exist of
- *          if `fd` is not a directory.
+ * returns: 0 if the operation was successful or -1 on failure.
+ *          Possible failures:
+ *          - `path` is invalid.
+ *          - `path` does not exist.
+ *          - `path` is not a directory.
  */
 int chdir(const char* path)
 {

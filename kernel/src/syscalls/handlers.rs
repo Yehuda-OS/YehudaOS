@@ -62,10 +62,14 @@ pub unsafe fn get_current_dir_name() -> *mut u8 {
 /// Change the current working directory.
 ///
 /// # Arguments
-/// - `fd` - File descriptor to the new working directory.
+/// - `path` - Path to the new working directory.
 ///
 /// # Returns
-/// 0 if the operation was successful or -1 if `fd` does not exist or if `fd` is not a directory.
+/// 0 if the operation was successful or -1 on failure.
+/// Possible failures:
+/// - `path` is invalid.
+/// - `path` does not exist.
+/// - `path` is not a directory.
 pub unsafe fn chdir(path: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_mut().unwrap();
     let file_id;
