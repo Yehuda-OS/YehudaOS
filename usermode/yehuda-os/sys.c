@@ -151,12 +151,19 @@ void free(void* ptr)
  * Grow or shrink a block that was allocated with `malloc`.
  * Copies the data from the original block to the new block.
  *
+ * `ptr`: The block that was allocated with `malloc`.
+ *        If `ptr` is `NULL`, then the call is equivalent to `malloc(size)`
  * `size`: The new required size of the block.
  *
  * returns: A pointer to a new allocation or null on failure.
  */
 void* realloc(void* ptr, size_t size)
 {
+    if (ptr == NULL)
+    {
+        return malloc(size);
+    }
+
     return (void*)syscall(REALLOC, (size_t)ptr, size, 0, 0, 0, 0);
 }
 

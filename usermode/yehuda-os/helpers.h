@@ -16,6 +16,6 @@ char* getline();
 
 void print_str(const char* str);
 
-void int_to_string(int num, char* str);
+void int_to_string(int num, char* buffer);
 
 #endif // YEHUDAOS_HELPERS
