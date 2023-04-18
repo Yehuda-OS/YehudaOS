@@ -304,11 +304,13 @@ pub unsafe fn load_from_queue() -> ! {
             HIGH_PRIORITY_VALUE -= 1;
         }
 
-        HIGH_PRIORITY.pop_front().unwrap()
+        HIGH_PRIORITY
+            .pop_front()
+            .expect("No processes in the queue")
     } else {
         HIGH_PRIORITY_VALUE = HIGH_PRIORITY_RELOAD;
 
-        LOW_PRIORITY.pop_front().unwrap()
+        LOW_PRIORITY.pop_front().expect("No processes in the queue")
     };
 
     if let Some(process) = &CURR_PROC {
