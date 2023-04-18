@@ -76,18 +76,25 @@ pub unsafe fn initialize_everything() {
 /// # Arguments
 /// - `name` - The name/path of the file.
 /// - `content` - The content of the file.
-pub unsafe fn add_file(name: &str, content: &[u8]) -> Result<(), FsError> {
+///
+/// # Returns
+/// The inode ID of the new file on success or `FsError` on error.
+pub unsafe fn add_executable(name: &str, content: &[u8]) -> Result<usize, FsError> {
     let file_id = fs::create_file(name, false, None)?;
 
     fs::write(file_id, content, 0)?;
 
-    Ok(())
+    Ok(file_id)
 }
 
 pub unsafe fn add_processes() {
-    let shell = include_bytes!("../bin/shell");
+    let shell =
+        add_executable("/shell", include_bytes!("../bin/shell")).expect("Failed to add the shell");
 
-    add_file("/shell", shell).expect("Failed to add the shell");
+    scheduler::add_to_the_queue(
+        scheduler::Process::new_user_process(shell as u64, "/", &Vec::new())
+            .expect("Failed to add the shell"),
+    );
     scheduler::add_to_the_queue(
         scheduler::Process::new_kernel_task(
             scheduler::terminator::terminate_from_queue,
