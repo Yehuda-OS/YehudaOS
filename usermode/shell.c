@@ -272,7 +272,6 @@ bool_t handle_command()
 
 int main()
 {
-    print_str("Welcome to YehudaSH!\n");
     while (TRUE)
     {
         if (!handle_command())
