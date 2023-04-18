@@ -569,5 +569,9 @@ pub unsafe fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
         .as_mut()
         .unwrap()
         .allocator()
-        .realloc(ptr, Layout::from_size_align_unchecked(0, 1), size)
+        .realloc(
+            ptr,
+            Layout::from_size_align_unchecked(size, allocator::DEFAULT_ALIGNMENT),
+            size,
+        )
 }
