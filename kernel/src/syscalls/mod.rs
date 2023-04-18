@@ -132,7 +132,9 @@ fn get_absolute_path(path: &str) -> String {
         match component {
             "." => continue,
             ".." => {
-                stack.pop();
+                if stack.len() > 1 {
+                    stack.pop();
+                }
             }
             _ => {
                 stack.push(component);
@@ -140,6 +142,9 @@ fn get_absolute_path(path: &str) -> String {
         }
     }
     result.push_str(&stack.join("/"));
+    if result.is_empty() {
+        result.push('/');
+    }
 
     result
 }
