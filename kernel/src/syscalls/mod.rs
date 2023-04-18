@@ -109,7 +109,7 @@ unsafe fn strlen(buffer: *const u8) -> usize {
 unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
     let mut len = 0;
 
-    while !(*argv).is_null() {
+    while !(*argv.add(len)).is_null() {
         len += 1;
     }
 
@@ -132,7 +132,9 @@ fn get_absolute_path(path: &str) -> String {
         match component {
             "." => continue,
             ".." => {
-                stack.pop();
+                if stack.len() > 1 {
+                    stack.pop();
+                }
             }
             _ => {
                 stack.push(component);
@@ -140,6 +142,9 @@ fn get_absolute_path(path: &str) -> String {
         }
     }
     result.push_str(&stack.join("/"));
+    if result.is_empty() {
+        result.push('/');
+    }
 
     result
 }
@@ -266,5 +271,6 @@ pub unsafe fn handler() -> ! {
         proc.registers.r9,
     ) as u64;
 
+    scheduler::switch_current_process();
     scheduler::load_from_queue();
 }

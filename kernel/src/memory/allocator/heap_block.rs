@@ -102,6 +102,10 @@ impl HeapBlock {
         self.prev
     }
 
+    pub fn set_prev(&mut self, value: *mut HeapBlock) {
+        self.prev = value;
+    }
+
     /// function that gets pointer and return the block it belongs to
     ///
     /// # Arguments

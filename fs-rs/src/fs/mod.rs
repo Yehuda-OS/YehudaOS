@@ -123,7 +123,7 @@ fn names_equal(first: &[u8], second: &[u8]) -> bool {
 /// - `path` - The path to the file.
 /// - `cwd` - The current working directory, used for relative paths.
 fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
-    let mut next_delimiter = path.find('/');
+    let mut next_delimiter;
     let mut next_folder;
     let mut inode = get_root_dir();
     let mut dir_entry = DirEntry::default();
@@ -143,6 +143,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         path = &path[0..path.len() - 1];
     }
 
+    next_delimiter = path.find('/');
     loop {
         index = 0;
         found = false;
@@ -589,12 +590,13 @@ pub fn format() {
 /// - `cwd` - The ID of the current working directory.
 ///
 /// # Returns
+/// On success, the function returns the inode ID of the new file.
 /// The function might return the errors:
 /// - `FileNotFound`
 /// - `NotEnoughDiskSpace`
 /// - `MaximumSizeExceeded`
 /// - `FileAlreadyExists`
-pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Result<(), FsError> {
+pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Result<usize, FsError> {
     let last_delimiter = path_str.rfind('/');
     let file_name = match last_delimiter {
         Some(delimiter) => &path_str[delimiter + 1..],
@@ -646,7 +648,9 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
     };
     file_details.id = file.id();
 
-    add_file_to_folder(&file_details, dir.id())
+    add_file_to_folder(&file_details, dir.id())?;
+
+    Ok(file.id())
 }
 
 /// function that removes a file

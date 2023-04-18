@@ -237,10 +237,13 @@ unsafe fn find_usable_block(
 /// # Safety
 /// This function is unsafe because it requires the block to have a free block after it.
 unsafe fn merge_blocks(block: *mut HeapBlock) {
-    let next = *(*block).next();
+    let next = (*block).next();
 
-    (*block).set_size((*block).size() + next.size() + HEADER_SIZE);
-    (*block).set_has_next(next.has_next());
+    if (*next).has_next() {
+        (*(*next).next()).set_prev(block);
+    }
+    (*block).set_size((*block).size() + (*next).size() + HEADER_SIZE);
+    (*block).set_has_next((*next).has_next());
 }
 
 /// Split a block into two blocks, one with the required size and one with the remaining size.
@@ -255,10 +258,15 @@ unsafe fn merge_blocks(block: *mut HeapBlock) {
 unsafe fn shrink_block(block: *mut HeapBlock, size: u64) {
     let has_next = (*block).has_next();
     let extra = (*block).size() - size;
+    let next;
 
     (*block).set_size(size as u64);
     (*block).set_has_next(true);
-    *(*block).next() = HeapBlock::new(true, has_next, (extra - HEADER_SIZE) as u64, block);
+    next = (*block).next();
+    *next = HeapBlock::new(true, has_next, (extra - HEADER_SIZE) as u64, block);
+    if has_next {
+        (*(*next).next()).set_prev(next);
+    }
 }
 
 /// Check if the block is bigger than the required size and if it is resize it accordingly and
@@ -298,15 +306,35 @@ unsafe fn resize_block(mut block: *mut HeapBlock, size: u64, align: u64) -> *mut
 
 /// Used for debugging.
 #[allow(unused)]
-unsafe fn print_list(first: *mut HeapBlock) {
+unsafe fn print_list(allocator: &mut Allocator) {
     use crate::println;
-    let mut curr = first;
+    use x86_64::registers::control::Cr3;
 
-    println!("\n\n|LIST|");
+    let mut curr = allocator.heap_start as *mut HeapBlock;
+    let before = Cr3::read().0.start_address();
+
+    memory::load_tables_to_cr3(memory::get_page_table());
+
+    println!("\n\n|LIST|, pages: {}", allocator.pages);
     while curr != null_mut() {
-        println!("{:p} : {:?}, size: {:#x}", curr, *curr, (*curr).size());
+        memory::load_tables_to_cr3(before);
+        let addr = curr;
+        let copy = *curr;
+
         curr = (*curr).next();
+        memory::load_tables_to_cr3(memory::get_page_table());
+
+        println!(
+            "{:p} : {:?}, size: {:#x}, free: {}, has_next: {}",
+            addr,
+            copy,
+            copy.size(),
+            copy.free(),
+            copy.has_next()
+        );
     }
+
+    memory::load_tables_to_cr3(before);
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {

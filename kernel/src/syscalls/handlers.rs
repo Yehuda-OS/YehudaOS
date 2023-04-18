@@ -5,7 +5,7 @@ use crate::{
     memory::{self, allocator},
     scheduler,
 };
-use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+use alloc::{string::ToString, vec::Vec};
 use fs_rs::fs::{self, DirEntry};
 
 pub const READ: u64 = 0x0;
@@ -97,7 +97,7 @@ pub unsafe fn chdir(path: *const u8) -> i64 {
     };
     if fs::is_dir(file_id).unwrap_or(false) {
         absolute_path = if path_str.starts_with('/') {
-            path_str.to_string()
+            super::get_absolute_path(&path_str)
         } else {
             super::get_absolute_path(&combined_path)
         };
@@ -424,9 +424,10 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 /// - `dirp` - A buffer to write the data into.
 ///
 /// # Returns
-/// A pointer to the directory entry.
-/// The directory entry contains the file's name and the file's id that can be used as a file
-/// descriptor.
+/// 0 on success, -1 on failure.
+/// Possible failures:
+/// - `fd` is negative or invalid.
+/// - `fd` is a directory.
 pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
     let file_id;
 
@@ -569,5 +570,9 @@ pub unsafe fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
         .as_mut()
         .unwrap()
         .allocator()
-        .realloc(ptr, Layout::from_size_align_unchecked(0, 1), size)
+        .realloc(
+            ptr,
+            Layout::from_size_align_unchecked(size, allocator::DEFAULT_ALIGNMENT),
+            size,
+        )
 }

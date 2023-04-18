@@ -15,7 +15,7 @@ size_t count_words(const char* str)
 
     while (*str != '\0')
     {
-        if (*str == ' ')
+        if (isspace(*str))
         {
             in_word = FALSE;
         }
@@ -53,7 +53,7 @@ char** parse_command(const char* command)
 
     while (*current != '\0')
     {
-        if (*current == ' ')
+        if (isspace(*current))
         {
             if (in_word)
             {
@@ -97,7 +97,9 @@ char** parse_command(const char* command)
         }
         strncpy(words[count], start, word_len);
         words[count][word_len] = '\0';
+        count++;
     }
+    words[count] = NULL;
 
     return words;
 }
@@ -149,20 +151,20 @@ void handle_builtin(char* const argv[])
     {
         if (argv[1] == NULL)
         {
-            print_str("YehudaSH: cd: No target parameter");
+            print_str("YehudaSH: cd: No target parameter\n");
         }
         else if (chdir(argv[1]) == -1)
         {
             print_str("YehudaSH: cd: ");
             print_str(argv[1]);
-            print_str(": No such file or directory");
+            print_str(": No such file or directory\n");
         }
     }
     else
     {
         print_str("YehudaSH: ");
         print_str(argv[0]);
-        print_str(": command not found");
+        print_str(": command not found\n");
     }
 }
 
@@ -181,7 +183,7 @@ void handle_executable(char* const argv[])
     {
         print_str("YehudaSH: execution of ");
         print_str(argv[0]);
-        print_str("has failed\n");
+        print_str(" has failed\n");
 
         return;
     }
@@ -198,7 +200,7 @@ void handle_executable(char* const argv[])
         print_str(" has exited with exit code ");
         print_str(exitcode_buffer);
     }
-    print_str("\n");
+    print_newline();
 }
 
 /**
@@ -236,9 +238,16 @@ bool_t handle_command()
     {
         return FALSE;
     }
-
     free(command);
     command = NULL;
+
+    if (command_args[0] == NULL)
+    {
+        free(command_args);
+
+        return TRUE;
+    }
+
     if (is_executable(command_args[0]))
     {
         handle_executable((char* const*)command_args);
@@ -263,7 +272,6 @@ bool_t handle_command()
 
 int main()
 {
-    print_str("Welcome to YehudaSH!\n");
     while (TRUE)
     {
         if (!handle_command())

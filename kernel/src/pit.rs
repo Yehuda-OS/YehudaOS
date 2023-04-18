@@ -1,5 +1,5 @@
 use super::io;
-use crate::{memory, scheduler};
+use crate::scheduler;
 use x86_64::structures::idt::InterruptStackFrame;
 
 const TICKS_PER_SECOND: u32 = 1193182;
@@ -24,11 +24,9 @@ pub unsafe fn start(tps: u32) {
     io::outb(PIT_CHANNEL0, high);
 }
 
-#[no_mangle]
 pub unsafe extern "C" fn pit_handler(frame: &InterruptStackFrame) {
     let curr = scheduler::get_running_process().as_mut().unwrap();
 
-    memory::load_tables_to_cr3(memory::get_page_table());
     curr.instruction_pointer = frame.instruction_pointer.as_u64();
     curr.stack_pointer = frame.stack_pointer.as_u64();
     curr.flags = frame.cpu_flags;

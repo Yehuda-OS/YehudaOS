@@ -6,6 +6,7 @@ use crate::syscalls::int_0x80_handler as syscall_handler;
 use crate::{interrupt_handler, print, println, scheduler};
 use bit_field::BitField;
 use core::arch::asm;
+use keyboard::handler as keyboard_handler;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
@@ -56,10 +57,21 @@ lazy_static! {
             )
             .set_stack_index(1),
         );
-        idt.set_handler(KEYBOARD_HANDLER, keyboard::handler as u64);
-        idt.set_handler(
+        idt.set_handler_entry(
+            KEYBOARD_HANDLER,
+            *Entry::new(
+                SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
+                interrupt_handler!(keyboard_handler => keyboard) as u64,
+            )
+            .set_stack_index(1),
+        );
+        idt.set_handler_entry(
             SYSCALL_HANDLER,
-            interrupt_handler!(syscall_handler => syscall) as u64,
+            *Entry::new(
+                SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
+                interrupt_handler!(syscall_handler => syscall) as u64,
+            )
+            .set_stack_index(1),
         );
 
         idt
@@ -204,9 +216,10 @@ unsafe fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) -> ! {
     let curr = crate::scheduler::get_running_process().as_mut().unwrap();
-    if x86_64::registers::control::Cr2::read() <= curr.stack_start()
-        && x86_64::registers::control::Cr2::read()
-            >= (curr.stack_start() - scheduler::MAX_STACK_SIZE)
+    let pfault_address = x86_64::registers::control::Cr2::read();
+
+    if pfault_address <= curr.stack_start()
+        && pfault_address >= (curr.stack_start() - scheduler::MAX_STACK_SIZE)
     {
         let new_stack_page: PhysFrame;
         match crate::memory::page_allocator::allocate() {
