@@ -11,6 +11,7 @@
 extern crate alloc;
 
 use fs_rs::fs;
+use limine::LimineFramebufferRequest;
 
 mod gdt;
 mod idt;
@@ -24,6 +25,63 @@ mod scheduler;
 mod syscalls;
 mod terminal;
 
+const LOGO_SIZE: u64 = 500;
+
+static FRAMEBUFFER: LimineFramebufferRequest = LimineFramebufferRequest::new(0);
+
+pub unsafe fn print_logo() -> Option<()> {
+    let framebuffer = &FRAMEBUFFER.get_response().get()?.framebuffers()[0];
+    let address = framebuffer.address.as_ptr()?;
+    let logo = include_bytes!("../../YehudaOS.rgba");
+
+    for y in 0..LOGO_SIZE {
+        for x in 0..LOGO_SIZE {
+            let offset = (y * LOGO_SIZE + x) as usize * 4;
+            let screen_offset = (y * framebuffer.width + x) as usize * 4;
+            *address.add(screen_offset) = logo[offset];
+            *address.add(screen_offset + 1) = logo[offset + 1];
+            *address.add(screen_offset + 2) = logo[offset + 2];
+            *address.add(screen_offset + 3) = logo[offset + 3];
+        }
+    }
+    for _ in 0..28 {
+        println!("");
+    }
+
+    Some(())
+}
+
+pub unsafe fn initialize_everything() {
+    memory::page_allocator::initialize();
+    // UNWRAP: There's no point in continuing without a valid page table.
+    memory::PAGE_TABLE =
+        memory::vmm::create_page_table().expect("Not enough free memory for a kernel's page table");
+    memory::map_kernel_address().unwrap();
+    memory::create_hhdm(memory::PAGE_TABLE).unwrap();
+    memory::map_bootloader_memory().unwrap();
+    memory::load_tables_to_cr3(memory::PAGE_TABLE);
+    memory::allocator::ALLOCATOR
+        .lock()
+        .set_page_table(memory::PAGE_TABLE);
+    gdt::create();
+    gdt::activate();
+    fs::init();
+    scheduler::load_tss();
+    idt::IDT.load();
+    syscalls::initialize();
+    pit::start(19);
+}
+
+pub unsafe fn add_processes() {
+    scheduler::add_to_the_queue(
+        scheduler::Process::new_kernel_task(
+            scheduler::terminator::terminate_from_queue,
+            core::ptr::null_mut(),
+        )
+        .expect("Error: failed to load processes terminator"),
+    );
+}
+
 /// Kernel Entry Point
 ///
 /// `_start` is defined in the linker script as the entry point for the ELF file.
@@ -31,37 +89,12 @@ mod terminal;
 /// the bootloader will transfer control to this function.
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    memory::page_allocator::initialize();
     unsafe {
-        // UNWRAP: There's no point in continuing without a valid page table.
-        memory::PAGE_TABLE = memory::vmm::create_page_table()
-            .expect("Not enough free memory for a kernel's page table");
-        memory::map_kernel_address().unwrap();
-        memory::create_hhdm(memory::PAGE_TABLE).unwrap();
-        memory::map_bootloader_memory().unwrap();
-        memory::load_tables_to_cr3(memory::PAGE_TABLE);
-        memory::allocator::ALLOCATOR
-            .lock()
-            .set_page_table(memory::PAGE_TABLE);
-        gdt::create();
-        gdt::activate();
-        fs::init();
-        scheduler::load_tss();
-        idt::IDT.load();
-        syscalls::initialize();
-        pit::start(19);
-
-        scheduler::add_to_the_queue(
-            scheduler::Process::new_kernel_task(
-                scheduler::terminator::terminate_from_queue,
-                core::ptr::null_mut(),
-            )
-            .expect("Error: failed to load processes terminator"),
-        );
+        initialize_everything();
+        print_logo();
+        add_processes();
+        scheduler::load_from_queue();
     }
-    println!("Hello world");
-
-    hcf();
 }
 
 #[panic_handler]
