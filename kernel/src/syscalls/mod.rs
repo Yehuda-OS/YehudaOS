@@ -266,5 +266,6 @@ pub unsafe fn handler() -> ! {
         proc.registers.r9,
     ) as u64;
 
+    scheduler::switch_current_process();
     scheduler::load_from_queue();
 }
