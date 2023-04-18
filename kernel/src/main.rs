@@ -44,9 +44,7 @@ pub unsafe fn print_logo() -> Option<()> {
             *address.add(screen_offset + 3) = logo[offset + 3];
         }
     }
-    for _ in 0..28 {
-        println!("");
-    }
+    print!("{}", "\n".repeat(28));
 
     Some(())
 }
