@@ -177,7 +177,7 @@ void* realloc(void* ptr, size_t size)
  */
 int exec(const char* pathname, char* const argv[])
 {
-    return (int)syscall(EXEC, (size_t)pathname, 0, 0, 0, 0, 0);
+    return (int)syscall(EXEC, (size_t)pathname, (size_t)argv, 0, 0, 0, 0);
 }
 
 /**
