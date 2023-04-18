@@ -123,7 +123,7 @@ fn names_equal(first: &[u8], second: &[u8]) -> bool {
 /// - `path` - The path to the file.
 /// - `cwd` - The current working directory, used for relative paths.
 fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
-    let mut next_delimiter = path.find('/');
+    let mut next_delimiter;
     let mut next_folder;
     let mut inode = get_root_dir();
     let mut dir_entry = DirEntry::default();
@@ -143,6 +143,7 @@ fn get_inode(mut path: &str, cwd: Option<Inode>) -> Option<Inode> {
         path = &path[0..path.len() - 1];
     }
 
+    next_delimiter = path.find('/');
     loop {
         index = 0;
         found = false;
