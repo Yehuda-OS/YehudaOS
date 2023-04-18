@@ -6,6 +6,7 @@ use crate::syscalls::int_0x80_handler as syscall_handler;
 use crate::{interrupt_handler, print, println, scheduler};
 use bit_field::BitField;
 use core::arch::asm;
+use keyboard::handler as keyboard_handler;
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::addr::VirtAddr;
@@ -56,10 +57,17 @@ lazy_static! {
             )
             .set_stack_index(1),
         );
-        idt.set_handler(KEYBOARD_HANDLER, keyboard::handler as u64);
         idt.set_handler(
+            KEYBOARD_HANDLER,
+            interrupt_handler!(keyboard_handler => keyboard) as u64,
+        );
+        idt.set_handler_entry(
             SYSCALL_HANDLER,
-            interrupt_handler!(syscall_handler => syscall) as u64,
+            *Entry::new(
+                SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
+                interrupt_handler!(syscall_handler => syscall) as u64,
+            )
+            .set_stack_index(1),
         );
 
         idt
