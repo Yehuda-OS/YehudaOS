@@ -57,9 +57,13 @@ lazy_static! {
             )
             .set_stack_index(1),
         );
-        idt.set_handler(
+        idt.set_handler_entry(
             KEYBOARD_HANDLER,
-            interrupt_handler!(keyboard_handler => keyboard) as u64,
+            *Entry::new(
+                SegmentSelector::new(crate::gdt::KERNEL_CODE / 8, PrivilegeLevel::Ring0),
+                interrupt_handler!(keyboard_handler => keyboard) as u64,
+            )
+            .set_stack_index(1),
         );
         idt.set_handler_entry(
             SYSCALL_HANDLER,
