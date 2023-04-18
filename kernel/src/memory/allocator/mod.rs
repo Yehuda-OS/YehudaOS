@@ -298,15 +298,28 @@ unsafe fn resize_block(mut block: *mut HeapBlock, size: u64, align: u64) -> *mut
 
 /// Used for debugging.
 #[allow(unused)]
-unsafe fn print_list(first: *mut HeapBlock) {
+unsafe fn print_list(allocator: &mut Allocator) {
     use crate::println;
-    let mut curr = first;
+    use x86_64::registers::control::Cr3;
 
-    println!("\n\n|LIST|");
+    let mut curr = allocator.heap_start as *mut HeapBlock;
+    let before = Cr3::read().0.start_address();
+
+    memory::load_tables_to_cr3(memory::get_page_table());
+
+    println!("\n\n|LIST|, pages: {}", allocator.pages);
     while curr != null_mut() {
-        println!("{:p} : {:?}, size: {:#x}", curr, *curr, (*curr).size());
+        memory::load_tables_to_cr3(before);
+        let addr = curr;
+        let copy = *curr;
+
         curr = (*curr).next();
+        memory::load_tables_to_cr3(memory::get_page_table());
+
+        println!("{:p} : {:?}, size: {:#x}", addr, copy, copy.size());
     }
+
+    memory::load_tables_to_cr3(before);
 }
 
 unsafe impl GlobalAlloc for Locked<Allocator> {
