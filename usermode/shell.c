@@ -238,9 +238,16 @@ bool_t handle_command()
     {
         return FALSE;
     }
-
     free(command);
     command = NULL;
+
+    if (command_args[0] == NULL)
+    {
+        free(command_args);
+
+        return TRUE;
+    }
+
     if (is_executable(command_args[0]))
     {
         handle_executable((char* const*)command_args);
