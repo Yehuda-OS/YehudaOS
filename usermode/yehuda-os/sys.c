@@ -51,7 +51,7 @@ syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg
  */
 ssize_t read(int fd, void* buf, size_t count, size_t offset)
 {
-    return syscall(READ, fd, (size_t)buf, count, offset, 0, 0);
+    return (ssize_t)syscall(READ, fd, (size_t)buf, count, offset, 0, 0);
 }
 
 /**
@@ -67,7 +67,7 @@ ssize_t read(int fd, void* buf, size_t count, size_t offset)
  */
 int write(int fd, const void* buf, size_t count, size_t offset)
 {
-    return syscall(WRITE, fd, (size_t)buf, count, offset, 0, 0);
+    return (int)syscall(WRITE, fd, (size_t)buf, count, offset, 0, 0);
 }
 
 /**
@@ -80,7 +80,7 @@ int write(int fd, const void* buf, size_t count, size_t offset)
  */
 int open(const char* pathname)
 {
-    return syscall(OPEN, (size_t)pathname, 0, 0, 0, 0, 0);
+    return (int)syscall(OPEN, (size_t)pathname, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -93,7 +93,7 @@ int open(const char* pathname)
  */
 int fstat(int fd, struct Stat* statbuf)
 {
-    return syscall(FSTAT, fd, (size_t)statbuf, 0, 0, 0, 0);
+    return (int)syscall(FSTAT, fd, (size_t)statbuf, 0, 0, 0, 0);
 }
 
 /**
@@ -111,7 +111,7 @@ int fstat(int fd, struct Stat* statbuf)
  */
 int waitpid(pid_t pid, int* wstatus)
 {
-    return syscall(WAITPID, pid, (size_t)wstatus, 0, 0, 0, 0);
+    return (int)syscall(WAITPID, pid, (size_t)wstatus, 0, 0, 0, 0);
 }
 
 /**
@@ -170,7 +170,7 @@ void* realloc(void* ptr, size_t size)
  */
 int exec(const char* pathname, char* const argv[])
 {
-    return syscall(EXEC, (size_t)pathname, 0, 0, 0, 0, 0);
+    return (int)syscall(EXEC, (size_t)pathname, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -212,7 +212,7 @@ char* get_current_dir_name()
  */
 int chdir(const char* path)
 {
-    return syscall(CHDIR, (size_t)path, 0, 0, 0, 0, 0);
+    return (int)syscall(CHDIR, (size_t)path, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -226,7 +226,7 @@ int chdir(const char* path)
  */
 int creat(const char* path, bool_t directory)
 {
-    return syscall(CREAT, (size_t)path, (size_t)directory, 0, 0, 0, 0);
+    return (int)syscall(CREAT, (size_t)path, (size_t)directory, 0, 0, 0, 0);
 }
 
 /// Remove a file from the file system, or remove a directory that must be empty.
@@ -239,7 +239,7 @@ int creat(const char* path, bool_t directory)
 /// 0 if the operation was successful, -1 otherwise.
 int remove_file(const char* path)
 {
-    return syscall(REMOVE_FILE, (size_t)path, 0, 0, 0, 0, 0);
+    return (int)syscall(REMOVE_FILE, (size_t)path, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -255,7 +255,7 @@ int remove_file(const char* path)
  */
 int readdir(int fd, size_t offset, struct DirEntry* dirp)
 {
-    return syscall(READ_DIR, fd, offset, (size_t)dirp, 0, 0, 0);
+    return (int)syscall(READ_DIR, fd, offset, (size_t)dirp, 0, 0, 0);
 }
 
 /**
@@ -271,7 +271,7 @@ int readdir(int fd, size_t offset, struct DirEntry* dirp)
  */
 int truncate(const char* path, size_t length)
 {
-    return syscall(TRUNCATE, (size_t)path, length, 0, 0, 0, 0);
+    return (int)syscall(TRUNCATE, (size_t)path, length, 0, 0, 0, 0);
 }
 
 /**
@@ -287,5 +287,5 @@ int truncate(const char* path, size_t length)
  */
 int ftruncate(int fd, size_t length)
 {
-    return syscall(FTRUNCATE, fd, length, 0, 0, 0, 0);
+    return (int)syscall(FTRUNCATE, fd, length, 0, 0, 0, 0);
 }
