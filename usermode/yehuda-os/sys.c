@@ -256,9 +256,10 @@ int remove_file(const char* path)
  * `offset`: The offset **in files** inside the directory to read from.
  * `dirp`: A buffer to write the data into.
  *
- * returns: A pointer to the directory entry.
- *          The directory entry contains the file's name and the file's id that
- *          can be used as a file descriptor.
+ * returns: 0 on success, -1 on failure.
+ *          Possible failures:
+ *          - `fd` is negative or invalid.
+ *          - `fd` is a directory.
  */
 int readdir(int fd, size_t offset, struct DirEntry* dirp)
 {
