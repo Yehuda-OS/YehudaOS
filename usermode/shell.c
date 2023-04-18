@@ -149,20 +149,20 @@ void handle_builtin(char* const argv[])
     {
         if (argv[1] == NULL)
         {
-            print_str("YehudaSH: cd: No target parameter");
+            print_str("YehudaSH: cd: No target parameter\n");
         }
         else if (chdir(argv[1]) == -1)
         {
             print_str("YehudaSH: cd: ");
             print_str(argv[1]);
-            print_str(": No such file or directory");
+            print_str(": No such file or directory\n");
         }
     }
     else
     {
         print_str("YehudaSH: ");
         print_str(argv[0]);
-        print_str(": command not found");
+        print_str(": command not found\n");
     }
 }
 
