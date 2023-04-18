@@ -2,6 +2,7 @@ mod keycode;
 use crate::iostream::key_handle;
 
 use crate::mutex::Mutex;
+use crate::{memory, scheduler};
 use bitflags::bitflags;
 use lazy_static::lazy_static;
 
@@ -145,14 +146,24 @@ pub fn read_char() -> Option<char> {
         .map(|ascii| lock.state.modify(ascii) as char)
 }
 
-pub extern "x86-interrupt" fn handler(stack_frame: &x86_64::structures::idt::InterruptStackFrame) {
+pub unsafe extern "C" fn handler(frame: &x86_64::structures::idt::InterruptStackFrame) {
+    let p = scheduler::get_running_process().as_mut().unwrap();
+
+    p.stack_pointer = frame.stack_pointer.as_u64();
+    p.instruction_pointer = frame.instruction_pointer.as_u64();
+    p.flags = frame.cpu_flags;
+
     if let Some(input) = read_char() {
         key_handle(input);
+        memory::load_tables_to_cr3(memory::get_page_table());
         crate::print!("{}", input);
     }
+
     // send the PICs the end interrupt signal
     unsafe {
-        let mut pics = super::PICS.lock();
-        pics.notify_end_of_interrupt(0x21);
+        super::PICS.lock().notify_end_of_interrupt(0x21);
+
+        scheduler::switch_current_process();
+        scheduler::load_from_queue();
     }
 }

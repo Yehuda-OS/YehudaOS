@@ -10,6 +10,7 @@
 
 extern crate alloc;
 
+use alloc::vec::Vec;
 use fs_rs::fs;
 
 mod gdt;
@@ -51,13 +52,23 @@ pub extern "C" fn _start() -> ! {
         syscalls::initialize();
         pit::start(19);
 
+        let shell = include_bytes!("../bin/shell");
+
+        fs::create_file("/a", false, None).unwrap();
+        fs::write(1, shell, 0).unwrap();
+
         scheduler::add_to_the_queue(
-            scheduler::Process::new_kernel_task(
-                scheduler::terminator::terminate_from_queue,
-                core::ptr::null_mut(),
-            )
-            .expect("Error: failed to load processes terminator"),
+            scheduler::Process::new_user_process(1, "/", &Vec::new()).unwrap(),
         );
+
+        // scheduler::add_to_the_queue(
+        //     scheduler::Process::new_kernel_task(
+        //         scheduler::terminator::terminate_from_queue,
+        //         core::ptr::null_mut(),
+        //     )
+        //     .expect("Error: failed to load processes terminator"),
+        // );
+        scheduler::load_from_queue();
     }
     println!("Hello world");
 
