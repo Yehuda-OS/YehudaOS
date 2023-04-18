@@ -1,6 +1,5 @@
 use super::io;
 use crate::{memory, scheduler};
-use core::arch::asm;
 use x86_64::structures::idt::InterruptStackFrame;
 
 const TICKS_PER_SECOND: u32 = 1193182;
@@ -33,8 +32,6 @@ pub unsafe extern "C" fn pit_handler(frame: &InterruptStackFrame) {
     curr.instruction_pointer = frame.instruction_pointer.as_u64();
     curr.stack_pointer = frame.stack_pointer.as_u64();
     curr.flags = frame.cpu_flags;
-
-    crate::print!(".");
 
     scheduler::switch_current_process();
     super::idt::PICS.lock().notify_end_of_interrupt(0x20);

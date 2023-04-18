@@ -1,11 +1,11 @@
-use core::alloc::Layout;
+use core::alloc::{GlobalAlloc, Layout};
 
 use crate::{
     iostream::STDIN,
     memory::{self, allocator},
     scheduler,
 };
-use alloc::vec::Vec;
+use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use fs_rs::fs::{self, DirEntry};
 
 pub const READ: u64 = 0x0;
@@ -14,10 +14,13 @@ pub const OPEN: u64 = 0x2;
 pub const FSTAT: u64 = 0x5;
 pub const WAITPID: u64 = 0x7;
 pub const MALLOC: u64 = 0x9;
+pub const CALLOC: u64 = 0xa;
 pub const FREE: u64 = 0xb;
+pub const REALLOC: u64 = 0xc;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
-pub const FCHDIR: u64 = 0x51;
+pub const GET_CURRENT_DIR_NAME: u64 = 0x4f;
+pub const CHDIR: u64 = 0x50;
 pub const CREAT: u64 = 0x55;
 pub const REMOVE_FILE: u64 = 0x57;
 pub const READ_DIR: u64 = 0x59;
@@ -35,24 +38,70 @@ pub struct Stat {
     directory: bool,
 }
 
+/// Get the current working directory.
+///
+/// # Returns
+/// On success, a string containing the current working directory
+/// that has been allocated with `malloc` will be returned.
+/// It is the user's responsibility to free the buffer with `free`.
+/// On failure, null is returned.
+pub unsafe fn get_current_dir_name() -> *mut u8 {
+    let path = scheduler::get_running_process()
+        .as_ref()
+        .unwrap()
+        .cwd_path();
+    let buffer = malloc(path.len() + 1);
+
+    if !buffer.is_null() {
+        core::ptr::copy_nonoverlapping(path.as_ptr(), buffer, path.len());
+        // Add null terminator.
+        *buffer.add(path.len()) = 0;
+    }
+
+    buffer
+}
+
 /// Change the current working directory.
 ///
 /// # Arguments
-/// - `fd` - File descriptor to the new working directory.
+/// - `path` - Path to the new working directory.
 ///
 /// # Returns
-/// 0 if the operation was successful or -1 if `fd` does not exist or if `fd` is not a directory.
-pub unsafe fn fchdir(fd: i32) -> i64 {
+/// 0 if the operation was successful or -1 on failure.
+/// Possible failures:
+/// - `path` is invalid.
+/// - `path` does not exist.
+/// - `path` is not a directory.
+pub unsafe fn chdir(path: *const u8) -> i64 {
     let p = scheduler::get_running_process().as_mut().unwrap();
     let file_id;
+    let path_str;
+    let combined_path;
+    let absolute_path;
 
-    if fd < RESERVED_FILE_DESCRIPTORS {
+    if let Some(path) = super::get_user_str(p, path) {
+        path_str = path;
+    } else {
         return -1;
     }
-    file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    if let Some(id) = fs::get_file_id(path_str, Some(p.cwd())) {
+        file_id = id;
+    } else {
+        return -1;
+    }
 
+    combined_path = if p.cwd_path().ends_with('/') {
+        p.cwd_path().to_string() + path_str
+    } else {
+        p.cwd_path().to_string() + "/" + path_str
+    };
     if fs::is_dir(file_id).unwrap_or(false) {
-        p.set_cwd(file_id);
+        absolute_path = if path_str.starts_with('/') {
+            path_str.to_string()
+        } else {
+            super::get_absolute_path(&combined_path)
+        };
+        p.set_cwd(&absolute_path);
 
         0
     } else {
@@ -134,7 +183,7 @@ pub unsafe fn remove_file(path: *mut u8) -> i64 {
 /// - `offset` - The offset in the file to start reading from, ignored for `stdin`.
 ///
 /// # Returns
-/// 0 if the operation was successful, -1 otherwise.
+/// The amount of bytes read or -1 on failure.
 pub unsafe fn read(fd: i32, buf: *mut u8, count: usize, offset: usize) -> i64 {
     let p = scheduler::get_running_process().as_ref().unwrap();
     let buffer;
@@ -200,7 +249,7 @@ pub unsafe fn write(fd: i32, buf: *const u8, count: usize, offset: usize) -> i64
         STDOUT_DESCRIPTOR => {
             if let Ok(string) = core::str::from_utf8(buffer) {
                 memory::load_tables_to_cr3(memory::get_page_table());
-                crate::println!("{}", string);
+                crate::print!("{}", string);
 
                 0
             } else {
@@ -404,6 +453,7 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
 ///
 /// # Arguments
 /// - `pathname` - Path to the file to execute, must be a valid ELF file.
+/// - `argv` - The commandline arguments.
 ///
 /// # Returns
 /// The process ID of the new process if the operation was successful, -1 otherwise.
@@ -435,7 +485,10 @@ pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
     }
     if let Ok(proc) = scheduler::Process::new_user_process(
         file_id as u64,
-        scheduler::get_running_process().as_ref().unwrap().cwd(),
+        scheduler::get_running_process()
+            .as_ref()
+            .unwrap()
+            .cwd_path(),
         &args_str,
     ) {
         new_pid = proc.pid();
@@ -463,7 +516,27 @@ pub unsafe fn malloc(size: usize) -> *mut u8 {
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
-        allocation = allocator.global_alloc(layout);
+        allocation = allocator.alloc(layout);
+    }
+
+    allocation
+}
+
+/// Behaves like `malloc`, but sets the memory to 0.
+///
+/// # Arguments
+/// - `nitems` - The number of elements to be allocated.
+/// - `size` - The size of each element.
+pub unsafe fn calloc(nitems: usize, size: usize) -> *mut u8 {
+    let allocator = scheduler::get_running_process()
+        .as_mut()
+        .unwrap()
+        .allocator();
+    let layout = Layout::from_size_align(nitems * size, allocator::DEFAULT_ALIGNMENT);
+    let mut allocation = core::ptr::null_mut();
+
+    if let Ok(layout) = layout {
+        allocation = allocator.alloc_zeroed(layout);
     }
 
     allocation
@@ -478,7 +551,23 @@ pub unsafe fn free(ptr: *mut u8) -> i64 {
         .as_mut()
         .unwrap()
         .allocator()
-        .global_dealloc(ptr, Layout::from_size_align(0, 1).unwrap());
+        .dealloc(ptr, Layout::from_size_align(0, 1).unwrap());
 
     0
+}
+
+/// Grow or shrink a block that was allocated with `malloc`.
+/// Copies the data from the original block to the new block.
+///
+/// # Arguments
+/// `size` - The new required size of the block.
+///
+/// # Returns
+/// A pointer to a new allocation or null on failure.
+pub unsafe fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
+    scheduler::get_running_process()
+        .as_mut()
+        .unwrap()
+        .allocator()
+        .realloc(ptr, Layout::from_size_align_unchecked(0, 1), size)
 }

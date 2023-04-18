@@ -1,9 +1,12 @@
-use core::{alloc::Layout, mem::size_of};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    mem::size_of,
+};
 
 use super::{Process, SchedulerError};
 use crate::memory;
 use crate::memory::allocator;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use fs_rs::fs;
 use x86_64::{
     registers::control::Cr3,
@@ -184,7 +187,7 @@ unsafe fn alloc(p: &super::Process, size: usize) -> Option<*mut u8> {
     let mut allocation = core::ptr::null_mut();
 
     if let Ok(layout) = layout {
-        allocation = p.allocator.global_alloc(layout);
+        allocation = p.allocator.alloc(layout);
     }
 
     if allocation.is_null() {
@@ -242,12 +245,15 @@ impl super::Process {
     /// # Returns
     /// The function returns a newly created `Process` struct or an `OutOfMemory` error.
     ///
+    /// # Panics
+    /// If `cwd` does not exist in the filesystem.
+    ///
     /// # Safety
     /// This function is unsafe because it assumes that `file_id` points to a valid
     /// ELF file.
     pub unsafe fn new_user_process(
         file_id: u64,
-        cwd: usize,
+        cwd: &str,
         argv: &Vec<&str>,
     ) -> Result<Self, SchedulerError> {
         let header = get_header(file_id);
@@ -262,10 +268,12 @@ impl super::Process {
             pid: super::allocate_pid(),
             kernel_task: false,
             stack_start: VirtAddr::new(PROCESS_STACK_POINTER),
-            cwd,
+            cwd_path: String::from(cwd),
+            cwd: fs::get_file_id(cwd, None).unwrap(),
             allocator: allocator::Locked::new(allocator::Allocator::new(
                 allocator::USER_HEAP_START,
                 page_table,
+                true,
             )),
         };
 

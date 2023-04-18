@@ -1,3 +1,5 @@
+use alloc::string::String;
+use alloc::vec::Vec;
 use x86_64::VirtAddr;
 
 use super::io;
@@ -54,16 +56,19 @@ unsafe fn handle_syscall(
 ) -> i64 {
     match syscall_number {
         handlers::READ => {
-            handlers::read(arg0 as i32, arg2 as *mut u8, arg2 as usize, arg3 as usize)
+            handlers::read(arg0 as i32, arg1 as *mut u8, arg2 as usize, arg3 as usize)
         }
         handlers::WRITE => {
-            handlers::write(arg0 as i32, arg2 as *const u8, arg2 as usize, arg3 as usize)
+            handlers::write(arg0 as i32, arg1 as *const u8, arg2 as usize, arg3 as usize)
         }
         handlers::EXEC => handlers::exec(arg0 as *const u8, arg1 as *const *const u8),
         handlers::MALLOC => handlers::malloc(arg0 as usize) as i64,
+        handlers::CALLOC => handlers::calloc(arg0 as usize, arg1 as usize) as i64,
         handlers::FREE => handlers::free(arg0 as *mut u8),
+        handlers::REALLOC => handlers::realloc(arg0 as *mut u8, arg1 as usize) as i64,
         handlers::EXIT => handlers::exit(arg0 as i32),
-        handlers::FCHDIR => handlers::fchdir(arg0 as i32),
+        handlers::GET_CURRENT_DIR_NAME => handlers::get_current_dir_name() as i64,
+        handlers::CHDIR => handlers::chdir(arg0 as *const u8),
         handlers::CREAT => handlers::creat(arg0 as *mut u8, arg2 > 0) as i64,
         handlers::OPEN => handlers::open(arg0 as *const u8) as i64,
         handlers::FSTAT => handlers::fstat(arg0 as i32, arg1 as *mut handlers::Stat),
@@ -94,6 +99,13 @@ unsafe fn strlen(buffer: *const u8) -> usize {
     i
 }
 
+/// Get the arguments array from a raw pointer.
+///
+/// # Arguments
+/// - `argv` - The pointer to the arguments array.
+///
+/// # Safety
+/// Assumes that `argv` points to a null-terminated array.
 unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
     let mut len = 0;
 
@@ -102,6 +114,34 @@ unsafe fn get_args(argv: *const *const u8) -> &'static [*const u8] {
     }
 
     core::slice::from_raw_parts(argv, len)
+}
+
+/// Get the absolute path to a file from a relative path.
+///
+/// # Arguments
+/// - `path` - A path to a file.
+///
+/// # Returns
+/// The absolute path to the file that `path` refers to.
+fn get_absolute_path(path: &str) -> String {
+    let components = path.split('/');
+    let mut stack = Vec::new();
+    let mut result = String::new();
+
+    for component in components {
+        match component {
+            "." => continue,
+            ".." => {
+                stack.pop();
+            }
+            _ => {
+                stack.push(component);
+            }
+        }
+    }
+    result.push_str(&stack.join("/"));
+
+    result
 }
 
 /// Get a slice borrow from a user buffer.
@@ -131,7 +171,7 @@ unsafe fn get_user_buffer(
             .ok()?;
 
         Some(core::slice::from_raw_parts(
-            (page + memory::HHDM_OFFSET).as_u64() as *const u8,
+            (page.as_u64() + memory::HHDM_OFFSET) as *const u8,
             len,
         ))
     }

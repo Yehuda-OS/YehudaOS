@@ -20,20 +20,22 @@ const HEADER_SIZE: u64 = core::mem::size_of::<HeapBlock>() as u64;
 
 #[global_allocator]
 pub static mut ALLOCATOR: Locked<Allocator> =
-    Locked::<Allocator>::new(Allocator::new(KERNEL_HEAP_START, PhysAddr::zero()));
+    Locked::<Allocator>::new(Allocator::new(KERNEL_HEAP_START, PhysAddr::zero(), false));
 
 pub struct Allocator {
     heap_start: u64,
     pages: u64,
     page_table: PhysAddr,
+    usermode_allocator: bool,
 }
 
 impl Allocator {
-    pub const fn new(heap_start: u64, page_table: PhysAddr) -> Self {
+    pub const fn new(heap_start: u64, page_table: PhysAddr, usermode_allocator: bool) -> Self {
         Allocator {
             heap_start,
             pages: 0,
             page_table,
+            usermode_allocator,
         }
     }
 
@@ -73,7 +75,13 @@ fn alloc_node(
     let start = VirtAddr::new(allocator.heap_start + allocator.pages * Size4KiB::SIZE);
     let mut current_size = 0;
     let adjustment = get_adjustment(start.as_mut_ptr(), align);
-    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let flags = PageTableFlags::PRESENT
+        | PageTableFlags::WRITABLE
+        | if allocator.usermode_allocator {
+            PageTableFlags::USER_ACCESSIBLE
+        } else {
+            PageTableFlags::empty()
+        };
     let allocated;
     let required_pages = if (size + adjustment) % Size4KiB::SIZE == 0 {
         (size + adjustment) / Size4KiB::SIZE
@@ -301,20 +309,6 @@ unsafe fn print_list(first: *mut HeapBlock) {
     }
 }
 
-impl Locked<Allocator> {
-    pub unsafe fn global_alloc(&self, layout: Layout) -> *mut u8 {
-        self.alloc(layout)
-    }
-
-    pub unsafe fn global_dealloc(&self, ptr: *mut u8, layout: Layout) {
-        self.dealloc(ptr, layout);
-    }
-
-    pub fn get_page_table(&self) -> PhysAddr {
-        self.inner.lock().page_table
-    }
-}
-
 unsafe impl GlobalAlloc for Locked<Allocator> {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         let mut allocator = self.lock();
@@ -339,10 +333,15 @@ unsafe impl GlobalAlloc for Locked<Allocator> {
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        let mut allocator = self.lock();
-        let block = HeapBlock::get_ptr_block(_ptr);
+        let mut allocator;
+        let block;
 
-        // use dealloc_node function
+        if _ptr.is_null() {
+            return;
+        }
+
+        allocator = self.lock();
+        block = HeapBlock::get_ptr_block(_ptr);
         dealloc_node(&mut allocator, block);
     }
 }

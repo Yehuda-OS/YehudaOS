@@ -3,8 +3,10 @@ use crate::memory::allocator::{Allocator, Locked};
 use crate::mutex::Mutex;
 use crate::{io, syscalls};
 use alloc::collections::{BTreeMap, LinkedList};
+use alloc::string::String;
 use core::arch::asm;
 use core::fmt;
+use fs_rs::fs;
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
@@ -107,6 +109,7 @@ pub struct Process {
     pub flags: u64,
     pid: i64,
     stack_start: VirtAddr,
+    cwd_path: String,
     cwd: usize,
     kernel_task: bool,
     allocator: Locked<Allocator>,
@@ -142,8 +145,17 @@ impl Process {
         self.cwd
     }
 
-    pub fn set_cwd(&mut self, value: usize) {
-        self.cwd = value;
+    pub fn cwd_path(&self) -> &str {
+        &self.cwd_path
+    }
+
+    /// Set the current working directory of the process to `value`.
+    ///
+    /// # Panics
+    /// If `value` does not exist in the filesystem.
+    pub fn set_cwd(&mut self, value: &str) {
+        self.cwd_path = String::from(value);
+        self.cwd = fs::get_file_id(value, None).unwrap();
     }
 
     pub const fn kernel_task(&self) -> bool {

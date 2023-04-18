@@ -1,13 +1,9 @@
-#define NULL (void*)0
-#define FALSE 0
-#define TRUE !FALSE
-#define FILE_NAME_LEN 11
-#define stdin 0
-#define stdout 1
+#ifndef YEHUDAOS_SYS
+#define YEHUDAOS_SYS
 
-typedef unsigned long size_t;
+#include "defines.h"
+
 typedef long pid_t;
-typedef unsigned char bool_t;
 
 struct Stat
 {
@@ -21,7 +17,7 @@ struct DirEntry
     size_t id;
 };
 
-int read(int fd, void* buf, size_t count, size_t offset);
+ssize_t read(int fd, void* buf, size_t count, size_t offset);
 
 int write(int fd, const void* buf, size_t count, size_t offset);
 
@@ -31,13 +27,19 @@ int fstat(int fd, struct Stat* statbuf);
 
 void* malloc(size_t size);
 
+void* calloc(size_t nitems, size_t size);
+
 void free(void* ptr);
 
-int exec(const char* pathname);
+void* realloc(void* ptr, size_t size);
+
+int exec(const char* pathname, char* const argv[]);
 
 void exit(int status);
 
-int fchdir(int fd);
+char* get_current_dir_name();
+
+int chdir(const char* path);
 
 int creat(const char* path, bool_t directory);
 
@@ -50,3 +52,5 @@ int truncate(const char* path, size_t length);
 int ftruncate(int fd, size_t length);
 
 int waitpid(pid_t pid, int* wstatus);
+
+#endif // YEHUDAOS_SYS

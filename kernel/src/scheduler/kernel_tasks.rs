@@ -1,4 +1,5 @@
 use super::MAX_STACK_SIZE;
+use alloc::string::String;
 use x86_64::{
     structures::paging::{PageSize, PageTableFlags, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
@@ -105,8 +106,13 @@ impl super::Process {
             pid: -1,
             kernel_task: true,
             stack_start: VirtAddr::new(stack),
+            cwd_path: String::from("/"),
             cwd: 0,
-            allocator: allocator::Locked::new(allocator::Allocator::new(0, PhysAddr::zero())),
+            allocator: allocator::Locked::new(allocator::Allocator::new(
+                0,
+                PhysAddr::zero(),
+                false,
+            )),
         };
 
         memory::vmm::map_address(

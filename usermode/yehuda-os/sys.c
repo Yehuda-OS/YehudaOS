@@ -1,35 +1,43 @@
-#include "yehuda-os.h"
+#include "sys.h"
 
-const size_t READ        = 0x0;
-const size_t WRITE       = 0x1;
-const size_t OPEN        = 0x2;
-const size_t FSTAT       = 0x5;
-const size_t WAITPID     = 0x7;
-const size_t MALLOC      = 0x9;
-const size_t FREE        = 0xb;
-const size_t EXEC        = 0x3b;
-const size_t EXIT        = 0x3c;
-const size_t FCHDIR      = 0x51;
-const size_t CREAT       = 0x55;
-const size_t REMOVE_FILE = 0x57;
-const size_t READ_DIR    = 0x59;
-const size_t TRUNCATE    = 0x4c;
-const size_t FTRUNCATE   = 0x4d;
+const size_t READ                 = 0x0;
+const size_t WRITE                = 0x1;
+const size_t OPEN                 = 0x2;
+const size_t FSTAT                = 0x5;
+const size_t WAITPID              = 0x7;
+const size_t MALLOC               = 0x9;
+const size_t CALLOC               = 0xa;
+const size_t FREE                 = 0xb;
+const size_t REALLOC              = 0xc;
+const size_t EXEC                 = 0x3b;
+const size_t EXIT                 = 0x3c;
+const size_t GET_CURRENT_DIR_NAME = 0x4f;
+const size_t CHDIR                = 0x50;
+const size_t CREAT                = 0x55;
+const size_t REMOVE_FILE          = 0x57;
+const size_t READ_DIR             = 0x59;
+const size_t TRUNCATE             = 0x4c;
+const size_t FTRUNCATE            = 0x4d;
 
 size_t
 syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
     size_t result;
+    register long rax asm("rax") = syscall_number;
+    register long rdi asm("rdi") = arg0;
+    register long rsi asm("rsi") = arg1;
+    register long rdx asm("rdx") = arg2;
     register long r10 asm("r10") = arg3;
-    register long r8 asm("r10")  = arg4;
-    register long r9 asm("r10")  = arg5;
+    register long r8 asm("r8")   = arg4;
+    register long r9 asm("r9")   = arg5;
 
-    asm volatile("syscall" ::"%rax"(syscall_number), "%rdi"(arg0), "%rsi"(arg1),
-    "%rdx"(arg2), "r"(r10), "r"(r8), "r"(r9));
+    asm volatile("syscall" ::"r"(rax), "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10),
+    "r"(r8), "r"(r9));
     asm("movq %%rax, %0;" : "=r"(result));
 
     return result;
 }
+
 
 /**
  * Read bytes from a file descriptor.
@@ -39,9 +47,9 @@ syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg
  * `count`: The number of bytes to read.
  * `offset`: The offset in the file to start reading from, ignored for `stdin`.
  *
- * returns: 0 if the operation was successful, -1 otherwise.
+ * returns: The amount of bytes read or -1 on failure.
  */
-int read(int fd, void* buf, size_t count, size_t offset)
+ssize_t read(int fd, void* buf, size_t count, size_t offset)
 {
     return syscall(READ, fd, (size_t)buf, count, offset, 0, 0);
 }
@@ -119,6 +127,17 @@ void* malloc(size_t size)
 }
 
 /**
+ * Behaves like `malloc`, but sets the memory to 0.
+ *
+ * `nitems`: The number of elements to be allocated.
+ * `size`: The size of each element.
+ */
+void* calloc(size_t nitems, size_t size)
+{
+    return (void*)syscall(CALLOC, nitems, size, 0, 0, 0, 0);
+}
+
+/**
  * Deallocate an allocation that was allocated with `malloc`.
  *
  * `ptr`: The pointer to the allocation that was returned from `malloc`.
@@ -129,13 +148,27 @@ void free(void* ptr)
 }
 
 /**
+ * Grow or shrink a block that was allocated with `malloc`.
+ * Copies the data from the original block to the new block.
+ *
+ * `size`: The new required size of the block.
+ *
+ * returns: A pointer to a new allocation or null on failure.
+ */
+void* realloc(void* ptr, size_t size)
+{
+    return (void*)syscall(REALLOC, (size_t)ptr, size, 0, 0, 0, 0);
+}
+
+/**
  * Execute a program in a new process.
  *
  * `pathname`: Path to the file to execute, must be a valid ELF file.
+ * `argv`: The commandline arguments.
  *
  * returns: The process ID of the new process if the operation was successful, -1 otherwise.
  */
-int exec(const char* pathname)
+int exec(const char* pathname, char* const argv[])
 {
     return syscall(EXEC, (size_t)pathname, 0, 0, 0, 0, 0);
 }
@@ -154,16 +187,32 @@ void exit(int status)
 }
 
 /**
+ * Get the current working directory.
+ *
+ * returns: On success, a string containing the current working directory
+ *          that has been allocated with `malloc` will be returned.
+ *          It is the user's responsibility to free the buffer with `free`.
+ *          On failure, `NULL` is returned.
+ */
+char* get_current_dir_name()
+{
+    return (char*)syscall(GET_CURRENT_DIR_NAME, 0, 0, 0, 0, 0, 0);
+}
+
+/**
  * Change the current working directory.
  *
- * `fd`: File descriptor to the new working directory.
+ * `path`: Path to the new working directory.
  *
- * returns: 0 if the operation was successful or -1 if `fd` does not exist of
- *          if `fd` is not a directory.
+ * returns: 0 if the operation was successful or -1 on failure.
+ *          Possible failures:
+ *          - `path` is invalid.
+ *          - `path` does not exist.
+ *          - `path` is not a directory.
  */
-int fchdir(int fd)
+int chdir(const char* path)
 {
-    return syscall(FCHDIR, fd, 0, 0, 0, 0, 0);
+    return syscall(CHDIR, (size_t)path, 0, 0, 0, 0, 0);
 }
 
 /**
