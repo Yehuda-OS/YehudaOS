@@ -15,7 +15,7 @@ size_t count_words(const char* str)
 
     while (*str != '\0')
     {
-        if (*str == ' ')
+        if (isspace(*str))
         {
             in_word = FALSE;
         }
@@ -53,7 +53,7 @@ char** parse_command(const char* command)
 
     while (*current != '\0')
     {
-        if (*current == ' ')
+        if (isspace(*current))
         {
             if (in_word)
             {
@@ -97,7 +97,9 @@ char** parse_command(const char* command)
         }
         strncpy(words[count], start, word_len);
         words[count][word_len] = '\0';
+        count++;
     }
+    words[count] = NULL;
 
     return words;
 }
@@ -181,7 +183,7 @@ void handle_executable(char* const argv[])
     {
         print_str("YehudaSH: execution of ");
         print_str(argv[0]);
-        print_str("has failed\n");
+        print_str(" has failed\n");
 
         return;
     }
@@ -198,7 +200,7 @@ void handle_executable(char* const argv[])
         print_str(" has exited with exit code ");
         print_str(exitcode_buffer);
     }
-    print_str("\n");
+    print_newline();
 }
 
 /**

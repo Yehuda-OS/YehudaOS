@@ -61,6 +61,11 @@ int strcmp(const char* str1, const char* str2)
     return str1[i] > str2[i] ? 1 : -1;
 }
 
+int isspace(int c)
+{
+    return (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v');
+}
+
 /**
  * Free all the elements of an array of pointers `arr` with length of `size`.
  */
@@ -122,6 +127,14 @@ char* getline()
 void print_str(const char* str)
 {
     write(STDOUT, str, strlen(str), 0);
+}
+
+/**
+ * Print the '\n' character.
+ */
+void print_newline()
+{
+    write(STDOUT, "\n", 1, 0);
 }
 
 /**
