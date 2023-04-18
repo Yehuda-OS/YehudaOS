@@ -11,7 +11,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use fs_rs::fs;
+use fs_rs::fs::{self, FsError};
 use limine::LimineFramebufferRequest;
 
 mod gdt;
@@ -71,7 +71,23 @@ pub unsafe fn initialize_everything() {
     pit::start(19);
 }
 
+/// Add a file to the file system.
+///
+/// # Arguments
+/// - `name` - The name/path of the file.
+/// - `content` - The content of the file.
+pub unsafe fn add_file(name: &str, content: &[u8]) -> Result<(), FsError> {
+    let file_id = fs::create_file(name, false, None)?;
+
+    fs::write(file_id, content, 0)?;
+
+    Ok(())
+}
+
 pub unsafe fn add_processes() {
+    let shell = include_bytes!("../bin/shell");
+
+    add_file("/shell", shell).expect("Failed to add the shell");
     scheduler::add_to_the_queue(
         scheduler::Process::new_kernel_task(
             scheduler::terminator::terminate_from_queue,
