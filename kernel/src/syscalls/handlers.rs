@@ -97,7 +97,7 @@ pub unsafe fn chdir(path: *const u8) -> i64 {
     };
     if fs::is_dir(file_id).unwrap_or(false) {
         absolute_path = if path_str.starts_with('/') {
-            path_str.to_string()
+            super::get_absolute_path(&path_str)
         } else {
             super::get_absolute_path(&combined_path)
         };
