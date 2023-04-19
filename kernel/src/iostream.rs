@@ -12,10 +12,6 @@ pub fn key_handle(ch: char) {
     let mut stdin = unsafe { STDIN.lock() };
 
     stdin.push(ch);
-    if ch == BACKSPACE {
-        crate::print!("{ch}");
-        crate::print!(" ");
-    }
 }
 
 pub struct Stdin {
