@@ -11,11 +11,9 @@ pub static mut STDIN: Stdin = Stdin::new();
 pub fn key_handle(ch: char) {
     let mut stdin = unsafe { STDIN.lock() };
 
+    stdin.push(ch);
     if ch == BACKSPACE {
-        stdin.pop();
         // have to implement function that deletes the char
-    } else {
-        stdin.push(ch);
     }
 }
 

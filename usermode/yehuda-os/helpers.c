@@ -111,6 +111,10 @@ char* getline()
 
             return NULL;
         }
+        else if (buffer[current] == '\b' && current > 0)
+        {
+            current--;
+        }
         else
         {
             current += bytes_read;
