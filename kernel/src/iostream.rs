@@ -13,7 +13,8 @@ pub fn key_handle(ch: char) {
 
     stdin.push(ch);
     if ch == BACKSPACE {
-        // have to implement function that deletes the char
+        crate::print!("{ch}");
+        crate::print!(" ");
     }
 }
 
