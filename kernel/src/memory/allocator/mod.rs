@@ -220,10 +220,10 @@ unsafe fn find_usable_block(
     loop {
         let curr_adjustment = get_adjustment(curr, align);
 
-        if curr.is_null() || !(*curr).has_next() {
-            return alloc_node(allocator, curr, size, align);
-        } else if (*curr).free() && (*curr).size() >= size + curr_adjustment {
+        if !curr.is_null() && (*curr).free() && (*curr).size() >= size + curr_adjustment {
             return Some(curr);
+        } else if curr.is_null() || !(*curr).has_next() {
+            return alloc_node(allocator, curr, size, align);
         }
         curr = (*curr).next();
     }
