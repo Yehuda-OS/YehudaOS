@@ -484,14 +484,8 @@ pub unsafe fn exec(pathname: *const u8, argv: *const *const u8) -> i64 {
             return -1;
         }
     }
-    if let Ok(proc) = scheduler::Process::new_user_process(
-        file_id as u64,
-        scheduler::get_running_process()
-            .as_ref()
-            .unwrap()
-            .cwd_path(),
-        &args_str,
-    ) {
+    if let Ok(proc) = scheduler::Process::new_user_process(file_id as u64, p.cwd_path(), &args_str)
+    {
         new_pid = proc.pid();
         scheduler::add_to_the_queue(proc);
 
