@@ -256,6 +256,7 @@ pub unsafe fn wait_for(pid: i64, parent: Process, wstatus: *mut i32) {
 /// Should not be used in a multi-threaded situation.
 pub unsafe fn stop_waiting_for(p: &Process, status: i32) {
     if let Some(parent) = WAITING_QUEUE.remove(&p.pid()) {
+        memory::load_tables_to_cr3(parent.0.page_table);
         add_to_the_queue(parent.0);
         *parent.1 = status;
     }
