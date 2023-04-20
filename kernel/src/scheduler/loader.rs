@@ -222,9 +222,11 @@ fn write_args(p: &super::Process, argv: &Vec<&str>) -> Result<*const *const u8, 
         // checked from before, and `allocation` was returned from
         // our allocator so it should be valid.
         unsafe {
-            allocation = alloc(p, arg.len()).ok_or(SchedulerError::OutOfMemory)?;
+            allocation = alloc(p, arg.len() + 1).ok_or(SchedulerError::OutOfMemory)?;
 
             core::ptr::copy(arg.as_ptr(), allocation, arg.len());
+            // Add the null terminator.
+            *allocation.add(arg.len()) = 0;
             *pointers_arr.add(i) = allocation;
         }
     }
