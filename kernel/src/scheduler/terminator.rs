@@ -1,15 +1,27 @@
-use super::Process;
-use crate::{mutex::Mutex, queue::Queue};
+use alloc::collections::LinkedList;
 
-static mut TERMINATE_PROC_QUEUE: Mutex<Queue<Process>> = Mutex::new(Queue::new());
+use super::Process;
+use crate::mutex::Mutex;
+
+static TERMINATE_PROC_QUEUE: Mutex<LinkedList<Process>> = Mutex::new(LinkedList::new());
 
 pub unsafe fn add_to_queue(p: Process) {
-    TERMINATE_PROC_QUEUE.lock().enqueue(p);
+    if let Some(mut q) = TERMINATE_PROC_QUEUE.try_lock() {
+        q.push_back(p);
+    }
 }
 
 pub extern "C" fn terminate_from_queue(_: *mut u64) -> i32 {
+    let mut q;
+
     loop {
-        for _ in 0..20 {} // wait a little, else the TERMINATE_PROC_QUEUE mutex will corrupt and the system will crash
-        unsafe { TERMINATE_PROC_QUEUE.lock() }.dequeue();
+        q = TERMINATE_PROC_QUEUE.lock();
+
+        q.pop_front();
+
+        drop(q);
+
+        // Call `sched_yield`.
+        unsafe { core::arch::asm!("mov rax, 0x18; syscall") }
     }
 }

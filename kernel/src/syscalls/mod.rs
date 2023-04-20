@@ -66,6 +66,7 @@ unsafe fn handle_syscall(
         handlers::CALLOC => handlers::calloc(arg0 as usize, arg1 as usize) as i64,
         handlers::FREE => handlers::free(arg0 as *mut u8),
         handlers::REALLOC => handlers::realloc(arg0 as *mut u8, arg1 as usize) as i64,
+        handlers::SCHED_YIELD => handlers::sched_yield(),
         handlers::EXIT => handlers::exit(arg0 as i32),
         handlers::GET_CURRENT_DIR_NAME => handlers::get_current_dir_name() as i64,
         handlers::CHDIR => handlers::chdir(arg0 as *const u8),

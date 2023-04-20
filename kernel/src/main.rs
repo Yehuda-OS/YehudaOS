@@ -34,18 +34,18 @@ pub unsafe fn print_logo() -> Option<()> {
     let framebuffer = &FRAMEBUFFER.get_response().get()?.framebuffers()[0];
     let address = framebuffer.address.as_ptr()?;
     let logo = include_bytes!("../../YehudaOS.rgba");
+    let row_offset = framebuffer.width - LOGO_SIZE;
 
     for y in 0..LOGO_SIZE {
         for x in 0..LOGO_SIZE {
             let offset = (y * LOGO_SIZE + x) as usize * 4;
-            let screen_offset = (y * framebuffer.width + x) as usize * 4;
+            let screen_offset = (y * framebuffer.width + x + row_offset) as usize * 4;
             *address.add(screen_offset) = logo[offset];
             *address.add(screen_offset + 1) = logo[offset + 1];
             *address.add(screen_offset + 2) = logo[offset + 2];
             *address.add(screen_offset + 3) = logo[offset + 3];
         }
     }
-    print!("{}", "\n".repeat(28));
 
     Some(())
 }

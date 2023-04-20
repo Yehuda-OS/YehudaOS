@@ -17,6 +17,7 @@ pub const MALLOC: u64 = 0x9;
 pub const CALLOC: u64 = 0xa;
 pub const FREE: u64 = 0xb;
 pub const REALLOC: u64 = 0xc;
+pub const SCHED_YIELD: u64 = 0x18;
 pub const EXEC: u64 = 0x3b;
 pub const EXIT: u64 = 0x3c;
 pub const GET_CURRENT_DIR_NAME: u64 = 0x4f;
@@ -569,4 +570,8 @@ pub unsafe fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
             Layout::from_size_align_unchecked(size, allocator::DEFAULT_ALIGNMENT),
             size,
         )
+}
+
+pub fn sched_yield() -> i64 {
+    0
 }
