@@ -90,6 +90,7 @@ pub unsafe fn add_executable(name: &str, content: &[u8]) -> Result<usize, FsErro
 pub unsafe fn add_processes() -> Result<(), FsError> {
     let shell = add_executable("/shell", include_bytes!("../bin/shell"))?;
 
+    add_executable("/ls", include_bytes!("../bin/ls"))?;
     add_executable("/repeat", include_bytes!("../bin/repeat"))?;
     add_executable("/multiprocessing", include_bytes!("../bin/multiprocessing"))?;
 
