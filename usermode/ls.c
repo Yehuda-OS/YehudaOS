@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     int offset = 0;
     for (; offset < stat.size; offset += sizeof(struct DirEntry))
     {
-        print_str(((struct DirEntry *)((char *)entry + offset))->name);
+        print_str(((struct DirEntry *)((struct DirEntry *)entry + offset))->name);
         print_newline();
     }
 

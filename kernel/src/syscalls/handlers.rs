@@ -311,12 +311,9 @@ pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
         return -1;
     }
 
-    if let Some(size) = fs::get_file_size(fd as usize) {
-        *statbuf = Stat {
-            size: size as u64,
-            // UNWRAP: We already checked that the file exists.
-            directory: fs::is_dir(fd as usize).unwrap(),
-        };
+    if let Some(size) = fs::get_file_size((fd - RESERVED_FILE_DESCRIPTORS) as usize) {
+        (*statbuf).size = size as u64;
+        (*statbuf).directory = fs::is_dir(fd as usize).unwrap();
 
         0
     } else {
@@ -435,7 +432,7 @@ pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
 
     if fd >= RESERVED_FILE_DESCRIPTORS {
         file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-        if fs::is_dir(file_id).unwrap_or(true) {
+        if !fs::is_dir(file_id).unwrap_or(true) {
             -1
         } else {
             if let Some(mut entry) = fs::read_dir(file_id, offset) {
