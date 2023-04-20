@@ -87,13 +87,13 @@ pub unsafe fn add_executable(name: &str, content: &[u8]) -> Result<usize, FsErro
     Ok(file_id)
 }
 
-pub unsafe fn add_processes() {
-    let shell =
-        add_executable("/shell", include_bytes!("../bin/shell")).expect("Failed to add the shell");
+pub unsafe fn add_processes() -> Result<(), FsError> {
+    let shell = add_executable("/shell", include_bytes!("../bin/shell"))?;
 
+    add_executable("/repeat", include_bytes!("../bin/repeat"))?;
     scheduler::add_to_the_queue(
         scheduler::Process::new_user_process(shell as u64, "/", &Vec::new())
-            .expect("Failed to add the shell"),
+            .map_err(|_| FsError::NotEnoughDiskSpace)?,
     );
     scheduler::add_to_the_queue(
         scheduler::Process::new_kernel_task(
@@ -102,6 +102,8 @@ pub unsafe fn add_processes() {
         )
         .expect("Error: failed to load processes terminator"),
     );
+
+    Ok(())
 }
 
 /// Kernel Entry Point
@@ -114,7 +116,8 @@ pub extern "C" fn _start() -> ! {
     unsafe {
         initialize_everything();
         print_logo();
-        add_processes();
+        add_processes().expect("failed to add executables");
+        println!("Welcome to YehudaOS!");
         scheduler::load_from_queue();
     }
 }
