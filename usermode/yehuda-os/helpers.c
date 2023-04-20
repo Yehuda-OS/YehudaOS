@@ -1,7 +1,7 @@
 #include "helpers.h"
 #include "sys.h"
 
-size_t strlen(const char* s)
+size_t strlen(const char *s)
 {
     size_t count = 0;
 
@@ -14,9 +14,9 @@ size_t strlen(const char* s)
     return count;
 }
 
-char* strcpy(char* destination, const char* source)
+char *strcpy(char *destination, const char *source)
 {
-    char* ptr = destination;
+    char *ptr = destination;
 
     while (*source != '\0')
     {
@@ -29,7 +29,7 @@ char* strcpy(char* destination, const char* source)
     return ptr;
 }
 
-char* strncpy(char* dest, const char* src, size_t n)
+char *strncpy(char *dest, const char *src, size_t n)
 {
     size_t i;
 
@@ -45,7 +45,7 @@ char* strncpy(char* dest, const char* src, size_t n)
     return dest;
 }
 
-int strcmp(const char* str1, const char* str2)
+int strcmp(const char *str1, const char *str2)
 {
     int i = 0;
 
@@ -69,7 +69,7 @@ int isspace(int c)
 /**
  * Free all the elements of an array of pointers `arr` with length of `size`.
  */
-void free_array(void** arr, size_t size)
+void free_array(void **arr, size_t size)
 {
     for (size_t i = 0; i < size; i++)
     {
@@ -84,12 +84,12 @@ void free_array(void** arr, size_t size)
  * returns: The line that was read or `NULL` on an allocation failure.
  *          The returned buffer must be freed by the caller.
  */
-char* getline()
+char *getline()
 {
     ssize_t bytes_read = 0;
-    size_t current     = 0;
-    size_t len         = 1;
-    char* buffer       = NULL;
+    size_t current = 0;
+    size_t len = 1;
+    char *buffer = NULL;
 
     do
     {
@@ -136,7 +136,7 @@ char* getline()
 /**
  * Print a string `str` to the screen.
  */
-void print_str(const char* str)
+void print_str(const char *str)
 {
     write(STDOUT, str, strlen(str), 0);
 }
@@ -156,9 +156,9 @@ void print_newline()
  * `buffer`: The string to put the result into.
  *           Must be at least 11 bytes long.
  */
-void int_to_string(int num, char* buffer)
+void int_to_string(int num, char *buffer)
 {
-    int i        = 0;
+    int i = 0;
     int num_copy = 0;
 
     if (num == 0)
@@ -172,8 +172,8 @@ void int_to_string(int num, char* buffer)
     if (num < 0)
     {
         buffer[0] = '-';
-        num       = -num;
-        i         = 1;
+        num = -num;
+        i = 1;
     }
 
     num_copy = num;
@@ -190,4 +190,21 @@ void int_to_string(int num, char* buffer)
         buffer[i] = '0' + (num % 10);
         num /= 10;
     }
+}
+
+char *strcat(char *dst, const char *src)
+{
+    char *ptr = dst + strlen(dst);
+
+    // appends characters of the source to the destination string
+    while (*src != '\0')
+    {
+        *ptr++ = *src++;
+    }
+
+    // null terminate destination string
+    *ptr = '\0';
+
+    // the destination is returned by standard `strcat()`
+    return dst;
 }

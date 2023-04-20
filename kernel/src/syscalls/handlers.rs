@@ -27,6 +27,7 @@ pub const REMOVE_FILE: u64 = 0x57;
 pub const READ_DIR: u64 = 0x59;
 pub const TRUNCATE: u64 = 0x4c;
 pub const FTRUNCATE: u64 = 0x4d;
+pub const GETDENTS: u64 = 0x4E;
 
 const STDIN_DESCRIPTOR: i32 = 0;
 const STDOUT_DESCRIPTOR: i32 = 1;

@@ -4,6 +4,7 @@
 #include "defines.h"
 
 typedef long pid_t;
+typedef struct DirListEntry *dir_list;
 
 struct Stat
 {
@@ -17,40 +18,41 @@ struct DirEntry
     size_t id;
 };
 
-ssize_t read(int fd, void* buf, size_t count, size_t offset);
+ssize_t
+read(int fd, void *buf, size_t count, size_t offset);
 
-int write(int fd, const void* buf, size_t count, size_t offset);
+int write(int fd, const void *buf, size_t count, size_t offset);
 
-int open(const char* pathname);
+int open(const char *pathname);
 
-int fstat(int fd, struct Stat* statbuf);
+int fstat(int fd, struct Stat *statbuf);
 
-void* malloc(size_t size);
+void *malloc(size_t size);
 
-void* calloc(size_t nitems, size_t size);
+void *calloc(size_t nitems, size_t size);
 
-void free(void* ptr);
+void free(void *ptr);
 
-void* realloc(void* ptr, size_t size);
+void *realloc(void *ptr, size_t size);
 
-int exec(const char* pathname, char* const argv[]);
+int exec(const char *pathname, char *const argv[]);
 
 void exit(int status);
 
-char* get_current_dir_name();
+char *get_current_dir_name();
 
-int chdir(const char* path);
+int chdir(const char *path);
 
-int creat(const char* path, bool_t directory);
+int creat(const char *path, bool_t directory);
 
-int remove_file(const char* path);
+int remove_file(const char *path);
 
-int readdir(int fd, size_t offset, struct DirEntry* dirp);
+int readdir(int fd, size_t offset, struct DirEntry *dirp);
 
-int truncate(const char* path, size_t length);
+int truncate(const char *path, size_t length);
 
 int ftruncate(int fd, size_t length);
 
-int waitpid(pid_t pid, int* wstatus);
+int waitpid(pid_t pid, int *wstatus);
 
 #endif // YEHUDAOS_SYS

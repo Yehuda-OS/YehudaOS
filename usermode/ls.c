@@ -1,22 +1,17 @@
 #include "yehuda-os/sys.h"
 #include "yehuda-os/helpers.h"
 
-int list_dir(const char *path)
-{
-    int fd = open(path);
-    struct DirEntry *dirent;
+#define BUF_SIZE 1024
 
-    while (readdir(fd, 0, dirent) != -1)
-    {
-        print_str(dirent->name);
-    }
+int main(int argc, char *argv[])
+{
+    struct DirEntry *entry;
+
+    int fd = open(argc == 0 ? "/." : argv[0]);
+    int res = readdir(fd, 0, entry);
+    print_str(entry->name);
 
     return 0;
-}
-
-int main(int argc, char **argv)
-{
-    return list_dir(argc == 0 ? "." : argv[0]);
 }
 
 // Tell the compiler incoming stack alignment is not RSP%16==8 or ESP%16==12
