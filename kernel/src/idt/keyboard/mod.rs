@@ -155,8 +155,6 @@ pub unsafe extern "C" fn handler(frame: &x86_64::structures::idt::InterruptStack
 
     if let Some(input) = read_char() {
         key_handle(input);
-        memory::load_tables_to_cr3(memory::get_page_table());
-        crate::print!("{}", input);
     }
 
     // send the PICs the end interrupt signal

@@ -111,9 +111,21 @@ char* getline()
 
             return NULL;
         }
-        else
+        else if (bytes_read == 1)
         {
-            current += bytes_read;
+            if (buffer[current] == '\b')
+            {
+                if (current > 0)
+                {
+                    print_str("\b \b");
+                    current--;
+                }
+            }
+            else
+            {
+                write(STDOUT, buffer + current, 1, 0);
+                current++;
+            }
         }
     } while (buffer[current - bytes_read] != '\n');
     buffer[current - bytes_read] = '\0';
