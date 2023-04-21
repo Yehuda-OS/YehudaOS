@@ -132,6 +132,7 @@ fn alloc_node(
 
         return None;
     }
+    memory::flush_tlb_cache();
     // Allocation succeeded, add the allocated block to the list.
     allocated = start.as_mut_ptr::<HeapBlock>();
     unsafe {
