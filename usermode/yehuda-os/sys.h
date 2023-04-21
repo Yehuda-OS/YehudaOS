@@ -6,7 +6,6 @@
 #define FILE_NAME_LEN 21
 
 typedef long pid_t;
-typedef struct DirListEntry* dir_list;
 
 struct Stat
 {
