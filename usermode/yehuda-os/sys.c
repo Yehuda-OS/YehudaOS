@@ -1,24 +1,24 @@
 #include "sys.h"
 
-const size_t READ = 0x0;
-const size_t WRITE = 0x1;
-const size_t OPEN = 0x2;
-const size_t FSTAT = 0x5;
-const size_t WAITPID = 0x7;
-const size_t MALLOC = 0x9;
-const size_t CALLOC = 0xa;
-const size_t FREE = 0xb;
-const size_t REALLOC = 0xc;
-const size_t EXEC = 0x3b;
-const size_t EXIT = 0x3c;
+const size_t READ                 = 0x0;
+const size_t WRITE                = 0x1;
+const size_t OPEN                 = 0x2;
+const size_t FSTAT                = 0x5;
+const size_t WAITPID              = 0x7;
+const size_t MALLOC               = 0x9;
+const size_t CALLOC               = 0xa;
+const size_t FREE                 = 0xb;
+const size_t REALLOC              = 0xc;
+const size_t EXEC                 = 0x3b;
+const size_t EXIT                 = 0x3c;
 const size_t GET_CURRENT_DIR_NAME = 0x4f;
-const size_t CHDIR = 0x50;
-const size_t CREAT = 0x55;
-const size_t REMOVE_FILE = 0x57;
-const size_t READ_DIR = 0x59;
-const size_t TRUNCATE = 0x4c;
-const size_t FTRUNCATE = 0x4d;
-const size_t GETDENTS = 0x4E;
+const size_t CHDIR                = 0x50;
+const size_t CREAT                = 0x55;
+const size_t REMOVE_FILE          = 0x57;
+const size_t READ_DIR             = 0x59;
+const size_t TRUNCATE             = 0x4c;
+const size_t FTRUNCATE            = 0x4d;
+const size_t GETDENTS             = 0x4E;
 
 size_t
 syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
@@ -29,13 +29,12 @@ syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg
     register size_t rsi asm("rsi") = arg1;
     register size_t rdx asm("rdx") = arg2;
     register size_t r10 asm("r10") = arg3;
-    register size_t r8 asm("r8") = arg4;
-    register size_t r9 asm("r9") = arg5;
+    register size_t r8 asm("r8")   = arg4;
+    register size_t r9 asm("r9")   = arg5;
 
     asm volatile("syscall" ::"r"(rax), "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10),
-                 "r"(r8), "r"(r9));
-    asm("movq %%rax, %0;"
-        : "=r"(result));
+    "r"(r8), "r"(r9));
+    asm("movq %%rax, %0;" : "=r"(result));
 
     return result;
 }
@@ -50,7 +49,7 @@ syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg
  *
  * returns: The amount of bytes read or -1 on failure.
  */
-ssize_t read(int fd, void *buf, size_t count, size_t offset)
+ssize_t read(int fd, void* buf, size_t count, size_t offset)
 {
     return (ssize_t)syscall(READ, fd, (size_t)buf, count, offset, 0, 0);
 }
@@ -66,7 +65,7 @@ ssize_t read(int fd, void *buf, size_t count, size_t offset)
  *           Reading from a hole will return null bytes.
  * returns: 0 if the operation was successful, -1 otherwise.
  */
-int write(int fd, const void *buf, size_t count, size_t offset)
+int write(int fd, const void* buf, size_t count, size_t offset)
 {
     return (int)syscall(WRITE, fd, (size_t)buf, count, offset, 0, 0);
 }
@@ -79,7 +78,7 @@ int write(int fd, const void *buf, size_t count, size_t offset)
  *
  * returns: The file descriptor for the file on success or -1 otherwise.
  */
-int open(const char *pathname)
+int open(const char* pathname)
 {
     return (int)syscall(OPEN, (size_t)pathname, 0, 0, 0, 0, 0);
 }
@@ -93,7 +92,7 @@ int open(const char *pathname)
  *
  * returns: 0 if the file exists and -1 if it doesn't or if `fd` is negative.
  */
-int fstat(int fd, struct Stat *statbuf)
+int fstat(int fd, struct Stat* statbuf)
 {
     return (int)syscall(FSTAT, fd, (size_t)statbuf, 0, 0, 0, 0);
 }
@@ -111,7 +110,7 @@ int fstat(int fd, struct Stat *statbuf)
  *          - The process specified by `pid` does not exist.
  *          - The process specified by `pid` has already finished its execution.
  */
-int waitpid(pid_t pid, int *wstatus)
+int waitpid(pid_t pid, int* wstatus)
 {
     return (int)syscall(WAITPID, pid, (size_t)wstatus, 0, 0, 0, 0);
 }
@@ -123,9 +122,9 @@ int waitpid(pid_t pid, int *wstatus)
  *
  * returns: Apointer to the allocation or null on failure.
  */
-void *malloc(size_t size)
+void* malloc(size_t size)
 {
-    return (void *)syscall(MALLOC, size, 0, 0, 0, 0, 0);
+    return (void*)syscall(MALLOC, size, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -134,9 +133,9 @@ void *malloc(size_t size)
  * `nitems`: The number of elements to be allocated.
  * `size`: The size of each element.
  */
-void *calloc(size_t nitems, size_t size)
+void* calloc(size_t nitems, size_t size)
 {
-    return (void *)syscall(CALLOC, nitems, size, 0, 0, 0, 0);
+    return (void*)syscall(CALLOC, nitems, size, 0, 0, 0, 0);
 }
 
 /**
@@ -144,7 +143,7 @@ void *calloc(size_t nitems, size_t size)
  *
  * `ptr`: The pointer to the allocation that was returned from `malloc`.
  */
-void free(void *ptr)
+void free(void* ptr)
 {
     syscall(FREE, (size_t)ptr, 0, 0, 0, 0, 0);
 }
@@ -159,14 +158,14 @@ void free(void *ptr)
  *
  * returns: A pointer to a new allocation or null on failure.
  */
-void *realloc(void *ptr, size_t size)
+void* realloc(void* ptr, size_t size)
 {
     if (ptr == NULL)
     {
         return malloc(size);
     }
 
-    return (void *)syscall(REALLOC, (size_t)ptr, size, 0, 0, 0, 0);
+    return (void*)syscall(REALLOC, (size_t)ptr, size, 0, 0, 0, 0);
 }
 
 /**
@@ -177,7 +176,7 @@ void *realloc(void *ptr, size_t size)
  *
  * returns: The process ID of the new process if the operation was successful, -1 otherwise.
  */
-int exec(const char *pathname, char *const argv[])
+int exec(const char* pathname, char* const argv[])
 {
     return (int)syscall(EXEC, (size_t)pathname, (size_t)argv, 0, 0, 0, 0);
 }
@@ -203,9 +202,9 @@ void exit(int status)
  *          It is the user's responsibility to free the buffer with `free`.
  *          On failure, `NULL` is returned.
  */
-char *get_current_dir_name()
+char* get_current_dir_name()
 {
-    return (char *)syscall(GET_CURRENT_DIR_NAME, 0, 0, 0, 0, 0, 0);
+    return (char*)syscall(GET_CURRENT_DIR_NAME, 0, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -219,7 +218,7 @@ char *get_current_dir_name()
  *          - `path` does not exist.
  *          - `path` is not a directory.
  */
-int chdir(const char *path)
+int chdir(const char* path)
 {
     return (int)syscall(CHDIR, (size_t)path, 0, 0, 0, 0, 0);
 }
@@ -233,7 +232,7 @@ int chdir(const char *path)
  *
  * returns: The file descriptor of the new file if the operation was successful, -1 otherwise.
  */
-int creat(const char *path, bool_t directory)
+int creat(const char* path, bool_t directory)
 {
     return (int)syscall(CREAT, (size_t)path, (size_t)directory, 0, 0, 0, 0);
 }
@@ -246,7 +245,7 @@ int creat(const char *path, bool_t directory)
 ///
 /// # Returns
 /// 0 if the operation was successful, -1 otherwise.
-int remove_file(const char *path)
+int remove_file(const char* path)
 {
     return (int)syscall(REMOVE_FILE, (size_t)path, 0, 0, 0, 0, 0);
 }
@@ -263,7 +262,7 @@ int remove_file(const char *path)
  *          - `fd` is negative or invalid.
  *          - `fd` is not a directory.
  */
-int readdir(int fd, size_t offset, struct DirEntry *dirp)
+int readdir(int fd, size_t offset, struct DirEntry* dirp)
 {
     return (int)syscall(READ_DIR, fd, offset, (size_t)dirp, 0, 0, 0);
 }
@@ -279,7 +278,7 @@ int readdir(int fd, size_t offset, struct DirEntry *dirp)
  *
  * returns: 0 if the operation was successful, -1 otherwise.j
  */
-int truncate(const char *path, size_t length)
+int truncate(const char* path, size_t length)
 {
     return (int)syscall(TRUNCATE, (size_t)path, length, 0, 0, 0, 0);
 }
