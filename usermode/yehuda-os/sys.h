@@ -3,6 +3,8 @@
 
 #include "defines.h"
 
+#define FILE_NAME_LEN 21
+
 typedef long pid_t;
 
 struct Stat

@@ -70,7 +70,7 @@ unsafe fn handle_syscall(
         handlers::EXIT => handlers::exit(arg0 as i32),
         handlers::GET_CURRENT_DIR_NAME => handlers::get_current_dir_name() as i64,
         handlers::CHDIR => handlers::chdir(arg0 as *const u8),
-        handlers::CREAT => handlers::creat(arg0 as *mut u8, arg2 > 0) as i64,
+        handlers::CREAT => handlers::creat(arg0 as *mut u8, arg1 != 0) as i64,
         handlers::OPEN => handlers::open(arg0 as *const u8) as i64,
         handlers::FSTAT => handlers::fstat(arg0 as i32, arg1 as *mut handlers::Stat),
         handlers::WAITPID => handlers::waitpid(arg0 as i64, arg1 as *mut i32),

@@ -23,13 +23,13 @@ size_t
 syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
     size_t result;
-    register long rax asm("rax") = syscall_number;
-    register long rdi asm("rdi") = arg0;
-    register long rsi asm("rsi") = arg1;
-    register long rdx asm("rdx") = arg2;
-    register long r10 asm("r10") = arg3;
-    register long r8 asm("r8")   = arg4;
-    register long r9 asm("r9")   = arg5;
+    register size_t rax asm("rax") = syscall_number;
+    register size_t rdi asm("rdi") = arg0;
+    register size_t rsi asm("rsi") = arg1;
+    register size_t rdx asm("rdx") = arg2;
+    register size_t r10 asm("r10") = arg3;
+    register size_t r8 asm("r8")   = arg4;
+    register size_t r9 asm("r9")   = arg5;
 
     asm volatile("syscall" ::"r"(rax), "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10),
     "r"(r8), "r"(r9));
@@ -37,7 +37,6 @@ syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg
 
     return result;
 }
-
 
 /**
  * Read bytes from a file descriptor.
@@ -87,7 +86,8 @@ int open(const char* pathname)
  * Get information about a file.
  *
  * `fd`: The file descriptor of that file.
- * `statbuf`: Path to the file.
+ * `statbuf`: A buffer to the `Stat` struct that will contain the information about the file.
+ * The struct contains the file's size or for directories the amount of files in the directory.
  *
  * returns: 0 if the file exists and -1 if it doesn't or if `fd` is negative.
  */
@@ -259,7 +259,7 @@ int remove_file(const char* path)
  * returns: 0 on success, -1 on failure.
  *          Possible failures:
  *          - `fd` is negative or invalid.
- *          - `fd` is a directory.
+ *          - `fd` is not a directory.
  */
 int readdir(int fd, size_t offset, struct DirEntry* dirp)
 {

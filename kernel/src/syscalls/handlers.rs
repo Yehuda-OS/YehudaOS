@@ -302,20 +302,25 @@ pub unsafe fn open(pathname: *const u8) -> i32 {
 /// # Arguments
 /// - `fd` - The file descriptor of that file.
 /// - `statbuf` - A buffer to the `Stat` struct that will contain the information about the file.
+/// The struct contains the file's size or for directories the amount of files in the directory.
 ///
 /// # Returns
 /// 0 if the file exists and -1 if it doesn't or if `fd` is negative.
 pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
-    if fd < 0 {
+    let file_id;
+
+    if fd < RESERVED_FILE_DESCRIPTORS {
         return -1;
     }
 
-    if let Some(size) = fs::get_file_size(fd as usize) {
-        *statbuf = Stat {
-            size: size as u64,
-            // UNWRAP: We already checked that the file exists.
-            directory: fs::is_dir(fd as usize).unwrap(),
-        };
+    file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    if let Some(size) = fs::get_file_size(file_id) {
+        (*statbuf).size = size as u64;
+        (*statbuf).directory = fs::is_dir(file_id).unwrap();
+
+        if (*statbuf).directory {
+            (*statbuf).size /= core::mem::size_of::<DirEntry>() as u64;
+        }
 
         0
     } else {
@@ -428,13 +433,13 @@ pub unsafe fn truncate(path: *const u8, length: u64) -> i64 {
 /// 0 on success, -1 on failure.
 /// Possible failures:
 /// - `fd` is negative or invalid.
-/// - `fd` is a directory.
+/// - `fd` is not a directory.
 pub unsafe fn readdir(fd: i32, offset: usize, dirp: *mut DirEntry) -> i64 {
     let file_id;
 
     if fd >= RESERVED_FILE_DESCRIPTORS {
         file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
-        if fs::is_dir(file_id).unwrap_or(true) {
+        if !fs::is_dir(file_id).unwrap_or(false) {
             -1
         } else {
             if let Some(mut entry) = fs::read_dir(file_id, offset) {

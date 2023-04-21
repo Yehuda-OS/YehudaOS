@@ -31,7 +31,13 @@ char* strcpy(char* destination, const char* source)
 
 char* strncpy(char* dest, const char* src, size_t n)
 {
-    size_t i;
+    size_t i = 0;
+
+    if ((dest == NULL) || (src == NULL))
+    {
+        return NULL;
+    }
+
 
     for (i = 0; i < n && src[i] != '\0'; i++)
     {
@@ -142,7 +148,7 @@ void print_str(const char* str)
 }
 
 /**
- * Print the '\n' character.
+ * Print the \n character.
  */
 void print_newline()
 {
@@ -190,4 +196,35 @@ void int_to_string(int num, char* buffer)
         buffer[i] = '0' + (num % 10);
         num /= 10;
     }
+}
+
+char* strcat(char* dst, const char* src)
+{
+    char* ptr = dst + strlen(dst);
+
+    // appends characters of the source to the destination string
+    while (*src != '\0')
+    {
+        *ptr++ = *src++;
+    }
+
+    // null terminate destination string
+    *ptr = '\0';
+
+    // the destination is returned by standard `strcat()`
+    return dst;
+}
+
+char* strrchr(const char* str, int c)
+{
+    const char* p = str + strlen(str); // start at the end of the string
+    while (p >= str)
+    {
+        if (*p == c)
+        {
+            return (char*)p;
+        }
+        p--;
+    }
+    return NULL;
 }

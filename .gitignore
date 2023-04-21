@@ -5,3 +5,4 @@ target/
 limine/
 # fleet configuration files
 .fleet/
+.vscode
