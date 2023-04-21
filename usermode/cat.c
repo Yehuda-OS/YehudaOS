@@ -3,6 +3,14 @@
 
 int main(int argc, char **argv)
 {
+    if (argc < 2)
+    {
+        print_str("cat: missing file operand");
+        print_newline();
+        print_str("Usage: cat <file>");
+        print_newline();
+        return 1;
+    }
     int fd = open(argv[1]);
     if (fd == -1)
     {

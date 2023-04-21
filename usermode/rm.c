@@ -23,6 +23,7 @@ int main(int argc, char **argv)
         print_newline();
         print_str("Usage: rm <file>");
         print_newline();
+        return 1;
     }
     int fd = open(argv[1]);
 

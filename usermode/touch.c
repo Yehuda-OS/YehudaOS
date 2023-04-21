@@ -23,6 +23,7 @@ int main(int argc, char **argv)
         print_newline();
         print_str("Usage: touch <file>");
         print_newline();
+        return 1;
     }
     char *slash = strrchr(argv[1], '/');
 
