@@ -10,8 +10,6 @@ char* strncpy(char* dest, const char* src, size_t n);
 
 int strcmp(const char* str1, const char* str2);
 
-int strcmp(const char* str1, const char* str2);
-
 int isspace(int c);
 
 void free_array(void** arr, size_t size);

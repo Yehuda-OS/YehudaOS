@@ -34,7 +34,9 @@ char* strncpy(char* dest, const char* src, size_t n)
     size_t i = 0;
 
     if ((dest == NULL) || (src == NULL))
+    {
         return NULL;
+    }
 
 
     for (i = 0; i < n && src[i] != '\0'; i++)
