@@ -5,7 +5,7 @@
 
 int main(int argc, char* argv[])
 {
-    int fd                  = open(argc > 1 ? "." : argv[1]);
+    int fd                  = open(argc > 1 ? argv[1] : ".");
     struct Stat ls_dir_stat = { .size = 0, .directory = 0 };
     struct Stat child_stat  = { .size = 0, .directory = 0 };
     struct DirEntry entry   = { .id = 0, .name = 0 };
@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
 
     for (size_t i = 0; i < ls_dir_stat.size; i++)
     {
-        if (readdir(fd, 0, &entry) == -1 || fstat((int)entry.id, &child_stat) == -1)
+        if (readdir(fd, i, &entry) == -1 || fstat((int)entry.id, &child_stat) == -1)
         {
             print_str("ls: failed to read directory\n");
 
