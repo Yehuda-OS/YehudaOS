@@ -3,20 +3,21 @@
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2)
+    int fd = 0;
+
+    if (argc <= 1)
     {
-        print_str("edit: missing file operand");
-        print_newline();
-        print_str("Usage: edit <file>");
-        print_newline();
+        print_str("edit: missing file operand\n"
+                  "Usage: edit <file>\n");
+
         return 1;
     }
 
-    int fd = open(argv[1]);
+    fd = open(argv[1]);
     if (fd == -1)
     {
-        print_str("File does not exist.");
-        print_newline();
+        print_str("edit: file does not exist.\n");
+
         return 1;
     }
 
@@ -40,15 +41,15 @@ int main(int argc, char* argv[])
     while (1)
     {
         curr_line = getline();
-        strcat(content, curr_line);
-        strcat(content, " \n");
 
         if (strlen(curr_line) == 0 || curr_line == NULL)
         {
             break;
         }
-
-        curr_line[0] = '\0';
+        strcat(content, curr_line);
+        strcat(content, " \n");
+        free(curr_line);
+        curr_line = NULL;
     }
 
     write(fd, content, strlen(content), 0);

@@ -19,29 +19,17 @@ int main(int argc, char** argv)
 {
     if (argc < 2)
     {
-        print_str("mkdir: missing file operand");
-        print_newline();
-        print_str("Usage: mkdir <dir_name>");
-        print_newline();
+        print_str("mkdir: missing file operand\n"
+                  "Usage: mkdir <dir_name>\n");
+
         return 1;
     }
-    char* slash = strrchr(argv[1], '/');
-
-    if (slash != NULL)
+    if (creat(argv[1], TRUE) == -1)
     {
-        int idx = (int)(slash - argv[1]);
-        char path[idx + 2];
-        strncpy(path, argv[1], idx + 1);
+        print_str("touch: failed to create file\n");
 
-        if (open(path) == -1)
-        {
-            print_str("invalid path");
-            print_newline();
-            return 1;
-        }
+        return 1;
     }
-    creat(argv[1], TRUE);
-    free(slash);
 
     return 0;
 }
