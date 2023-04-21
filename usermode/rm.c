@@ -29,18 +29,6 @@ int main(int argc, char **argv)
 
     if (fd != -1)
     {
-        if (slash != NULL)
-        {
-            int idx = (int)(slash - argv[1]);
-            char path[idx + 2];
-            strncpy(path, argv[1], idx + 1);
-            if (open(path) == -1)
-            {
-                print_str("invalid path");
-                print_newline();
-                return 0;
-            }
-        }
         struct Stat stat = {.directory = 0, .size = 0};
         fstat(fd, &stat);
         if (stat.directory == TRUE)
