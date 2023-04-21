@@ -34,12 +34,16 @@ int main(int argc, char **argv)
 
         if (open(path) == -1)
         {
+            free_array(path, idx + 2);
             print_str("invalid path");
             print_newline();
-            return 0;
+            return 1;
         }
+
+        free_array(path, idx + 2);
     }
     creat(argv[1], TRUE);
+    free(slash);
 
     return 0;
 }

@@ -24,7 +24,6 @@ int main(int argc, char **argv)
         print_str("Usage: rmdir <dir_name>");
         print_newline();
     }
-    char *slash = strrchr(argv[1], '/');
     int fd = open(argv[1]);
 
     if (fd != -1)
