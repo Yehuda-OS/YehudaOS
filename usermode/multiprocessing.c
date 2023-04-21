@@ -12,7 +12,7 @@ int main()
     for (int i = 0; i < NUM_OF_PROCESSES; i++)
     {
         print_str("Creating process\n");
-        pids[i] = exec("./repeat", args);
+        pids[i] = exec("/repeat", args);
         if (pids[i] == -1)
         {
             print_str("execution of one of the processes failed\n");
