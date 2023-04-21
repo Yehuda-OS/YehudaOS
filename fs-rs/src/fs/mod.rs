@@ -57,6 +57,7 @@ pub struct DirListEntry {
 }
 
 #[derive(Clone, PartialEq, Eq, Default)]
+#[repr(C)]
 pub struct DirEntry {
     pub name: [u8; FILE_NAME_LEN],
     pub id: usize,
@@ -643,6 +644,7 @@ pub fn create_file(path_str: &str, directory: bool, cwd: Option<usize>) -> Resul
                 name[i] = temp[i];
             }
         }
+        name[FILE_NAME_LEN - 1] = 0;
 
         name
     };
