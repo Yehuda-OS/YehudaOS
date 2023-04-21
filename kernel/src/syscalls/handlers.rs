@@ -308,13 +308,16 @@ pub unsafe fn open(pathname: *const u8) -> i32 {
 /// # Returns
 /// 0 if the file exists and -1 if it doesn't or if `fd` is negative.
 pub unsafe fn fstat(fd: i32, statbuf: *mut Stat) -> i64 {
-    if fd < 0 {
+    let file_id;
+
+    if fd < RESERVED_FILE_DESCRIPTORS {
         return -1;
     }
 
-    if let Some(size) = fs::get_file_size((fd - RESERVED_FILE_DESCRIPTORS) as usize) {
+    file_id = (fd - RESERVED_FILE_DESCRIPTORS) as usize;
+    if let Some(size) = fs::get_file_size(file_id) {
         (*statbuf).size = size as u64;
-        (*statbuf).directory = fs::is_dir(fd as usize).unwrap();
+        (*statbuf).directory = fs::is_dir(file_id).unwrap();
 
         if (*statbuf).directory {
             (*statbuf).size /= core::mem::size_of::<DirEntry>() as u64;
