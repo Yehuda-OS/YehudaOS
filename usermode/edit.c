@@ -1,7 +1,7 @@
 #include "yehuda-os/helpers.h"
 #include "yehuda-os/sys.h"
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     if (argc < 2)
     {

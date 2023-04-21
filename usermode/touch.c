@@ -15,7 +15,7 @@ __attribute__((force_align_arg_pointer)) void _start()
     __builtin_unreachable();
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc < 2)
     {
@@ -25,7 +25,7 @@ int main(int argc, char **argv)
         print_newline();
         return 1;
     }
-    char *slash = strrchr(argv[1], '/');
+    char* slash = strrchr(argv[1], '/');
 
     if (slash != NULL)
     {

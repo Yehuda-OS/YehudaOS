@@ -1,12 +1,12 @@
 #include "yehuda-os/helpers.h"
 #include "yehuda-os/sys.h"
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    int fd = open(argc > 1 ? argv[1] : ".");
-    struct Stat ls_dir_stat = {.size = 0, .directory = 0};
-    struct Stat child_stat = {.size = 0, .directory = 0};
-    struct DirEntry entry = {.id = 0, .name = 0};
+    int fd                  = open(argc > 1 ? argv[1] : ".");
+    struct Stat ls_dir_stat = { .size = 0, .directory = 0 };
+    struct Stat child_stat  = { .size = 0, .directory = 0 };
+    struct DirEntry entry   = { .id = 0, .name = 0 };
 
     if (fstat(fd, &ls_dir_stat) == -1)
     {

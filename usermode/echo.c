@@ -15,7 +15,7 @@ __attribute__((force_align_arg_pointer)) void _start()
     __builtin_unreachable();
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc == 1)
     {
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
         {
             len += strlen(argv[i]) + 1;
         }
-        char *msg = (char *)calloc(len, sizeof(char));
+        char* msg = (char*)calloc(len, sizeof(char));
         for (int i = 1; i < argc; i++)
         {
             strcat(msg, argv[i]);
