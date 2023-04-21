@@ -5,9 +5,9 @@
 
 int main()
 {
-    int status                   = 0;
-    pid_t pids[NUM_OF_PROCESSES] = { 0, 0, 0, 0, 0 };
-    char* const args[]           = { "./repeat", "a", NULL };
+    int status = 0;
+    pid_t pids[NUM_OF_PROCESSES] = {0, 0, 0, 0, 0};
+    char *const args[] = {"./repeat", "a", NULL};
 
     for (int i = 0; i < NUM_OF_PROCESSES; i++)
     {

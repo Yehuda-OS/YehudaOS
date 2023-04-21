@@ -32,8 +32,6 @@ int main(int argc, char **argv)
     print_str(buf);
     print_newline();
 
-    free_array(&buf, stat.size);
-
     return 0;
 }
 
