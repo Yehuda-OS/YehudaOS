@@ -15,7 +15,7 @@ __attribute__((force_align_arg_pointer)) void _start()
     __builtin_unreachable();
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     if (argc <= 1)
     {
@@ -23,6 +23,30 @@ int main(int argc, char** argv)
                   "Usage: touch <file>\n");
 
         return 1;
+    }
+    char *slash = NULL;
+    if ((slash = strrchr(argv[1], '/')) != NULL)
+    {
+        struct Stat stat = {.directory = 0, .size = 0};
+        char *path = malloc((slash - argv[1]) * sizeof(char));
+        size_t len = (slash - argv[1]) + 1; // Calculate the length of the substring
+        strncpy(path, argv[1], len);        // Copy the substring to dest
+        path[len] = '\0';                   // Null-terminate dest
+
+        print_str(path);
+        print_newline();
+        int fd = open(path);
+        if (fd != -1)
+        {
+            fstat(fd, &stat);
+            if (stat.directory == FALSE)
+            {
+                print_str("path is a file and not a folder");
+                print_newline();
+                return 1;
+            }
+        }
+        free(path);
     }
     if (creat(argv[1], FALSE) == -1)
     {
