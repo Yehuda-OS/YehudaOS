@@ -26,15 +26,9 @@ int main(int argc, char** argv)
         int len = 0;
         for (int i = 1; i < argc; i++)
         {
-            len += strlen(argv[i]) + 1;
+            print_str(argv[i]);
+            print_str(" ");
         }
-        char* msg = (char*)calloc(len, sizeof(char));
-        for (int i = 1; i < argc; i++)
-        {
-            strcat(msg, argv[i]);
-            strcat(msg, " ");
-        }
-        print_str(msg);
         print_newline();
     }
 
