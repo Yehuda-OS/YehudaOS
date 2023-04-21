@@ -31,20 +31,22 @@ char* strcpy(char* destination, const char* source)
 
 char* strncpy(char* dest, const char* src, size_t n)
 {
-    if ((dest == NULL) && (src == NULL))
+    size_t i = 0;
+
+    if ((dest == NULL) || (src == NULL))
         return NULL;
 
-    char* start = dest;
 
-    while (*src && n--)
+    for (i = 0; i < n && src[i] != '\0'; i++)
     {
-        *dest = *src;
-        dest++;
-        src++;
+        dest[i] = src[i];
+    }
+    for (; i < n; i++)
+    {
+        dest[i] = '\0';
     }
 
-    *dest = '\0';
-    return start;
+    return dest;
 }
 
 int strcmp(const char* str1, const char* str2)
