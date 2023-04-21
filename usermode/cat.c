@@ -1,34 +1,38 @@
-#include "yehuda-os/sys.h"
 #include "yehuda-os/helpers.h"
+#include "yehuda-os/sys.h"
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    if (argc < 2)
+    int fd           = 0;
+    struct Stat stat = { .directory = 0, .size = 0 };
+    char* buf        = NULL;
+
+    if (argc <= 1)
     {
-        print_str("cat: missing file operand");
-        print_newline();
-        print_str("Usage: cat <file>");
-        print_newline();
+        print_str("cat: missing file operand\n"
+                  "Usage: cat <file>\n");
+
         return 1;
     }
-    int fd = open(argv[1]);
+
+    fd = open(argv[1]);
     if (fd == -1)
     {
-        print_str("File does not exist.");
-        print_newline();
+        print_str("cat: file does not exist\n");
+
         return 1;
     }
-    struct Stat stat = {.directory = 0, .size = 0};
     fstat(fd, &stat);
     if (stat.directory == TRUE)
     {
-        print_str("Specified path is not a file.");
-        print_newline();
+        print_str("cat: specified path is not a file\n");
+
         return 1;
     }
 
-    char buf[stat.size];
-    read(fd, (void *)buf, stat.size, 0);
+    buf = malloc(stat.size + 1);
+    read(fd, (void*)buf, stat.size, 0);
+    buf[stat.size] = '\0';
     print_str(buf);
     print_newline();
 
