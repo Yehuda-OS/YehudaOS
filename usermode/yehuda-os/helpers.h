@@ -24,4 +24,6 @@ void print_newline();
 
 void int_to_string(int num, char *buffer);
 
+char *strrchr(const char *str, int c);
+
 #endif // YEHUDAOS_HELPERS

@@ -1,7 +1,7 @@
 #ifndef YEHUDAOS_DEFINES
 #define YEHUDAOS_DEFINES
 
-#define NULL ((void*)0)
+#define NULL ((void *)0)
 #define FALSE 0
 #define TRUE !FALSE
 #define STDIN 0

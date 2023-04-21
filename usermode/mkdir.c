@@ -19,9 +19,9 @@ int main(int argc, char **argv)
 {
     if (argc < 2)
     {
-        print_str("touch: missing file operand");
+        print_str("mkdir: missing file operand");
         print_newline();
-        print_str("Usage: touch <file>");
+        print_str("Usage: mkdir <dir_name>");
         print_newline();
     }
     char *slash = strrchr(argv[1], '/');
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
             return 0;
         }
     }
-    creat(argv[1], FALSE);
+    creat(argv[1], TRUE);
 
     return 0;
 }
