@@ -93,8 +93,10 @@ pub unsafe fn add_processes() -> Result<(), FsError> {
     add_executable("/touch", include_bytes!("../bin/touch"))?;
     add_executable("/mkdir", include_bytes!("../bin/mkdir"))?;
     add_executable("/ls", include_bytes!("../bin/ls"))?;
+    add_executable("/rm", include_bytes!("../bin/rm"))?;
     add_executable("/repeat", include_bytes!("../bin/repeat"))?;
     add_executable("/multiprocessing", include_bytes!("../bin/multiprocessing"))?;
+    add_executable("/rmdir", include_bytes!("../bin/rmdir"))?;
 
     scheduler::add_to_the_queue(
         scheduler::Process::new_user_process(shell as u64, "/", &Vec::new())

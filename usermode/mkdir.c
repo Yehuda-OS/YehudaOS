@@ -31,8 +31,6 @@ int main(int argc, char **argv)
         int idx = (int)(slash - argv[1]);
         char path[idx + 2];
         strncpy(path, argv[1], idx + 1);
-        print_str(path);
-        print_newline();
 
         if (open(path) == -1)
         {
