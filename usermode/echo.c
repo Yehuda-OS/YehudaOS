@@ -15,7 +15,7 @@ __attribute__((force_align_arg_pointer)) void _start()
     __builtin_unreachable();
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     if (argc == 1)
     {
@@ -23,7 +23,6 @@ int main(int argc, char** argv)
     }
     else
     {
-        int len = 0;
         for (int i = 1; i < argc; i++)
         {
             print_str(argv[i]);
