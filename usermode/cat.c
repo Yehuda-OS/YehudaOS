@@ -19,7 +19,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    read return 0;
+    char buf[stat.size];
+    read(fd, (void *)buf, stat.size, 0);
+    print_str(buf);
+    print_newline();
+
+    free_array(&buf, stat.size);
+
+    return 0;
 }
 
 // Tell the compiler incoming stack alignment is not RSP%16==8 or ESP%16==12

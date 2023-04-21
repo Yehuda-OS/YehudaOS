@@ -40,7 +40,7 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        free_array(path, idx + 2);
+        free_array(&path, idx + 2);
     }
     creat(argv[1], TRUE);
     free(slash);

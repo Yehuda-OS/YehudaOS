@@ -39,7 +39,7 @@ int main(int argc, char **argv)
             print_newline();
             return 1;
         }
-        free_array(path, idx + 2);
+        free_array(&path, idx + 2);
     }
     creat(argv[1], FALSE);
     free(slash);
