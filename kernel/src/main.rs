@@ -98,6 +98,8 @@ pub unsafe fn add_processes() -> Result<(), FsError> {
     add_executable("/multiprocessing", include_bytes!("../bin/multiprocessing"))?;
     add_executable("/rmdir", include_bytes!("../bin/rmdir"))?;
     add_executable("/cat", include_bytes!("../bin/cat"))?;
+    add_executable("/edit", include_bytes!("../bin/edit"))?;
+    add_executable("/echo", include_bytes!("../bin/echo"))?;
     scheduler::add_to_the_queue(
         scheduler::Process::new_user_process(shell as u64, "/", &Vec::new())
             .map_err(|_| FsError::NotEnoughDiskSpace)?,

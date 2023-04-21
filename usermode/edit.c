@@ -20,6 +20,20 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // clear the file memory
+    struct Stat stat = {.directory = 0, .size = 0};
+    fstat(fd, &stat);
+
+    if (stat.directory == TRUE)
+    {
+        print_str("cant edit a folder");
+        print_newline();
+        return 1;
+    }
+
+    char *empty = (char *)calloc(stat.size, sizeof(char));
+    write(fd, (void *)empty, stat.size, 0);
+
     char *curr_line = NULL;
     char content[1024] = "";
 
@@ -39,6 +53,7 @@ int main(int argc, char *argv[])
 
     write(fd, content, strlen(content), 0);
     free(curr_line);
+    free(empty);
 
     return 0;
 }
