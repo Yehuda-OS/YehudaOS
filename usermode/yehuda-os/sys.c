@@ -18,7 +18,6 @@ const size_t REMOVE_FILE          = 0x57;
 const size_t READ_DIR             = 0x59;
 const size_t TRUNCATE             = 0x4c;
 const size_t FTRUNCATE            = 0x4d;
-const size_t GETDENTS             = 0x4E;
 
 size_t
 syscall(size_t syscall_number, size_t arg0, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
