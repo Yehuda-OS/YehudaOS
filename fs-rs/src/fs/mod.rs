@@ -20,7 +20,7 @@ pub type DirList = Vec<DirListEntry>;
 
 const FS_MAGIC: [u8; 4] = *b"FSRS";
 const CURR_VERSION: u8 = 0x1;
-pub const FILE_NAME_LEN: usize = 11;
+pub const FILE_NAME_LEN: usize = 21;
 const BLOCK_SIZE: usize = 4096;
 const BITS_IN_BYTE: usize = 8;
 const BYTES_PER_INODE: usize = 16 * 1024;
@@ -485,11 +485,15 @@ const fn calc_parts(device_size: usize) -> DiskParts {
 /// - `folder` - The folder to add to.
 fn add_special_folders(containing_folder: &Inode, folder: &mut Inode) {
     let dot = DirEntry {
-        name: ['.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        name: [
+            '.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
         id: folder.id(),
     };
     let dot_dot = DirEntry {
-        name: ['.' as u8, '.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        name: [
+            '.' as u8, '.' as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
         id: containing_folder.id(),
     };
 
