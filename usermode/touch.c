@@ -33,13 +33,11 @@ int main(int argc, char **argv)
         strncpy(path, argv[1], len);        // Copy the substring to dest
         path[len] = '\0';                   // Null-terminate dest
 
-        print_str(path);
-        print_newline();
         int fd = open(path);
         if (fd != -1)
         {
             fstat(fd, &stat);
-            if (stat.directory == FALSE)
+            if (!stat.directory)
             {
                 print_str("path is a file and not a folder");
                 print_newline();
