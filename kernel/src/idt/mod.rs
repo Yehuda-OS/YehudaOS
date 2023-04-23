@@ -195,18 +195,21 @@ impl Idt {
 }
 
 unsafe fn divide_by_zero_handler(stack_frame: &InterruptStackFrame) -> ! {
-    println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
+    crate::memory::load_tables_to_cr3(crate::memory::get_page_table());
+    print!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", unsafe {
         &*stack_frame
     });
     loop {}
 }
 
 unsafe fn breakpoint_handler(stack_frame: &InterruptStackFrame) {
+    crate::memory::load_tables_to_cr3(crate::memory::get_page_table());
     print!("EXCEPTION: BREAKPOINT");
     loop {}
 }
 
 unsafe fn double_fault_handler(stack_frame: &InterruptStackFrame) -> ! {
+    crate::memory::load_tables_to_cr3(crate::memory::get_page_table());
     print!("EXCEPTION: double fault occured");
     loop {}
 }
@@ -243,6 +246,7 @@ unsafe fn page_fault_handler(
 
         crate::scheduler::load_from_queue();
     } else {
+        crate::memory::load_tables_to_cr3(crate::memory::get_page_table());
         println!("============");
         println!("|Page Fault|");
         println!("============");
